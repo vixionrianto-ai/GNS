@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\ProfileController;
@@ -8,6 +9,22 @@ use App\Http\Controllers\PaketController;
 use App\Http\Controllers\PelangganController;
 use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\PembayaranController;
+use App\Http\Controllers\DashboardController;
+
+
+
+use App\Models\Router;
+use App\Services\MikroTikService;
+
+Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
+
+    $router = Router::first();
+
+    dd([
+        'identity' => $mikrotik->getIdentity($router),
+        'version' => $mikrotik->getRouterVersion($router),
+    ]);
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -16,12 +33,16 @@ use App\Http\Controllers\PembayaranController;
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return view('auth.login');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware('auth')
+    ->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------

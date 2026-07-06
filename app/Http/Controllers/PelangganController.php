@@ -237,7 +237,16 @@ class PelangganController extends Controller
 
             DB::rollBack();
 
-            dd($e->getMessage());
+            \Log::error('Gagal menambah pelanggan', [
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'mikrotik' => $e->getMessage(),
+                ]);
 
         }
 
@@ -471,22 +480,23 @@ class PelangganController extends Controller
                     'success',
                     'Data pelanggan berhasil diperbarui.'
                 );
-
         } catch (Exception $e) {
-
             DB::rollBack();
+
+            \Log::error('Gagal memperbarui pelanggan', [
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
 
             return back()
                 ->withInput()
-                ->withErrors(
-                    $e->getMessage()
-                );
-
+                ->withErrors([
+                    'mikrotik' => $e->getMessage(),
+                ]);
         }
-
     }
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | SINKRONISASI PPP SECRET MIKROTIK
     |--------------------------------------------------------------------------

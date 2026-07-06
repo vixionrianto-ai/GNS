@@ -48,7 +48,8 @@ class PembayaranService
             |--------------------------------------------------------------------------
             */
 
-            $total = $tagihan->nominal + $tagihan->denda;
+            $biayaAdmin = (float) ($data['biaya_admin'] ?? 0);
+            $total = $tagihan->nominal + $tagihan->denda + $biayaAdmin;
 
             if ($data['dibayar'] < $total) {
 
@@ -76,7 +77,7 @@ class PembayaranService
 
                 'nominal'      => $tagihan->nominal,
 
-                'biaya_admin'  => $data['biaya_admin'] ?? 0,
+                'biaya_admin'  => $biayaAdmin,
 
                 'total_bayar'  => $total,
 
@@ -116,23 +117,8 @@ class PembayaranService
                 $pelanggan &&
                 $pelanggan->mikrotik_secret_id
             ) {
-
-                $this->mikrotik->enableSecretById(
-
-                    $pelanggan->router,
-
-                    $pelanggan->mikrotik_secret_id
-
-                );
-
-                /*
-                |--------------------------------------------------------------------------
-                | PUTUSKAN SESSION AGAR LOGIN ULANG
-                |--------------------------------------------------------------------------
-                */
-
-                $this->mikrotik
-                    ->disconnectActiveSessionBySecretId(
+                try {
+                    $this->mikrotik->enableSecretById(
 
                         $pelanggan->router,
 
@@ -140,6 +126,28 @@ class PembayaranService
 
                     );
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PUTUSKAN SESSION AGAR LOGIN ULANG
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $this->mikrotik
+                        ->disconnectActiveSessionBySecretId(
+
+                            $pelanggan->router,
+
+                            $pelanggan->mikrotik_secret_id
+
+                        );
+                } catch (\Throwable $e) {
+                    \Log::warning('Gagal memperbarui status PPP secret saat pembayaran', [
+                        'tagihan_id' => $tagihan->id,
+                        'pelanggan_id' => $pelanggan->id,
+                        'mikrotik_secret_id' => $pelanggan->mikrotik_secret_id,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
             }
 
             return $pembayaran;

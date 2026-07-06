@@ -33,7 +33,8 @@ class PembayaranController extends Controller
     public function show(Pembayaran $pembayaran)
     {
         $pembayaran->load([
-            'tagihan.pelanggan',
+            'tagihan.pelanggan.paket',
+            'tagihan.pelanggan.router',
             'user',
         ]);
 
@@ -61,17 +62,23 @@ class PembayaranController extends Controller
         PembayaranRequest $request,
         PembayaranService $service
     ) {
-
-        $service->bayar(
-            $request->validated()
-        );
-
-        return redirect()
-            ->route('tagihan.index')
-            ->with(
-                'success',
-                'Pembayaran berhasil disimpan.'
+        try {
+            $service->bayar(
+                $request->validated()
             );
 
+            return redirect()
+                ->route('tagihan.index')
+                ->with(
+                    'success',
+                    'Pembayaran berhasil disimpan.'
+                );
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'message' => $e->getMessage(),
+                ]);
+        }
     }
 }
