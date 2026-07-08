@@ -9,16 +9,16 @@
 
 <div class="flex justify-between items-center mb-6">
 <div>
-<h3 class="text-2xl font-bold">{{ \$pembayaran->tagihan->invoice_no }}</h3>
+<h3 class="text-2xl font-bold">{{ $pembayaran->tagihan->invoice_no }}</h3>
 <p class="text-gray-500">
 Tanggal Bayar :
-{{ optional(\$pembayaran->tanggal_bayar)->format('d-m-Y') }}
+{{ optional($pembayaran->tanggal_bayar)->format('d-m-Y') }}
 </p>
 </div>
 
-@if(\$pembayaran->isBerhasil())
+@if($pembayaran->isBerhasil())
 <span class="px-3 py-1 rounded bg-green-600 text-white">Berhasil</span>
-@elseif(\$pembayaran->isPending())
+@elseif($pembayaran->isPending())
 <span class="px-3 py-1 rounded bg-yellow-500 text-white">Pending</span>
 @else
 <span class="px-3 py-1 rounded bg-red-600 text-white">Dibatalkan</span>
@@ -27,17 +27,17 @@ Tanggal Bayar :
 
 <table class="table-auto w-full">
 <tbody>
-<tr><td class="font-semibold py-2 w-56">Pelanggan</td><td>{{ \$pembayaran->tagihan->pelanggan->nama }}</td></tr>
-<tr><td class="font-semibold py-2">Username PPPoE</td><td>{{ \$pembayaran->tagihan->pelanggan->username_pppoe }}</td></tr>
-<tr><td class="font-semibold py-2">Paket</td><td>{{ \$pembayaran->tagihan->pelanggan->paket->nama_paket ?? '-' }}</td></tr>
-<tr><td class="font-semibold py-2">Metode</td><td>{{ \$pembayaran->metode }}</td></tr>
-<tr><td class="font-semibold py-2">Nominal</td><td>Rp {{ number_format(\$pembayaran->nominal,0,',','.') }}</td></tr>
-<tr><td class="font-semibold py-2">Biaya Admin</td><td>Rp {{ number_format(\$pembayaran->biaya_admin,0,',','.') }}</td></tr>
-<tr><td class="font-semibold py-2">Total Bayar</td><td>Rp {{ number_format(\$pembayaran->total_bayar,0,',','.') }}</td></tr>
-<tr><td class="font-semibold py-2">Dibayar</td><td>Rp {{ number_format(\$pembayaran->dibayar,0,',','.') }}</td></tr>
-<tr><td class="font-semibold py-2">Kembalian</td><td>Rp {{ number_format(\$pembayaran->kembalian,0,',','.') }}</td></tr>
-<tr><td class="font-semibold py-2">Kasir</td><td>{{ \$pembayaran->user->name ?? '-' }}</td></tr>
-<tr><td class="font-semibold py-2">Keterangan</td><td>{{ \$pembayaran->keterangan ?: '-' }}</td></tr>
+<tr><td class="font-semibold py-2 w-56">Pelanggan</td><td>{{ $pembayaran->tagihan->pelanggan->nama }}</td></tr>
+<tr><td class="font-semibold py-2">Username PPPoE</td><td>{{ $pembayaran->tagihan->pelanggan->username_pppoe }}</td></tr>
+<tr><td class="font-semibold py-2">Paket</td><td>{{ $pembayaran->tagihan->pelanggan->paket->nama_paket ?? '-' }}</td></tr>
+<tr><td class="font-semibold py-2">Metode</td><td>{{ $pembayaran->metode }}</td></tr>
+<tr><td class="font-semibold py-2">Nominal</td><td>Rp {{ number_format($pembayaran->nominal,0,',','.') }}</td></tr>
+<tr><td class="font-semibold py-2">Biaya Admin</td><td>Rp {{ number_format($pembayaran->biaya_admin,0,',','.') }}</td></tr>
+<tr><td class="font-semibold py-2">Total Bayar</td><td>Rp {{ number_format($pembayaran->total_bayar,0,',','.') }}</td></tr>
+<tr><td class="font-semibold py-2">Dibayar</td><td>Rp {{ number_format($pembayaran->dibayar,0,',','.') }}</td></tr>
+<tr><td class="font-semibold py-2">Kembalian</td><td>Rp {{ number_format($pembayaran->kembalian,0,',','.') }}</td></tr>
+<tr><td class="font-semibold py-2">Kasir</td><td>{{ $pembayaran->user->name ?? '-' }}</td></tr>
+<tr><td class="font-semibold py-2">Keterangan</td><td>{{ $pembayaran->keterangan ?: '-' }}</td></tr>
 </tbody>
 </table>
 

@@ -27,26 +27,20 @@ class Pembayaran extends Model
 
     protected $fillable = [
 
+        'invoice_no',
+        'invoice_date',
+        'invoice_pdf',
+
         'tagihan_id',
-
         'user_id',
-
         'tanggal_bayar',
-
         'metode',
-
         'nominal',
-
         'biaya_admin',
-
         'total_bayar',
-
         'dibayar',
-
         'kembalian',
-
         'status',
-
         'keterangan',
 
     ];

@@ -191,7 +191,16 @@ Route::middleware('auth')->group(function () {
             'show',
             'store',
         ]);
+        Route::get(
+            '/pembayaran/{pembayaran}/invoice',
+            [PembayaranController::class, 'invoice']
+        )->name('pembayaran.invoice');
 
+        Route::get(
+            '/pembayaran/{pembayaran}/pdf',
+            [PembayaranController::class, 'pdf']
+        )->name('pembayaran.pdf');
+        
     /*
     |--------------------------------------------------------------------------
     | PROFILE

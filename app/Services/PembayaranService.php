@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
+use App\Services\InvoiceService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -11,11 +12,14 @@ use Exception;
 class PembayaranService
 {
     protected MikroTikService $mikrotik;
-
-    public function __construct(MikroTikService $mikrotik)
-    {
-        $this->mikrotik = $mikrotik;
-    }
+    protected InvoiceService $invoiceService;
+    public function __construct(
+            MikroTikService $mikrotik,
+            InvoiceService $invoiceService
+        ) {
+            $this->mikrotik = $mikrotik;
+            $this->invoiceService = $invoiceService;
+        }
 
     /**
      * Proses pembayaran tagihan
@@ -64,8 +68,13 @@ class PembayaranService
             | SIMPAN PEMBAYARAN
             |--------------------------------------------------------------------------
             */
-
+            $invoiceNo = $this->invoiceService->generate();
             $pembayaran = Pembayaran::create([
+                'invoice_no'   => $invoiceNo,
+
+                'invoice_date' => now(),
+
+                'invoice_pdf'  => null,
 
                 'tagihan_id'   => $tagihan->id,
 
