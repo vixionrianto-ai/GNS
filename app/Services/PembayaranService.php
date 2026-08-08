@@ -213,6 +213,14 @@ class PembayaranService
                 $dibayar
             );
 
+            $nominalBersih = $dibayar - $biayaAdmin;
+
+            if ($nominalBersih <= 0) {
+                throw new Exception(
+                    'Nominal pembayaran harus lebih besar dari biaya admin.'
+                );
+            }
+
             /*
             |--------------------------------------------------------------------------
             | Simpan Pembayaran
@@ -230,12 +238,14 @@ class PembayaranService
             |--------------------------------------------------------------------------
             | Alokasi Pembayaran (FIFO / Cicilan / Saldo)
             |--------------------------------------------------------------------------
+            | Yang dialokasikan hanya nominal bersih setelah biaya admin.
+            | Biaya admin tidak boleh mengurangi sisa tagihan.
             */
 
             $this->paymentAllocationService->allocate(
                 $pembayaran,
                 $tagihan,
-                $dibayar
+                (float) $pembayaran->nominal
             );
 
             /*
