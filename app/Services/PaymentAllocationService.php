@@ -248,13 +248,20 @@ class PaymentAllocationService
                 return 0;
             }
 
-            // Tagihan sudah lunas
-            if ($tagihan->status === Tagihan::STATUS_LUNAS) {
+            // Refresh data tagihan sebelum memutuskan apakah boleh dibayar
+            $tagihan->refresh();
+
+            // Hanya tagihan aktif yang boleh menerima pemakaian saldo
+            if (! in_array(
+                $tagihan->status,
+                [
+                    Tagihan::STATUS_BELUM_BAYAR,
+                    Tagihan::STATUS_SEBAGIAN,
+                    Tagihan::STATUS_JATUH_TEMPO,
+                ]
+            )) {
                 return 0;
             }
-
-            // Refresh data tagihan
-            $tagihan->refresh();
 
             $dipakai = $this->applyToSingleTagihan(
                 $tagihan,
