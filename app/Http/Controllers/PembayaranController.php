@@ -317,19 +317,32 @@ class PembayaranController extends Controller
     public function create(Tagihan $tagihan)
     {
         if ($tagihan->status === Tagihan::STATUS_LUNAS) {
-
             return redirect()
                 ->route('tagihan.show', $tagihan)
                 ->with(
                     'warning',
                     'Tagihan ini sudah lunas.'
                 );
-
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Total seluruh sisa tagihan pelanggan
+        |--------------------------------------------------------------------------
+        */
+        $totalSisaTagihan = Tagihan::where(
+            'pelanggan_id',
+            $tagihan->pelanggan_id
+        )
+            ->where('sisa', '>', 0)
+            ->sum('sisa');
 
         return view(
             'pembayaran.create',
-            compact('tagihan')
+            compact(
+                'tagihan',
+                'totalSisaTagihan'
+            )
         );
     }
 

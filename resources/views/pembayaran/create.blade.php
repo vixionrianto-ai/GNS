@@ -84,7 +84,7 @@
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold text-secondary mb-1">Nominal Dibayar (Rp)</label>
                                 <!-- Input bertipe text dengan format titik -->
-                                <input type="text" id="inputDibayar" name="dibayar" class="form-control form-control-sm rounded-2 shadow-none py-1.5" value="{{ number_format($tagihan->total ?? 0, 0, ',', '.') }}" required>
+                                <input type="text" id="inputDibayar" name="dibayar" class="form-control form-control-sm rounded-2 shadow-none py-1.5" value="{{ number_format($totalSisaTagihan ?? 0, 0, ',', '.') }}" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-secondary mb-1">Biaya Admin (Rp)</label>
