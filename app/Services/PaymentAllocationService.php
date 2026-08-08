@@ -37,7 +37,8 @@ class PaymentAllocationService
      * Alokasikan pembayaran secara FIFO.
      *
      * @param Tagihan $tagihanAwal Tagihan yang dipilih saat pembayaran dimulai.
-     * @param float $nominalBayar Nominal yang dibayar pelanggan.
+     * @param float $nominalBayar Nominal bersih yang siap dialokasikan ke tagihan,
+     *                            setelah biaya admin.
      *
      * @return array
      */
@@ -61,15 +62,20 @@ class PaymentAllocationService
 
             /*
             |--------------------------------------------------------------------------
-            | Ambil semua tagihan yang belum lunas
+            | Ambil semua tagihan yang boleh menerima pembayaran
             |--------------------------------------------------------------------------
+            | Tagihan Dibatalkan harus selalu dikeluarkan dari FIFO.
             */
 
             $tagihans = Tagihan::where(
                     'pelanggan_id',
                     $pelanggan->id
                 )
-                ->where('status', '!=', Tagihan::STATUS_LUNAS)
+                ->whereIn('status', [
+                    Tagihan::STATUS_BELUM_BAYAR,
+                    Tagihan::STATUS_SEBAGIAN,
+                    Tagihan::STATUS_JATUH_TEMPO,
+                ])
                 ->orderBy('tahun')
                 ->orderBy('bulan')
                 ->lockForUpdate()
