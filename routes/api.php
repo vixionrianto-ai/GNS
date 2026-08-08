@@ -18,7 +18,7 @@ use App\Http\Controllers\Api\PaketController;
 |--------------------------------------------------------------------------
 */
 Route::name('api.')->group(function () {
-    Route::apiResource('router', Api\RouterController::class);
+    Route::apiResource('router', RouterController::class);
 });
 
 Route::post(
