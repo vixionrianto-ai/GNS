@@ -19,16 +19,21 @@ class LaporanService
         $bulan        = $request?->bulan;
         $tahun        = $request?->tahun;
         $status       = $request?->status;
+
         /*
         |--------------------------------------------------------------------------
         | Query Dasar
         |--------------------------------------------------------------------------
         */
 
+        // Pembayaran Saldo adalah transaksi internal, bukan uang baru masuk.
         $pembayaran = Pembayaran::query()
-            ->where('status', Pembayaran::STATUS_BERHASIL);
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->where('metode', '!=', 'Saldo');
 
-       $tagihan = Tagihan::query()
+        // Tagihan Dibatalkan tidak boleh masuk KPI/piutang laporan.
+        $tagihan = Tagihan::query()
+            ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
             ->when($tanggalAwal, fn($q) =>
                 $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
             ->when($tanggalAkhir, fn($q) =>
@@ -41,6 +46,7 @@ class LaporanService
         $pelanggan = Pelanggan::query();
 
         $kpiTagihan = Tagihan::query()
+            ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
             ->when($tanggalAwal, fn($q) =>
                 $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
             ->when($tanggalAkhir, fn($q) =>
@@ -49,7 +55,7 @@ class LaporanService
                 $q->where('bulan', $bulan))
             ->when($tahun, fn($q) =>
                 $q->where('tahun', $tahun));
-                
+
         /*
         |--------------------------------------------------------------------------
         | Data Tabel Laporan
@@ -59,114 +65,76 @@ class LaporanService
         $laporan = Tagihan::with([
             'pelanggan.paket'
         ])
-
+        ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
         ->when($tanggalAwal, fn($q) =>
             $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-
         ->when($tanggalAkhir, fn($q) =>
             $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-
         ->when($bulan, fn($q) =>
             $q->where('bulan', $bulan))
-
         ->when($tahun, fn($q) =>
             $q->where('tahun', $tahun))
-
         ->when($status, fn($q) =>
             $q->where('status', $status))
         ->when($request?->filled('search'), function ($q) use ($request) {
-
             $search = $request->search;
 
             $q->where(function ($query) use ($search) {
-
                 $query->where('invoice_no', 'like', "%{$search}%")
-
                     ->orWhereHas('pelanggan', function ($pelanggan) use ($search) {
-
                         $pelanggan->where('nama', 'like', "%{$search}%");
-
                     });
-
             });
-
         })
         ->latest('tanggal_tagihan')
-
         ->paginate(15);
-        // ======================
-        // Grafik Pendapatan 12 Bulan
-        // ======================
 
         /*
-|--------------------------------------------------------------------------
-| Grafik Pendapatan
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | Grafik Pendapatan 12 Bulan
+        |--------------------------------------------------------------------------
+        | Pendapatan tagihan memakai nominal bersih pembayaran.
+        | Biaya admin dipisahkan dan tidak dihitung sebagai pembayaran tagihan.
+        |--------------------------------------------------------------------------
+        */
 
-$labelChart = [];
-$dataChart = [];
+        $labelChart = [];
+        $dataChart = [];
 
-for ($i = 1; $i <= 12; $i++) {
+        for ($i = 1; $i <= 12; $i++) {
+            $labelChart[] = date(
+                'M',
+                mktime(0, 0, 0, $i, 1)
+            );
 
-    $labelChart[] = date(
-        'M',
-        mktime(0, 0, 0, $i, 1)
-    );
+            $dataChart[] = Pembayaran::whereYear(
+                    'tanggal_bayar',
+                    now()->year
+                )
+                ->whereMonth(
+                    'tanggal_bayar',
+                    $i
+                )
+                ->where(
+                    'status',
+                    Pembayaran::STATUS_BERHASIL
+                )
+                ->where('metode', '!=', 'Saldo')
+                ->sum('nominal');
+        }
 
-    $dataChart[] = Pembayaran::whereYear(
-            'tanggal_bayar',
-            now()->year
-        )
-        ->whereMonth(
-            'tanggal_bayar',
-            $i
-        )
-        ->where(
-            'status',
-            Pembayaran::STATUS_BERHASIL
-        )
-        ->sum('total_bayar');
-}
+        /*
+        |--------------------------------------------------------------------------
+        | KPI Enterprise
+        |--------------------------------------------------------------------------
+        */
 
-    /*
-    |--------------------------------------------------------------------------
-    | KPI Enterprise
-    |--------------------------------------------------------------------------
-    */
+        $totalTagihan = (clone $tagihan)->sum('total');
 
-    $totalTagihan = (clone $tagihan)
-        ->when($tanggalAwal, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-        ->when($tanggalAkhir, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-        ->when($bulan, fn($q) =>
-            $q->where('bulan', $bulan))
-        ->when($tahun, fn($q) =>
-            $q->where('tahun', $tahun))
-        ->sum('total');
+        // Nilai pembayaran yang benar-benar dialokasikan ke tagihan.
+        $totalDibayar = (clone $tagihan)->sum('dibayar');
 
-    $totalDibayar = (clone $tagihan)
-        ->when($tanggalAwal, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-        ->when($tanggalAkhir, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-        ->when($bulan, fn($q) =>
-            $q->where('bulan', $bulan))
-        ->when($tahun, fn($q) =>
-            $q->where('tahun', $tahun))
-        ->sum('dibayar');
-
-    $piutang = (clone $tagihan)
-        ->when($tanggalAwal, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-        ->when($tanggalAkhir, fn($q) =>
-            $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-        ->when($bulan, fn($q) =>
-            $q->where('bulan', $bulan))
-        ->when($tahun, fn($q) =>
-            $q->where('tahun', $tahun))
-        ->sum('sisa');
+        $piutang = (clone $tagihan)->sum('sisa');
 
         /*
         |--------------------------------------------------------------------------
@@ -188,49 +156,42 @@ for ($i = 1; $i <= 12; $i++) {
         */
 
         $topPiutang = Tagihan::with('pelanggan')
-
+            ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
             ->when($tanggalAwal, fn($q) =>
                 $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-
             ->when($tanggalAkhir, fn($q) =>
                 $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-
             ->when($bulan, fn($q) =>
                 $q->where('bulan', $bulan))
-
             ->when($tahun, fn($q) =>
                 $q->where('tahun', $tahun))
-
             ->when($status, fn($q) =>
                 $q->where('status', $status))
-
             ->where('sisa', '>', 0)
-
             ->orderByDesc('sisa')
-
             ->limit(10)
-
             ->get();
 
         return [
-            
             /*
             |--------------------------------------------------------------------------
             | Pendapatan Hari Ini
             |--------------------------------------------------------------------------
+            | Nilai pembayaran tagihan, tidak termasuk biaya admin dan Saldo internal.
+            |--------------------------------------------------------------------------
             */
 
             'pendapatanHariIni' => (clone $pembayaran)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
-            ->when($bulan, fn($q) =>
-                $q->whereMonth('tanggal_bayar', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->whereYear('tanggal_bayar', $tahun))
-            ->whereDate('tanggal_bayar', today())
-            ->sum('total_bayar'),
+                ->when($tanggalAwal, fn($q) =>
+                    $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                ->when($tanggalAkhir, fn($q) =>
+                    $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
+                ->when($bulan, fn($q) =>
+                    $q->whereMonth('tanggal_bayar', $bulan))
+                ->when($tahun, fn($q) =>
+                    $q->whereYear('tanggal_bayar', $tahun))
+                ->whereDate('tanggal_bayar', today())
+                ->sum('nominal'),
 
             /*
             |--------------------------------------------------------------------------
@@ -239,41 +200,40 @@ for ($i = 1; $i <= 12; $i++) {
             */
 
             'pendapatanBulanIni' => (clone $pembayaran)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
-            ->when($bulan, fn($q) =>
-                $q->whereMonth('tanggal_bayar', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->whereYear('tanggal_bayar', $tahun))
-            ->whereYear('tanggal_bayar', now()->year)
-            ->whereMonth('tanggal_bayar', now()->month)
-            ->sum('total_bayar'),
+                ->when($tanggalAwal, fn($q) =>
+                    $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                ->when($tanggalAkhir, fn($q) =>
+                    $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
+                ->when($bulan, fn($q) =>
+                    $q->whereMonth('tanggal_bayar', $bulan))
+                ->when($tahun, fn($q) =>
+                    $q->whereYear('tanggal_bayar', $tahun))
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('nominal'),
 
             /*
             |--------------------------------------------------------------------------
-            | Total Tagihan
+            | Biaya Admin Terpisah
             |--------------------------------------------------------------------------
             */
+
+            'biayaAdminHariIni' => (clone $pembayaran)
+                ->whereDate('tanggal_bayar', today())
+                ->sum('biaya_admin'),
+
+            'biayaAdminBulanIni' => (clone $pembayaran)
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('biaya_admin'),
+
+            'totalBiayaAdmin' => (clone $pembayaran)
+                ->sum('biaya_admin'),
 
             'totalTagihan' => $totalTagihan,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Total Dibayar
-            |--------------------------------------------------------------------------
-            */
-
             'totalDibayar' => $totalDibayar,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Total Piutang
-            |--------------------------------------------------------------------------
-            */
-
             'piutang' => $piutang,
+
             'persenLunas' => $totalTagihan > 0
                 ? round(($totalDibayar / $totalTagihan) * 100)
                 : 0,
@@ -282,21 +242,9 @@ for ($i = 1; $i <= 12; $i++) {
                 ? round(($piutang / $totalTagihan) * 100)
                 : 0,
 
-            /*
-            |--------------------------------------------------------------------------
-            | Pelanggan Aktif
-            |--------------------------------------------------------------------------
-            */
-
             'pelangganAktif' => (clone $pelanggan)
                 ->where('status', Pelanggan::STATUS_AKTIF)
                 ->count(),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Statistik Status
-            |--------------------------------------------------------------------------
-            */
 
             'totalLunas' => (clone $kpiTagihan)
                 ->where('status', Tagihan::STATUS_LUNAS)
@@ -313,13 +261,12 @@ for ($i = 1; $i <= 12; $i++) {
             'totalJatuhTempo' => (clone $kpiTagihan)
                 ->where('status', Tagihan::STATUS_JATUH_TEMPO)
                 ->count(),
-          'laporan' => $laporan,
 
+            'laporan' => $laporan,
             'chartLabels' => $labelChart,
             'chartData' => $dataChart,
             'statusChart' => $statusChart,
             'topPiutang' => $topPiutang,
-      
         ];
     }
 }
