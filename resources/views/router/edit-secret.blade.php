@@ -1,139 +1,300 @@
-<x-app-layout>
+@extends('adminlte::page')
 
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+@section('title', 'Edit PPP Secret')
+
+@section('content_header')
+
+<div class="d-flex justify-content-between align-items-center">
+
+    <div>
+
+        <h1>
+
+            <i class="fas fa-user-edit text-warning"></i>
+
             Edit PPP Secret
-        </h2>
-    </x-slot>
 
-    <div class="py-6">
+        </h1>
 
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <small class="text-muted">
 
-            <div class="bg-white shadow rounded p-6">
+            Router :
 
-                <form action="{{ route('router.pppsecret.update', [$router->id, $secret['name']]) }}" method="POST">
+            <strong>
 
-                    @csrf
-                    @method('PUT')
+                {{ $router->nama_router }}
 
-                    <div class="mb-4">
+            </strong>
 
-                        <label class="block font-semibold">
-                            Username
-                        </label>
+        </small>
 
-                        <input type="text"
-                            name="username"
-                            value="{{ $secret['name'] }}"
-                            class="border rounded w-full p-2"
-                            required>
+    </div>
+
+    <div>
+
+        <a
+            href="{{ route('router.pppsecret',$router->id) }}"
+            class="btn btn-secondary">
+
+            <i class="fas fa-arrow-left"></i>
+
+            Kembali
+
+        </a>
+
+    </div>
+
+</div>
+
+@stop
+
+
+@section('content')
+
+@if($errors->any())
+
+<div class="alert alert-danger">
+
+    <h5>
+
+        <i class="fas fa-ban"></i>
+
+        Terjadi Kesalahan
+
+    </h5>
+
+    <ul class="mb-0">
+
+        @foreach($errors->all() as $error)
+
+            <li>{{ $error }}</li>
+
+        @endforeach
+
+    </ul>
+
+</div>
+
+@endif
+
+<form
+    action="{{ route('router.pppsecret.update', [$router->id, $secret['name']]) }}"
+    method="POST">
+
+    @csrf
+
+    @method('PUT')
+
+    <div class="row">
+
+        <div class="col-lg-8">
+
+            <div class="card card-warning card-outline shadow">
+
+                <div class="card-header">
+
+                    <h3 class="card-title">
+
+                        Informasi PPP Secret
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Username</label>
+
+                                <input
+                                    type="text"
+                                    name="username"
+                                    class="form-control"
+                                    value="{{ old('username',$secret['name']) }}"
+                                    required>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Password</label>
+
+                                <input
+                                    type="text"
+                                    name="password"
+                                    class="form-control"
+                                    value="{{ old('password',$secret['password'] ?? '') }}"
+                                    required>
+
+                            </div>
+
+                        </div>
 
                     </div>
 
-                    <div class="mb-4">
+                    <div class="row">
+                                                <div class="col-md-6">
 
-                        <label class="block font-semibold">
-                            Password
-                        </label>
+                            <div class="form-group">
 
-                        <input type="text"
-                            name="password"
-                            value="{{ $secret['password'] ?? '' }}"
-                            class="border rounded w-full p-2"
-                            required>
+                                <label>Service</label>
+
+                                <select
+                                    name="service"
+                                    class="form-control">
+
+                                    <option value="pppoe"
+                                        {{ ($secret['service'] ?? '') == 'pppoe' ? 'selected' : '' }}>
+
+                                        PPPoE
+
+                                    </option>
+
+                                    <option value="any"
+                                        {{ ($secret['service'] ?? '') == 'any' ? 'selected' : '' }}>
+
+                                        Any
+
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Profile</label>
+
+                                <select
+                                    name="profile"
+                                    class="form-control">
+
+                                    @foreach($profiles as $profile)
+
+                                        <option
+                                            value="{{ $profile['name'] }}"
+                                            {{ ($secret['profile'] ?? '') == $profile['name'] ? 'selected' : '' }}>
+
+                                            {{ $profile['name'] }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                        </div>
 
                     </div>
 
-                    <div class="mb-4">
+                    <div class="form-group">
 
-                        <label class="block font-semibold">
-                            Service
-                        </label>
+                        <label>Status</label>
 
-                        <select name="service"
-                            class="border rounded w-full p-2">
-
-                            <option value="pppoe"
-                                {{ ($secret['service'] ?? '') == 'pppoe' ? 'selected' : '' }}>
-                                PPPoE
-                            </option>
-
-                            <option value="any"
-                                {{ ($secret['service'] ?? '') == 'any' ? 'selected' : '' }}>
-                                Any
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                    <div class="mb-4">
-
-                        <label class="block font-semibold">
-                            Profile
-                        </label>
-
-                        <select name="profile"
-                            class="border rounded w-full p-2">
-
-                            @foreach($profiles as $profile)
-
-                                <option value="{{ $profile['name'] }}"
-                                    {{ ($secret['profile'] ?? '') == $profile['name'] ? 'selected' : '' }}>
-
-                                    {{ $profile['name'] }}
-
-                                </option>
-
-                            @endforeach
-
-                        </select>
-
-                    </div>
-
-                    <div class="mb-4">
-
-                        <label class="block font-semibold">
-                            Status
-                        </label>
-
-                        <select name="disabled"
-                            class="border rounded w-full p-2">
+                        <select
+                            name="disabled"
+                            class="form-control">
 
                             <option value="false"
                                 {{ ($secret['disabled'] ?? 'false') == 'false' ? 'selected' : '' }}>
+
                                 Aktif
+
                             </option>
 
                             <option value="true"
                                 {{ ($secret['disabled'] ?? 'false') == 'true' ? 'selected' : '' }}>
+
                                 Disabled
+
                             </option>
 
                         </select>
 
                     </div>
 
-                    <div class="mt-5">
+                </div>
 
-                        <button type="submit"
-                            style="background:#16a34a;color:white;padding:10px 20px;border:none;border-radius:5px;">
+                <div class="card-footer">
 
-                            Update
+                    <button
+                        type="submit"
+                        class="btn btn-warning">
 
-                        </button>
+                        <i class="fas fa-save"></i>
 
-                        <a href="{{ route('router.pppsecret',$router->id) }}"
-                            style="background:#6b7280;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;margin-left:10px;">
+                        Update PPP Secret
 
-                            Kembali
+                    </button>
 
-                        </a>
+                    <a
+                        href="{{ route('router.pppsecret',$router->id) }}"
+                        class="btn btn-secondary">
 
-                    </div>
+                        Batal
 
-                </form>
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <div class="card card-info card-outline shadow">
+
+                <div class="card-header">
+
+                    <h3 class="card-title">
+
+                        Informasi
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <p>
+
+                        Perubahan akan langsung disinkronkan ke Router MikroTik.
+
+                    </p>
+
+                    <hr>
+
+                    <p>
+
+                        Pastikan profile yang dipilih masih tersedia pada router.
+
+                    </p>
+
+                    <hr>
+
+                    <p class="text-muted mb-0">
+
+                        Gunakan status <strong>Disabled</strong> jika ingin menonaktifkan akun tanpa menghapusnya.
+
+                    </p>
+
+                </div>
 
             </div>
 
@@ -141,4 +302,6 @@
 
     </div>
 
-</x-app-layout>
+</form>
+
+@stop

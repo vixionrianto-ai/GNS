@@ -94,28 +94,50 @@ class RouterController extends Controller
     public function test($id)
     {
         $router = Router::findOrFail($id);
+
         try {
+
             $client = new Client(new Config([
                 'host' => $router->ip_router,
                 'user' => $router->username,
                 'pass' => $router->password,
                 'port' => $router->api_port,
             ]));
+
             $query = new Query('/system/resource/print');
             $result = $client->query($query)->read();
+
+            // Simpan status berhasil
+            $router->update([
+                'is_online'       => true,
+                'last_checked_at' => now(),
+                'versi_routeros'  => $result[0]['version'] ?? $router->versi_routeros,
+            ]);
+
             return redirect()
                 ->route('router.index')
                 ->with(
                     'success',
-                    'Berhasil terhubung : ' .
-                    $result[0]['board-name'] .
+                    'Berhasil terhubung ke ' .
+                    ($result[0]['board-name'] ?? 'Router') .
                     ' | RouterOS ' .
-                    $result[0]['version']
+                    ($result[0]['version'] ?? '-')
                 );
+
         } catch (\Exception $e) {
+
+            // Simpan status gagal
+            $router->update([
+                'is_online'       => false,
+                'last_checked_at' => now(),
+            ]);
+
             return redirect()
                 ->route('router.index')
-                ->with('error', $e->getMessage());
+                ->with(
+                    'error',
+                    'Koneksi gagal : ' . $e->getMessage()
+                );
         }
     }
     /*
@@ -680,11 +702,23 @@ public function disableSecret($id, $secret)
 */
 public function destroy(Router $router)
 {
+    if ($router->pelanggans()->exists()) {
+
+        return back()->with(
+            'error',
+            'Router masih digunakan oleh pelanggan dan tidak dapat dihapus.'
+        );
+
+    }
+
     $router->delete();
 
     return redirect()
         ->route('router.index')
-        ->with('success', 'Router berhasil dihapus.');
+        ->with(
+            'success',
+            'Router berhasil dihapus.'
+        );
 }
 
 }

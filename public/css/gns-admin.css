@@ -1,0 +1,31 @@
+.brand-link{
+    padding-top:18px;
+    padding-bottom:18px;
+}
+
+.brand-link .brand-image{
+    max-height:42px;
+}
+
+.brand-text{
+    font-size:18px;
+    font-weight:700;
+}
+
+.main-sidebar{
+    border-right:3px solid #007bff;
+}
+
+.nav-sidebar .nav-link{
+    border-radius:8px;
+    margin:2px 8px;
+}
+
+.nav-sidebar .nav-link.active{
+    background:#007bff;
+    color:#fff;
+}
+
+.content-wrapper{
+    background:#f4f6f9;
+}

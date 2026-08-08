@@ -71,7 +71,15 @@ class PaketController extends Controller
         'status'            => 'required',
     ]);
 
-        Paket::create($request->all());
+        Paket::create($request->only([
+            'router_id',
+            'nama_paket',
+            'kecepatan',
+            'profile_mikrotik',
+            'harga',
+            'status',
+            'keterangan',
+        ]));
 
         return redirect()->route('paket.index')
                         ->with('success', 'Paket berhasil ditambahkan.');
@@ -100,6 +108,7 @@ class PaketController extends Controller
     public function update(Request $request, Paket $paket)
     {
         $request->validate([
+            'router_id'        => 'required|exists:routers,id',
             'nama_paket'       => 'required',
             'kecepatan'        => 'required',
             'profile_mikrotik' => 'required',
@@ -107,7 +116,16 @@ class PaketController extends Controller
             'status'           => 'required',
         ]);
 
-        $paket->update($request->all());
+
+        $paket->update($request->only([
+            'router_id',
+            'nama_paket',
+            'kecepatan',
+            'profile_mikrotik',
+            'harga',
+            'status',
+            'keterangan',
+        ]));
 
         return redirect()->route('paket.index')
                         ->with('success', 'Paket berhasil diupdate.');
@@ -117,7 +135,15 @@ class PaketController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy(Paket $paket)
-    {
+        {
+            if ($paket->pelanggans()->exists()) {
+
+        return back()->with(
+            'error',
+            'Paket masih digunakan pelanggan.'
+        );
+
+    }
         $paket->delete();
 
         return redirect()->route('paket.index')

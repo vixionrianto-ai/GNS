@@ -1,0 +1,23 @@
+info:
+  name: List Router
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/pelanggan/44/pembayaran"
+  headers:
+    - name: Authorization
+      value: Bearer {{token}}
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: ""
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

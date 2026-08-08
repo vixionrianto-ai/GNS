@@ -1,0 +1,907 @@
+/* ==========================================================
+   GNS BILLING ENTERPRISE v4
+   Dashboard Enterprise
+========================================================== */
+
+:root{
+
+    --radius:18px;
+
+    --shadow:0 10px 28px rgba(0,0,0,.08);
+
+    --shadow-hover:0 16px 35px rgba(0,0,0,.12);
+
+    --transition:.25s;
+
+    --primary:#2563eb;
+    --success:#10b981;
+    --danger:#ef4444;
+    --warning:#f59e0b;
+    --info:#06b6d4;
+
+    --text:#1f2937;
+    --text-muted:#6b7280;
+
+    --card-padding:16px;
+
+}
+
+/* ==========================================================
+   BODY
+========================================================== */
+
+body{
+
+    background:#f4f6fb;
+
+    color:var(--text);
+
+}
+
+/* ==========================================================
+   CARD
+========================================================== */
+
+.dashboard-card{
+
+    background:#fff;
+
+    border:0;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    overflow:hidden;
+
+    transition:var(--transition);
+
+}
+
+.dashboard-card:hover{
+
+    box-shadow:var(--shadow-hover);
+
+}
+
+.dashboard-card .card-header{
+
+    background:#fff;
+
+    border-bottom:1px solid #eef2f7;
+
+    padding:12px 18px;
+
+}
+
+.dashboard-card .card-body{
+
+    padding:var(--card-padding);
+
+}
+
+/* ==========================================================
+   KPI CARD
+========================================================== */
+
+.kpi-card{
+
+    border:0;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    transition:var(--transition);
+
+    min-height:128px;
+
+    display:flex;
+
+}
+
+.kpi-card:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:var(--shadow-hover);
+
+}
+
+.kpi-card .card-body{
+
+    flex:1;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:space-between;
+
+    padding:16px;
+
+}
+
+.kpi-top{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-start;
+
+    gap:14px;
+
+}
+
+/* ==========================================================
+   KPI ICON
+========================================================== */
+
+.kpi-icon{
+
+    width:48px;
+
+    height:48px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:#fff;
+
+    font-size:18px;
+
+    flex-shrink:0;
+
+}
+
+/* ==========================================================
+   TYPOGRAPHY
+========================================================== */
+
+.small-title{
+
+    font-size:10px;
+
+    font-weight:700;
+
+    letter-spacing:1px;
+
+    text-transform:uppercase;
+
+    color:var(--text-muted);
+
+    margin-bottom:6px;
+
+}
+
+.kpi-value{
+
+    font-size:22px;
+
+    font-weight:700;
+
+    line-height:1.2;
+
+    margin-bottom:8px;
+
+}
+
+.kpi-money{
+
+    font-size:24px;
+
+    font-weight:700;
+
+    line-height:1.2;
+
+    margin-bottom:10px;
+
+    white-space:nowrap;
+
+}
+
+.kpi-desc{
+
+    font-size:12px;
+
+    line-height:1.4;
+
+    color:var(--text-muted);
+
+}
+
+/* ==========================================================
+   PROGRESS
+========================================================== */
+
+.progress{
+
+    height:6px;
+
+    border-radius:30px;
+
+    overflow:hidden;
+
+}
+
+.progress-thin{
+
+    margin-top:12px;
+
+}
+/* ==========================================================
+   DASHBOARD HEADER
+========================================================== */
+
+.dashboard-logo{
+
+    width:52px;
+
+    height:52px;
+
+    border-radius:16px;
+
+    background:linear-gradient(135deg,#2563eb,#3b82f6);
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    color:#fff;
+
+    font-size:22px;
+
+    box-shadow:0 8px 18px rgba(37,99,235,.20);
+
+    flex-shrink:0;
+
+}
+
+.dashboard-title{
+
+    font-size:30px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+    line-height:1.2;
+
+    margin-bottom:4px;
+
+}
+
+.dashboard-subtitle{
+
+    font-size:14px;
+
+    color:var(--text-muted);
+
+    line-height:1.5;
+
+}
+
+.dashboard-user-name{
+
+    font-size:22px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+}
+
+.dashboard-clock{
+
+    font-size:14px;
+
+    font-weight:700;
+
+    color:var(--primary);
+
+    letter-spacing:.5px;
+
+}
+
+.dashboard-badge{
+
+    margin-top:10px;
+
+}
+
+.dashboard-badge .badge{
+
+    font-size:10px;
+
+    padding:4px 9px;
+
+    border-radius:20px;
+
+}
+
+/* ==========================================================
+   KPI ICON COLOR
+========================================================== */
+
+.icon-primary{
+
+    background:linear-gradient(135deg,#2563eb,#3b82f6);
+
+}
+
+.icon-success{
+
+    background:linear-gradient(135deg,#10b981,#34d399);
+
+}
+
+.icon-danger{
+
+    background:linear-gradient(135deg,#ef4444,#f87171);
+
+}
+
+.icon-warning{
+
+    background:linear-gradient(135deg,#f59e0b,#fbbf24);
+
+}
+
+.icon-info{
+
+    background:linear-gradient(135deg,#06b6d4,#38bdf8);
+
+}
+
+/* ==========================================================
+   CHART
+========================================================== */
+
+.chart-card{
+
+    overflow:hidden;
+
+}
+
+.chart-container{
+
+    position:relative;
+
+    width:100%;
+
+    height:280px;
+
+}
+
+.chart-card canvas{
+
+    width:100% !important;
+
+    height:100% !important;
+
+}
+
+/* ==========================================================
+   QUICK ACTION
+========================================================== */
+
+.quick-btn{
+
+    height:95px;
+
+    border-radius:16px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-weight:700;
+
+    transition:var(--transition);
+
+}
+
+.quick-btn:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:0 10px 22px rgba(37,99,235,.12);
+
+}
+
+.quick-btn i{
+
+    font-size:20px;
+
+    margin-bottom:10px;
+
+}
+
+.quick-btn div{
+
+    font-size:13px;
+
+    font-weight:600;
+
+}
+/* ==========================================================
+   INFO CARD
+   Statistik Tagihan | Status Sistem | Monitoring
+========================================================== */
+
+.info-card{
+
+    height:100%;
+
+}
+
+.info-card .card-body{
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+}
+
+.info-card .card-header{
+
+    padding:12px 16px;
+
+}
+
+.info-card .card-header h5{
+
+    margin:0;
+
+    font-size:15px;
+
+    font-weight:600;
+
+    line-height:1.3;
+
+}
+
+.info-card .card-header i{
+
+    font-size:13px;
+
+}
+
+.info-card .card-body{
+
+    padding:14px 16px;
+
+    font-size:12px;
+
+}
+
+.info-card .card-body>.d-flex{
+
+    margin-bottom:12px;
+
+}
+
+.info-card .card-body>.d-flex:last-child{
+
+    margin-bottom:0;
+
+}
+
+.info-card span{
+
+    font-size:12px;
+
+    color:var(--text-muted);
+
+}
+
+.info-card strong{
+
+    font-size:13px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+}
+
+.info-card small{
+
+    font-size:11px;
+
+    font-weight:600;
+
+}
+
+.info-card .badge{
+
+    font-size:10px;
+
+    padding:4px 8px;
+
+    border-radius:20px;
+
+}
+
+.info-card .progress{
+
+    height:6px;
+
+    margin:4px 0;
+
+    border-radius:20px;
+
+}
+
+.info-card .text-right{
+
+    font-size:11px;
+
+    font-weight:600;
+
+    color:var(--text-muted);
+
+}
+
+/* ==========================================================
+   TABLE
+========================================================== */
+
+.table thead th{
+
+    border-top:none;
+
+    border-bottom:1px solid #eef2f7;
+
+    font-size:12px;
+
+    font-weight:700;
+
+    color:#6b7280;
+
+    text-transform:uppercase;
+
+    letter-spacing:.5px;
+
+}
+
+.table tbody td{
+
+    vertical-align:middle;
+
+    font-size:13px;
+
+}
+
+.table tbody tr:hover{
+
+    background:#f8fafc;
+
+}
+
+/* ==========================================================
+   BADGE
+========================================================== */
+
+.badge{
+
+    font-weight:600;
+
+    letter-spacing:.3px;
+
+}
+
+/* ==========================================================
+   LIST GROUP
+========================================================== */
+
+.list-group-item{
+
+    border-left:0;
+
+    border-right:0;
+
+    padding:14px 18px;
+
+}
+
+.list-group-item:first-child{
+
+    border-top:0;
+
+}
+
+.list-group-item:last-child{
+
+    border-bottom:0;
+
+}
+
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
+
+@media (max-width:991.98px){
+
+    .dashboard-title{
+
+        font-size:24px;
+
+    }
+
+    .dashboard-user-name{
+
+        font-size:18px;
+
+    }
+
+    .kpi-money{
+
+        font-size:20px;
+
+    }
+
+    .chart-container{
+
+        height:240px;
+
+    }
+
+}
+
+@media (max-width:767.98px){
+
+    .dashboard-logo{
+
+        width:46px;
+
+        height:46px;
+
+        font-size:20px;
+
+    }
+
+    .dashboard-title{
+
+        font-size:22px;
+
+    }
+
+    .dashboard-subtitle{
+
+        font-size:13px;
+
+    }
+
+    .dashboard-user-name{
+
+        font-size:17px;
+
+    }
+
+    .kpi-value{
+
+        font-size:20px;
+
+    }
+
+    .kpi-money{
+
+        font-size:18px;
+
+    }
+
+    .quick-btn{
+
+        height:82px;
+
+    }
+
+    .quick-btn i{
+
+        font-size:18px;
+
+    }
+
+}
+
+@media (max-width:575.98px){
+
+    .dashboard-card .card-header{
+
+        padding:10px 14px;
+
+    }
+
+    .dashboard-card .card-body{
+
+        padding:12px;
+
+    }
+
+    .chart-container{
+
+        height:220px;
+
+    }
+
+}
+
+/* ==========================================================
+   FINAL POLISH
+========================================================== */
+
+.dashboard-card,
+.kpi-card{
+    border-radius:14px;
+    overflow:hidden;
+    transition:.25s;
+}
+
+.dashboard-card:hover,
+.kpi-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 12px 28px rgba(0,0,0,.08);
+}
+
+.card-header{
+    min-height:68px;
+}
+
+.card-header h4,
+.card-header h5{
+    margin-bottom:0;
+    font-weight:600;
+}
+
+.card-header small{
+    font-size:.80rem;
+}
+
+.table{
+    margin-bottom:0;
+}
+
+.table thead th{
+    white-space:nowrap;
+    vertical-align:middle;
+    font-size:.82rem;
+    font-weight:600;
+}
+
+.table tbody td{
+    vertical-align:middle;
+    font-size:.88rem;
+}
+
+.badge{
+    font-weight:600;
+    letter-spacing:.2px;
+}
+
+.progress{
+    height:8px;
+    border-radius:20px;
+}
+
+.progress-bar{
+    border-radius:20px;
+}
+
+.quick-btn{
+    height:100%;
+    min-height:110px;
+
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+
+    transition:.2s;
+}
+
+.quick-btn i{
+    font-size:24px;
+}
+
+.quick-btn:hover{
+    transform:translateY(-3px);
+}
+
+.list-group-item{
+    padding:14px 18px;
+}
+
+.info-card .card-body{
+    font-size:.88rem;
+}
+
+.info-card strong{
+    font-weight:600;
+}
+
+.dashboard-card hr{
+    margin:.9rem 0;
+}
+
+/* ==========================================================
+   RESPONSIVE
+========================================================== */
+
+@media (max-width:991px){
+
+    .card-header{
+        min-height:auto;
+    }
+
+    .quick-btn{
+        min-height:95px;
+    }
+
+}
+
+@media (max-width:768px){
+
+    .dashboard-card,
+    .kpi-card{
+        margin-bottom:20px;
+    }
+
+    .table{
+        font-size:.82rem;
+    }
+
+    .table th,
+    .table td{
+        white-space:nowrap;
+    }
+
+    .dashboard-card .card-header{
+
+        padding:14px 18px;
+
+    }
+
+    .dashboard-card .card-body{
+
+        padding:16px;
+
+    }
+
+}
+
+@media (max-width:576px){
+
+    .kpi-value{
+        font-size:1.6rem;
+    }
+
+    .dashboard-user-name{
+
+        font-size:1.2rem;
+
+    }
+
+    .quick-btn{
+
+        min-height:85px;
+
+    }
+
+    .quick-btn i{
+
+        font-size:20px;
+
+    }
+
+}

@@ -1,859 +1,340 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
-
 <meta charset="UTF-8">
-
 <title>Invoice {{ $pembayaran->invoice_no }}</title>
-
 <style>
-
-@page{
-    margin:20px;
+@page {
+    margin: 12px 15px;
+}
+body {
+    font-family: DejaVu Sans, sans-serif;
+    font-size: 10px;
+    line-height: 1.25;
+    color: #2c3e50;
+    margin: 0;
+    padding: 0;
+}
+* {
+    box-sizing: border-box;
+}
+.clear {
+    clear: both;
+}
+.text-right {
+    text-align: right;
+}
+.text-center {
+    text-align: center;
+}
+.bold {
+    font-weight: bold;
+}
+.small {
+    font-size: 9px;
 }
 
-body{
-    font-family: DejaVu Sans;
-    font-size:12px;
-    line-height:1.4;
-    color:#2c3e50;
-    margin:0;
-    padding:0;
+/* Header */
+.header {
+    border-bottom: 3px solid #1565C0;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+.brand-row {
+    width: 100%;
+}
+.logo {
+    width: 90px;
+    max-height: 50px;
+    object-fit: contain;
+    float: left;
+}
+.company {
+    float: right;
+    text-align: right;
+}
+.company-name {
+    font-size: 20px;
+    color: #1565C0;
+    font-weight: bold;
+    line-height: 1;
+}
+.company-desc {
+    font-size: 10px;
+    color: #3f4a57;
+    margin-top: 3px;
 }
 
-*{
-    box-sizing:border-box;
+/* Invoice Title & Status */
+.invoice-box {
+    width: 100%;
+    margin-bottom: 8px;
+}
+.invoice-title-left {
+    float: left;
+}
+.invoice-title-left h1 {
+    font-size: 16px;
+    color: #1565C0;
+    margin: 0 0 2px 0;
+}
+.invoice-number {
+    font-size: 14px;
+    color: #1565C0;
+    font-weight: bold;
+}
+.invoice-status-right {
+    float: right;
+    text-align: right;
+}
+.status {
+    background: #28a745;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    display: inline-block;
 }
 
-.clear{
-    clear:both;
+/* Info Card Pelanggan */
+.info-card {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+.card-header {
+    background: #1565C0;
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+.card-body {
+    padding: 8px;
+}
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.info-table td {
+    padding: 3px 5px;
+    border-bottom: 1px solid #e5e5e5;
+    vertical-align: top;
+}
+.info-table td:first-child {
+    width: 35%;
+    font-weight: bold;
+    color: #2f3b4c;
 }
 
-.text-right{
-    text-align:right;
+/* Tabel Rincian & Summary */
+.rincian, .summary {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+}
+.rincian th {
+    background: #1565C0;
+    color: white;
+    padding: 5px;
+    border: 1px solid #d8d8d8;
+    font-size: 9px;
+}
+.rincian td, .summary td {
+    border: 1px solid #d8d8d8;
+    padding: 5px;
+}
+.summary td:first-child {
+    width: 75%;
+    font-weight: bold;
+}
+.total {
+    color: #1565C0;
+    font-size: 12px;
+    font-weight: bold;
+}
+.green {
+    color: #28a745;
+    font-weight: bold;
 }
 
-.text-center{
-    text-align:center;
+/* Watermark */
+.watermark {
+    position: fixed;
+    top: 250px;
+    left: 150px;
+    transform: rotate(-35deg);
+    font-size: 80px;
+    color: #e9e9e9;
+    opacity: 0.25;
+    z-index: -1000;
 }
 
-.bold{
-    font-weight:bold;
+/* Footer */
+.footer {
+    margin-top: 10px;
+    width: 100%;
 }
-
-.small{
-    font-size:11px;
+.footer-left {
+    float: left;
+    width: 65%;
 }
-
-.mt-10{
-    margin-top:10px;
+.signature {
+    float: right;
+    width: 30%;
+    text-align: center;
 }
-
-.mt-20{
-    margin-top:20px;
+.signature hr {
+    margin-top: 35px;
+    margin-bottom: 2px;
 }
-
-.mt-30{
-    margin-top:30px;
+.note {
+    float: left;
+    width: 100%;
+    font-size: 9px;
+    color: #555;
 }
-
-.mb-20{
-    margin-bottom:20px;
-}
-
-.header{
-    border-bottom:4px solid #1565C0;
-    padding-bottom:15px;
-    overflow:hidden;
-}
-
-.brand-row{
-    display:flex;
-    align-items:flex-start;
-    gap:18px;
-}
-
-.logo{
-    width:120px;
-    max-height:95px;
-    object-fit:contain;
-    flex-shrink:0;
-}
-
-.company{
-    flex:1;
-}
-
-.company-name{
-    font-size:30px;
-    color:#1565C0;
-    font-weight:bold;
-    line-height:1.1;
-}
-
-.company-desc{
-    font-size:15px;
-    margin-top:3px;
-    color:#3f4a57;
-}
-
-.company-contact{
-    margin-top:8px;
-    font-size:12px;
-    color:#555;
-}
-
-.invoice-box{
-    margin-top:22px;
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:20px;
-}
-
-.invoice-title{
-    flex:1;
-}
-
-.invoice-title h1{
-    font-size:28px;
-    color:#1565C0;
-    margin:0 0 8px 0;
-}
-
-.invoice-status{
-    flex-shrink:0;
-}
-
-.status{
-    background:#28a745;
-    color:white;
-    padding:8px 20px;
-    border-radius:6px;
-    font-size:16px;
-    font-weight:bold;
-    display:inline-block;
-}
-
-.info-card{
-    margin-top:18px;
-    border:1px solid #d9d9d9;
-    border-radius:6px;
-    overflow:hidden;
-}
-
-.card-header{
-    background:#1565C0;
-    color:white;
-    padding:10px 15px;
-    font-size:15px;
-    font-weight:bold;
-}
-
-.card-body{
-    padding:15px;
-}
-
-.info-grid{
-    display:flex;
-    gap:4%;
-}
-
-.left{
-    width:48%;
-    float:none;
-}
-
-.right{
-    width:48%;
-    float:none;
-}
-
-.info-table{
-    width:100%;
-    border-collapse:collapse;
-    table-layout:fixed;
-}
-
-.info-table td{
-    padding:7px;
-    border-bottom:1px solid #e5e5e5;
-    vertical-align:top;
-}
-
-.info-table td:first-child{
-    width:36%;
-    font-weight:bold;
-    color:#2f3b4c;
-}
-
-.invoice-number{
-    font-size:24px;
-    color:#1565C0;
-    font-weight:bold;
-    margin-top:8px;
-}
-
-.barcode{
-    margin-top:15px;
-    border:1px solid #444;
-    height:50px;
-    text-align:center;
-    line-height:50px;
-    letter-spacing:4px;
-    font-weight:bold;
-}
-
-.watermark{
-    position:fixed;
-    top:320px;
-    left:110px;
-    transform:rotate(-35deg);
-    font-size:110px;
-    color:#e9e9e9;
-    opacity:0.35;
-}
-
-.rincian{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:20px;
-}
-
-.rincian th{
-    background:#1565C0;
-    color:white;
-    padding:10px;
-    border:1px solid #d8d8d8;
-}
-
-.rincian td{
-    border:1px solid #d8d8d8;
-    padding:10px;
-}
-
-.bg-blue{
-    background:#1565C0;
-    color:white;
-}
-
-.summary{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:20px;
-}
-
-.summary td{
-    border:1px solid #d8d8d8;
-    padding:10px;
-}
-
-.summary td:first-child{
-    width:75%;
-    font-weight:bold;
-}
-
-.total{
-    color:#1565C0;
-    font-size:18px;
-    font-weight:bold;
-}
-
-.green{
-    color:#28a745;
-    font-weight:bold;
-}
-
-.footer{
-    margin-top:30px;
-    display:flex;
-    justify-content:space-between;
-    gap:20px;
-    align-items:flex-start;
-}
-
-.footer-left{
-    flex:1;
-}
-
-.signature{
-    width:260px;
-    float:none;
-    text-align:center;
-    flex-shrink:0;
-}
-
-.signature hr{
-    margin-top:70px;
-}
-
-.qr{
-    width:95px;
-    height:95px;
-    border:1px solid #d8d8d8;
-    padding:5px;
-}
-
-.note{
-    margin-left:0;
-}
-
-.bottom{
-    margin-top:25px;
-    border-top:2px solid #1565C0;
-    padding-top:8px;
-    font-size:11px;
-    text-align:center;
-    color:#666;
-}
-
 </style>
-
 </head>
-
 <body>
 
-<div class="watermark">
+<div class="watermark">{{ strtoupper($pembayaran->status) }}</div>
 
-LUNAS
-
-</div>
-
+<!-- Header -->
 <div class="header">
-
-<div class="brand-row">
-
-@if(file_exists(public_path('images/logo.png')))
-
-<img
-src="{{ public_path('images/logo.png') }}"
-class="logo">
-
-@endif
-
-<div class="company">
-
-<div class="company-name">
-
-GNS NETWORK
-
+    <div class="brand-row">
+        @if(file_exists(public_path('images/logo.png')))
+            <img src="{{ public_path('images/logo.png') }}" class="logo">
+        @endif
+        <div class="company">
+            <div class="company-name">GNS NETWORK</div>
+            <div class="company-desc">Internet Service Provider & Billing System</div>
+        </div>
+        <div class="clear"></div>
+    </div>
 </div>
 
-<div class="company-desc">
-
-Internet Service Provider
-
-</div>
-
-<div class="company-desc">
-
-Billing Management System
-
-</div>
-
-<div class="company-contact">
-
-Indonesia • Telp : 08xxxxxxxxxx • Email : info@gns.net
-
-</div>
-
-</div>
-
-</div>
-
-<div class="clear"></div>
-
-</div>
+<!-- Invoice & Status -->
 <div class="invoice-box">
-
-<div class="invoice-title">
-
-<h1>
-
-INVOICE PEMBAYARAN
-
-</h1>
-
-<div class="invoice-number">
-
-{{ $pembayaran->invoice_no }}
-
-</div>
-
-<div class="barcode">
-
-|||| {{ $pembayaran->invoice_no }} ||||
-
-</div>
-
-</div>
-
-<div class="invoice-status">
-
-<div class="status">
-
-{{ strtoupper($pembayaran->status) }}
-
-</div>
-
-</div>
-
-</div>
-
-<div class="info-card">
-
-<div class="card-header">
-
-DATA PELANGGAN
-
-</div>
-
-<div class="card-body">
-
-<div class="info-grid">
-
-<div class="left">
-
-<table class="info-table">
-
-<tr>
-
-<td>Nama Pelanggan</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->nama }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Username PPPoE</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->username_pppoe }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Alamat</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->alamat }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>No HP</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->no_hp ?: '-' }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Router</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->router->nama_router ?? '-' }}
-
-</td>
-
-</tr>
-
-</table>
-
-</div>
-
-<div class="right">
-
-<table class="info-table">
-
-<tr>
-
-<td>Paket Internet</td>
-
-<td>
-
-{{ $pembayaran->tagihan->pelanggan->paket->nama_paket }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Periode</td>
-
-<td>
-
-{{ $pembayaran->tagihan->periode }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Metode</td>
-
-<td>
-
-{{ $pembayaran->metode }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Status</td>
-
-<td>
-
-<span class="green">
-
-{{ strtoupper($pembayaran->status) }}
-
-</span>
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>Kasir</td>
-
-<td>
-
-{{ $pembayaran->user->name ?? '-' }}
-
-</td>
-
-</tr>
-
-</table>
-
-</div>
-
-</div>
-
-<div class="clear"></div>
-
-</div>
-
-</div>
-
-<table class="rincian">
-
-<thead>
-
-<tr>
-
-<th width="8%">
-
-NO
-
-</th>
-
-<th width="42%">
-
-KETERANGAN
-
-</th>
-
-<th width="18%">
-
-NOMINAL
-
-</th>
-
-<th width="15%">
-
-BIAYA ADMIN
-
-</th>
-
-<th width="17%">
-
-TOTAL
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-<tr>
-
-<td class="text-center">
-
-1
-
-</td>
-
-<td>
-
-<strong>
-
-Tagihan Internet
-
-</strong>
-
-<br>
-
-<span class="small">
-
-{{ $pembayaran->tagihan->pelanggan->paket->nama_paket }}
-
-</span>
-
-</td>
-
-<td class="text-right">
-
-Rp {{ number_format($pembayaran->nominal,0,',','.') }}
-
-</td>
-
-<td class="text-right">
-
-Rp {{ number_format($pembayaran->biaya_admin,0,',','.') }}
-
-</td>
-
-<td class="text-right total">
-
-Rp {{ number_format($pembayaran->total_bayar,0,',','.') }}
-
-</td>
-
-</tr>
-
-</tbody>
-
-</table>
-
-<table class="summary">
-
-<tr>
-
-<td>
-
-TOTAL TAGIHAN
-
-</td>
-
-<td class="text-right total">
-
-Rp {{ number_format($pembayaran->total_bayar,0,',','.') }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>
-
-DIBAYAR
-
-</td>
-
-<td class="text-right total">
-
-Rp {{ number_format($pembayaran->dibayar,0,',','.') }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>
-
-KEMBALIAN
-
-</td>
-
-<td class="text-right green">
-
-Rp {{ number_format($pembayaran->kembalian,0,',','.') }}
-
-</td>
-
-</tr>
-
-<tr>
-
-<td>
-
-KETERANGAN
-
-</td>
-
-<td class="text-right">
-
-{{ $pembayaran->keterangan ?: '-' }}
-
-</td>
-
-</tr>
-
-</table>
-<div class="footer">
-
-    <div class="footer-left">
-
-        <table style="width:100%;border-collapse:collapse;">
-
-            <tr>
-
-                <td width="110">
-
-                    @if(file_exists(public_path('images/qrcode.png')))
-
-                        <img
-                            src="{{ public_path('images/qrcode.png') }}"
-                            class="qr">
-
-                    @else
-
-                        <div class="qr" style="text-align:center;line-height:85px;">
-
-                            QR
-
-                        </div>
-
-                    @endif
-
-                </td>
-
-                <td class="note">
-
-                    <strong>
-
-                        Terima kasih telah melakukan pembayaran.
-
-                    </strong>
-
-                    <br><br>
-
-                    Invoice ini dibuat secara otomatis oleh
-
-                    <strong>
-
-                        GNS NETWORK Billing System
-
-                    </strong>
-
-                    <br><br>
-
-                    Dokumen ini sah tanpa tanda tangan
-
-                    dan stempel.
-
-                </td>
-
-            </tr>
-
-        </table>
-
+    <div class="invoice-title-left">
+        <h1>INVOICE PEMBAYARAN</h1>
+        <div class="invoice-number">{{ $pembayaran->invoice_no }}</div>
     </div>
-
-    <div class="signature">
-
-        Hormat Kami,
-
-        <br><br><br><br><br>
-
-        <hr>
-
-        <strong>
-
-            {{ $pembayaran->user->name ?? 'Administrator' }}
-
-        </strong>
-
-        <br>
-
-        Administrator GNS Network
-
+    <div class="invoice-status-right">
+        <div class="status">{{ strtoupper($pembayaran->status) }}</div>
     </div>
-
     <div class="clear"></div>
-
 </div>
 
-<div class="bottom">
+<!-- Data Pelanggan & Informasi -->
+<div class="info-card">
+    <div class="card-header">DATA PELANGGAN & INVOICE</div>
+    <div class="card-body">
+        <table class="info-table" style="float: left; width: 49%;">
+            <tr>
+                <td>Nama Pelanggan</td>
+                <td>{{ optional(optional($pembayaran->tagihan)->pelanggan)->nama ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>Username PPPoE</td>
+                <td>{{ optional(optional($pembayaran->tagihan)->pelanggan)->username_pppoe ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>Alamat</td>
+                <td>{{ optional(optional($pembayaran->tagihan)->pelanggan)->alamat ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>No HP</td>
+                <td>{{ optional(optional($pembayaran->tagihan)->pelanggan)->no_hp ?: '-' }}</td>
+            </tr>
+        </table>
+        <table class="info-table" style="float: right; width: 49%;">
+            <tr>
+                <td>Paket Internet</td>
+                <td>{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>Periode</td>
+                <td>{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>Metode</td>
+                <td>{{ $pembayaran->metode ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td>Kasir</td>
+                <td>{{ optional($pembayaran->user)->name ?? '-' }}</td>
+            </tr>
+        </table>
+        <div class="clear"></div>
+    </div>
+</div>
 
-<table style="width:100%;border-collapse:collapse;">
-
-<tr>
-
-<td width="33%">
-
-<b>Website</b><br>
-
-www.gns.net
-
-</td>
-
-<td width="34%" class="text-center">
-
-<b>Email</b><br>
-
-info@gns.net
-
-</td>
-
-<td width="33%" class="text-right">
-
-<b>Dicetak :</b><br>
-
-{{ now()->format('d-m-Y H:i:s') }}
-
-</td>
-
-</tr>
-
+<!-- Tabel Rincian -->
+<table class="rincian">
+    <thead>
+        <tr>
+            <th width="6%">NO</th>
+            <th width="44%">KETERANGAN</th>
+            <th width="18%">NOMINAL</th>
+            <th width="15%">ADMIN</th>
+            <th width="17%">TOTAL</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-center">1</td>
+            <td>
+                <strong>Tagihan Internet</strong><br>
+                <span class="small">{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</span>
+            </td>
+            <td class="text-right">Rp {{ number_format($pembayaran->nominal ?? 0, 0, ',', '.') }}</td>
+            <td class="text-right">Rp {{ number_format($pembayaran->biaya_admin ?? 0, 0, ',', '.') }}</td>
+            <td class="text-right total">Rp {{ number_format($pembayaran->total_bayar ?? 0, 0, ',', '.') }}</td>
+        </tr>
+    </tbody>
 </table>
 
-<br>
+<!-- Tabel Summary -->
+<table class="summary">
+    <tr>
+        <td>TOTAL TAGIHAN</td>
+        <td class="text-right total">Rp {{ number_format($pembayaran->total_bayar ?? 0, 0, ',', '.') }}</td>
+    </tr>
+    <tr>
+        <td>DIBAYAR</td>
+        <td class="text-right total">Rp {{ number_format($pembayaran->dibayar ?? 0, 0, ',', '.') }}</td>
+    </tr>
+    <tr>
+        <td>KEMBALIAN</td>
+        <td class="text-right green">Rp {{ number_format($pembayaran->kembalian ?? 0, 0, ',', '.') }}</td>
+    </tr>
+    <tr>
+        <td>KETERANGAN</td>
+        <td class="text-right">{{ $pembayaran->keterangan ?: '-' }}</td>
+    </tr>
+</table>
 
-<hr>
-
-<div class="text-center">
-
-Copyright © {{ date('Y') }}
-
-<b>GNS NETWORK</b>
-
-All Rights Reserved.
-
-</div>
-
+<!-- Footer & Tanda Tangan -->
+<div class="footer">
+    <div class="footer-left">
+        <div class="note" style="width: 100%;">
+            <strong>Terima kasih telah melakukan pembayaran.</strong><br>
+            Invoice ini dibuat secara otomatis oleh <strong>GNS NETWORK</strong>.<br>
+            Dokumen sah tanpa tanda tangan dan stempel.
+        </div>
+        <div class="clear"></div>
+    </div>
+    <div class="signature">
+        Hormat Kami,<br><br>
+        <hr>
+        <strong>{{ optional($pembayaran->user)->name ?? 'Administrator' }}</strong><br>
+        <span class="small">Administrator GNS</span>
+    </div>
+    <div class="clear"></div>
 </div>
 
 </body>
-
 </html>

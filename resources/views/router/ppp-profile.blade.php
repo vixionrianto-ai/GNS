@@ -1,197 +1,312 @@
-<x-app-layout>
+@extends('adminlte::page')
 
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Data PPP Profile - {{ $router->nama_router }}
-        </h2>
-    </x-slot>
+@section('title', 'PPP Profile')
 
-    <div class="py-6">
+@section('content_header')
 
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+<div class="d-flex justify-content-between align-items-center">
 
-            {{-- Tombol Atas --}}
-            <div style="
-                display:flex;
-                align-items:center;
-                gap:12px;
-                margin-bottom:20px;">
+    <div>
 
-                <a href="{{ route('router.index') }}"
-                    style="
-                        background:#2563eb;
-                        color:white;
-                        padding:10px 18px;
-                        border-radius:6px;
-                        text-decoration:none;
-                        font-weight:500;
-                        display:inline-block;">
+        <h1>
 
-                    ← Kembali
+            <i class="fas fa-id-card text-info"></i>
 
-                </a>
+            PPP Profile
 
-                <a href="{{ route('router.pppprofile.create',$router->id) }}"
-                    style="
-                        background:#16a34a;
-                        color:white;
-                        padding:10px 18px;
-                        border-radius:6px;
-                        text-decoration:none;
-                        font-weight:500;
-                        display:inline-block;">
+        </h1>
 
-                    + Tambah PPP Profile
+        <small class="text-muted">
 
-                </a>
+            Router :
+
+            <strong>
+
+                {{ $router->nama_router }}
+
+            </strong>
+
+        </small>
+
+    </div>
+
+    <div>
+
+        <a
+            href="{{ route('router.index') }}"
+            class="btn btn-secondary">
+
+            <i class="fas fa-arrow-left"></i>
+
+            Kembali
+
+        </a>
+
+        <a
+            href="{{ route('router.pppprofile.create',$router->id) }}"
+            class="btn btn-primary">
+
+            <i class="fas fa-plus-circle"></i>
+
+            Tambah PPP Profile
+
+        </a>
+
+    </div>
+
+</div>
+
+@stop
+
+@section('content')
+
+@if(session('success'))
+
+<div class="alert alert-success alert-dismissible fade show">
+
+    <i class="fas fa-check-circle"></i>
+
+    {{ session('success') }}
+
+    <button class="close" data-dismiss="alert">
+
+        &times;
+
+    </button>
+
+</div>
+
+@endif
+
+@if(session('error'))
+
+<div class="alert alert-danger alert-dismissible fade show">
+
+    <i class="fas fa-times-circle"></i>
+
+    {{ session('error') }}
+
+    <button class="close" data-dismiss="alert">
+
+        &times;
+
+    </button>
+
+</div>
+
+@endif
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        <h3 class="card-title">
+
+            Data PPP Profile
+
+        </h3>
+
+    </div>
+
+    <div class="card-body table-responsive p-0">
+
+        <table class="table table-hover table-striped">
+
+            <thead>
+
+                <tr>
+
+                    <th width="60">#</th>
+
+                    <th>Profile</th>
+
+                    <th>Local Address</th>
+
+                    <th>Remote Address</th>
+
+                    <th>Rate Limit</th>
+
+                    <th>Only One</th>
+
+                    <th width="180">
+
+                        Aksi
+
+                    </th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+                @forelse($profiles as $profile)
+
+<tr>
+
+    <td>
+
+        {{ $loop->iteration }}
+
+    </td>
+
+    <td>
+
+        <strong>
+
+            {{ $profile['name'] ?? '-' }}
+
+        </strong>
+
+    </td>
+
+    <td>
+
+        {{ $profile['local-address'] ?? '-' }}
+
+    </td>
+
+    <td>
+
+        {{ $profile['remote-address'] ?? '-' }}
+
+    </td>
+
+    <td>
+
+        <span class="badge badge-primary">
+
+            {{ $profile['rate-limit'] ?? '-' }}
+
+        </span>
+
+    </td>
+
+    <td>
+
+        @if(($profile['only-one'] ?? 'no') == 'yes')
+
+            <span class="badge badge-success">
+
+                Yes
+
+            </span>
+
+        @else
+
+            <span class="badge badge-secondary">
+
+                No
+
+            </span>
+
+        @endif
+
+    </td>
+
+    <td>
+
+        <div class="btn-group">
+
+            <a
+
+                href="{{ route('router.pppprofile.edit', [$router->id, $profile['.id']]) }}"
+
+                class="btn btn-warning btn-sm"
+
+                title="Edit">
+
+                <i class="fas fa-edit"></i>
+
+            </a>
+
+            <form
+
+                action="{{ route('router.pppprofile.delete', [$router->id, $profile['.id']]) }}"
+
+                method="POST"
+
+                class="d-inline"
+
+                onsubmit="return confirm('Hapus PPP Profile {{ $profile['name'] }} ?')">
+
+                @csrf
+
+                @method('DELETE')
+
+                <button
+
+                    type="submit"
+
+                    class="btn btn-danger btn-sm"
+
+                    title="Hapus">
+
+                    <i class="fas fa-trash"></i>
+
+                </button>
+
+            </form>
+
+        </div>
+
+    </td>
+
+</tr>
+
+@empty
+
+<tr>
+
+    <td colspan="7" class="text-center py-5">
+
+        <i class="fas fa-id-card fa-3x text-muted mb-3"></i>
+
+        <br>
+
+        <span class="text-muted">
+
+            Belum ada PPP Profile.
+
+        </span>
+
+    </td>
+
+</tr>
+
+@endforelse
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="card-footer">
+
+        <div class="row">
+
+            <div class="col-md-6">
+
+                <small class="text-muted">
+
+                    Total Profile :
+
+                    <strong>
+
+                        {{ count($profiles) }}
+
+                    </strong>
+
+                </small>
 
             </div>
 
-            {{-- Pesan --}}
-            @if(session('success'))
-                <div style="background:#dcfce7;color:#166534;padding:10px;border-radius:5px;margin-bottom:10px;">
-                    {{ session('success') }}
-                </div>
-            @endif
+            <div class="col-md-6 text-right">
 
-            @if(session('error'))
-                <div style="background:#fee2e2;color:#991b1b;padding:10px;border-radius:5px;margin-bottom:10px;">
-                    {{ session('error') }}
-                </div>
-            @endif
+                <small class="text-muted">
 
-            <div class="bg-white shadow rounded p-4">
+                    {{ $router->nama_router }}
 
-                <table class="table-auto w-full border">
-
-                    <thead>
-
-                        <tr class="bg-gray-200">
-
-                            <th class="border p-2">No</th>
-
-                            <th class="border p-2">Profile</th>
-
-                            <th class="border p-2">Local Address</th>
-
-                            <th class="border p-2">Remote Address</th>
-
-                            <th class="border p-2">Rate Limit</th>
-
-                            <th class="border p-2">Only One</th>
-
-                            <th class="border p-2">Aksi</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                    @forelse($profiles as $profile)
-
-                        <tr>
-
-                            <td class="border p-2">
-
-                                {{ $loop->iteration }}
-
-                            </td>
-
-                            <td class="border p-2">
-
-                                {{ $profile['name'] ?? '-' }}
-
-                            </td>
-
-                            <td class="border p-2">
-
-                                {{ $profile['local-address'] ?? '-' }}
-
-                            </td>
-
-                            <td class="border p-2">
-
-                                {{ $profile['remote-address'] ?? '-' }}
-
-                            </td>
-
-                            <td class="border p-2">
-
-                                {{ $profile['rate-limit'] ?? '-' }}
-
-                            </td>
-
-                            <td class="border p-2">
-
-                                {{ $profile['only-one'] ?? 'no' }}
-
-                            </td>
-
-                           <td class="border p-2">
-
-                            <div style="display:flex; gap:8px; justify-content:center;">
-
-                                <a href="{{ route('router.pppprofile.edit', [$router->id, $profile['.id']]) }}"
-                                    style="
-                                        background:#f59e0b;
-                                        color:white;
-                                        padding:6px 14px;
-                                        border-radius:5px;
-                                        text-decoration:none;
-                                        display:inline-block;">
-
-                                    Edit
-
-                                </a>
-
-                                <form action="{{ route('router.pppprofile.delete', [$router->id, $profile['.id']]) }}"
-                                    method="POST"
-                                    onsubmit="return confirm('Yakin ingin menghapus PPP Profile {{ $profile['name'] }} ?')"
-                                    style="margin:0;">
-
-                                    @csrf
-                                    @method('DELETE')
-
-                                    <button type="submit"
-                                        style="
-                                            background:#dc2626;
-                                            color:white;
-                                            padding:6px 14px;
-                                            border:none;
-                                            border-radius:5px;
-                                            cursor:pointer;">
-
-                                        Hapus
-
-                                    </button>
-
-                                </form>
-
-                            </div>
-
-                        </td>
-
-                        </tr>
-
-                    @empty
-
-                        <tr>
-
-                            <td colspan="7"
-                                class="border p-3 text-center">
-
-                                Tidak ada PPP Profile.
-
-                            </td>
-
-                        </tr>
-
-                    @endforelse
-
-                    </tbody>
-
-                </table>
+                </small>
 
             </div>
 
@@ -199,4 +314,6 @@
 
     </div>
 
-</x-app-layout>
+</div>
+
+@stop

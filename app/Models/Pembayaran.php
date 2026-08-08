@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\AlokasiPembayaran;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pembayaran extends Model
 {
@@ -30,7 +32,7 @@ class Pembayaran extends Model
         'invoice_no',
         'invoice_date',
         'invoice_pdf',
-
+        'public_token',
         'tagihan_id',
         'user_id',
         'tanggal_bayar',
@@ -53,7 +55,9 @@ class Pembayaran extends Model
 
     protected $casts = [
 
-        'tanggal_bayar' => 'date',
+        'tanggal_bayar' => 'datetime',
+
+        'invoice_date' => 'datetime',
 
         'nominal' => 'decimal:2',
 
@@ -102,5 +106,53 @@ class Pembayaran extends Model
     public function isDibatalkan(): bool
     {
         return $this->status === self::STATUS_DIBATALKAN;
+    }
+        /**
+     * Total tagihan yang harus dibayar.
+     */
+    public function getTotalAttribute(): float
+    {
+        return (float) $this->total_bayar;
+    }
+
+    /**
+     * Apakah pembayaran lunas.
+     */
+    public function isLunas(): bool
+    {
+        return $this->isBerhasil();
+    }
+
+    /**
+     * Nominal kembalian.
+     */
+    public function hasKembalian(): bool
+    {
+        return $this->kembalian > 0;
+    }
+
+    /**
+     * Status badge Bootstrap.
+     */
+    public function badgeColor(): string
+    {
+        return match ($this->status) {
+
+            self::STATUS_BERHASIL => 'success',
+
+            self::STATUS_PENDING => 'warning',
+
+            self::STATUS_DIBATALKAN => 'danger',
+
+            default => 'secondary',
+
+        };
+    }
+    /**
+     * Detail alokasi pembayaran
+     */
+    public function alokasi(): HasMany
+    {
+        return $this->hasMany(AlokasiPembayaran::class);
     }
 }

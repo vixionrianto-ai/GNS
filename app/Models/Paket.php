@@ -7,6 +7,8 @@ use App\Models\Pelanggan;
 
 class Paket extends Model
 {
+    public const STATUS_AKTIF = 'Aktif';
+    public const STATUS_NONAKTIF = 'Nonaktif';
         protected $fillable = [
         'router_id',
         'nama_paket',

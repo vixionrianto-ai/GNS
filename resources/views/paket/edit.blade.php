@@ -1,111 +1,204 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-                <h2 class="text-xl font-semibold text-gray-900">Edit Paket Internet</h2>
-                <p class="text-sm text-gray-600">Perbarui data paket yang sudah ada.</p>
-            </div>
+@extends('adminlte::page')
+
+@section('title', 'Edit Paket Internet')
+
+@section('content_header')
+<div class="mb-2">
+    <h1 class="mb-1 font-weight-bold text-dark" style="font-size: 1.35rem;">
+        Edit Paket Internet
+    </h1>
+    <small class="text-muted" style="font-size: 11px;">
+        Perbarui data paket internet dan hubungkan dengan PPP Profile MikroTik.
+    </small>
+</div>
+@stop
+
+@section('content')
+
+@if ($errors->any())
+<div class="alert alert-danger py-2 mb-2 small shadow-sm rounded-3" style="font-size: 11px;">
+    <i class="fas fa-times-circle mr-1"></i> {{ $errors->first() }}
+</div>
+@endif
+
+<form action="{{ route('paket.update', $paket->id) }}" method="POST">
+    @csrf
+    @method('PUT')
+
+    <div class="card card-primary card-outline shadow-sm rounded-4 border-0 mb-3">
+        <div class="card-header bg-white py-3 border-0">
+            <h3 class="card-title font-weight-bold text-dark m-0" style="font-size: 0.95rem; line-height: 1.5;">
+                <i class="fas fa-wifi text-warning mr-2"></i> Formulir Edit Paket Internet
+            </h3>
         </div>
-    </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <form action="{{ route('paket.update', $paket->id) }}" method="POST" class="space-y-5">
-                    @csrf
-                    @method('PUT')
-
-                    <div class="grid gap-5 md:grid-cols-2">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-gray-700">Router</label>
-                            <select id="router_id" name="router_id" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                                @foreach($routers as $router)
-                                    <option value="{{ $router->id }}" {{ $router->id == $paket->router_id ? 'selected' : '' }}>{{ $router->nama_router }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-gray-700">Status</label>
-                            <select name="status" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="Aktif" {{ $paket->status == 'Aktif' ? 'selected' : '' }}>Aktif</option>
-                                <option value="Nonaktif" {{ $paket->status == 'Nonaktif' ? 'selected' : '' }}>Nonaktif</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-gray-700">Nama Paket</label>
-                        <input type="text" name="nama_paket" value="{{ $paket->nama_paket }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                    </div>
-
-                    <div>
-                        <label class="mb-1 block text-sm font-semibold text-gray-700">PPP Profile MikroTik</label>
-                        <select id="profile_mikrotik" name="profile_mikrotik" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                            <option value="{{ $paket->profile_mikrotik }}" selected>{{ $paket->profile_mikrotik }}</option>
+        <div class="card-body px-4 py-3">
+            <div class="row">
+                {{-- KOLOM KIRI --}}
+                <div class="col-md-6 pr-md-3">
+                    <div class="form-group mb-3">
+                        <label class="small font-weight-bold text-secondary">Router *</label>
+                        <select name="router_id" class="form-control form-control-sm" required>
+                            <option value="">-- Pilih Router --</option>
+                            @foreach($routers ?? [] as $router)
+                                <option value="{{ $router->id }}" {{ old('router_id', $paket->router_id ?? '') == $router->id ? 'selected' : '' }}>
+                                    {{ $router->nama_router }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
 
-                    <div class="grid gap-5 md:grid-cols-2">
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-gray-700">Kecepatan</label>
-                            <input type="text" id="kecepatan" name="kecepatan" value="{{ $paket->kecepatan }}" class="w-full rounded-lg border-gray-300 bg-gray-50 shadow-sm" readonly>
+                    <div class="form-group mb-3">
+                        <label class="small font-weight-bold text-secondary">Nama Paket *</label>
+                        <input type="text" name="nama_paket" class="form-control form-control-sm" value="{{ old('nama_paket', $paket->nama_paket ?? '') }}" placeholder="Contoh: GNS HEMAT" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="small font-weight-bold text-secondary">PPP Profile MikroTik *</label>
+                        <select name="ppp_profile" id="ppp_profile" class="form-control form-control-sm" required>
+                            @php
+                                $currentProfile = old('ppp_profile', $paket->ppp_profile ?? '');
+                            @endphp
+                            <option value="{{ $currentProfile }}" selected>{{ $currentProfile }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                {{-- KOLOM KANAN --}}
+                <div class="col-md-6 pl-md-3">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group mb-3">
+                                <label class="small font-weight-bold text-secondary">Kecepatan *</label>
+                                <input type="text" name="kecepatan" class="form-control form-control-sm" value="{{ old('kecepatan', $paket->kecepatan ?? '') }}" placeholder="10 Mbps" required>
+                            </div>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-gray-700">Harga</label>
-                            <input type="number" name="harga" value="{{ $paket->harga }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        <div class="col-6">
+                            <div class="form-group mb-3">
+                                <label class="small font-weight-bold text-secondary">Harga (Rp) *</label>
+                                <input type="number" name="harga" class="form-control form-control-sm" value="{{ old('harga', $paket->harga ?? '') }}" placeholder="100000" required>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row">
-                        <a href="{{ route('paket.index') }}" class="rounded-lg bg-gray-500 px-5 py-2.5 font-semibold text-white transition hover:bg-gray-600">
-                            ← Kembali
-                        </a>
-                        <button type="submit" class="rounded-lg bg-green-600 px-5 py-2.5 font-semibold text-white transition hover:bg-green-700">
-                            💾 Update Paket
-                        </button>
+                    <div class="form-group mb-3">
+                        <label class="small font-weight-bold text-secondary">Status *</label>
+                        <select name="status" class="form-control form-control-sm" required>
+                            <option value="Aktif" {{ old('status', $paket->status ?? '') == 'Aktif' ? 'selected' : '' }}>Aktif</option>
+                            <option value="Nonaktif" {{ old('status', $paket->status ?? '') == 'Nonaktif' ? 'selected' : '' }}>Nonaktif</option>
+                        </select>
                     </div>
-                </form>
+
+                    <div class="form-group mb-0">
+                        <label class="small font-weight-bold text-secondary">Keterangan</label>
+                        <textarea name="keterangan" rows="2" class="form-control form-control-sm" placeholder="Keterangan opsional...">{{ old('keterangan', $paket->keterangan ?? '') }}</textarea>
+                    </div>
+                </div>
             </div>
         </div>
+
+        <div class="card-footer bg-white py-3 border-0 text-right">
+            <a href="{{ route('paket.index') }}" class="btn btn-sm btn-light border px-4 font-weight-bold mr-2">Batal</a>
+            <button type="submit" class="btn btn-sm btn-warning px-4 font-weight-bold shadow-sm text-dark">
+                <i class="fas fa-save mr-1"></i> Update Paket Internet
+            </button>
+        </div>
     </div>
+</form>
 
-    <script>
-        function loadProfiles(routerId, selected = null) {
-            fetch('/router/' + routerId + '/profiles')
-                .then(response => response.json())
-                .then(function(data){
-                    let select = document.getElementById('profile_mikrotik');
-                    select.innerHTML = '';
+@stop
 
-                    data.forEach(function(item){
-                        let option = document.createElement('option');
-                        option.value = item;
-                        option.text = item;
-                        if (item == selected) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
+@section('css')
+<style>
+.card { 
+    border-radius: 12px; 
+}
+.form-control-sm { 
+    height: calc(1.5em + 0.5rem + 2px); 
+    font-size: 12px; 
+    border-radius: 6px; 
+}
+.btn { 
+    border-radius: 6px; 
+}
+/* Menjadikan navbar atas putih bersih seragam */
+.main-header.navbar {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+.main-header.navbar .nav-link {
+    color: #343a40 !important;
+}
+</style>
+@stop
+
+@section('js')
+<script>
+$(function(){
+    let currentProfile = "{{ old('ppp_profile', $paket->ppp_profile ?? '') }}";
+    let initialRouterId = $('[name="router_id"]').val();
+
+    function fetchProfiles(routerId) {
+        if (!routerId) return;
+        
+        $.get("{{ url('/router') }}/" + routerId + "/profiles", function(data) {
+            let profiles = data.profiles || data;
+            if (Array.isArray(profiles) && profiles.length > 0) {
+                let options = '<option value="">-- Pilih PPP Profile --</option>';
+                let found = false;
+
+                profiles.forEach(function(profile) {
+                    let isSelected = (profile === currentProfile) ? 'selected' : '';
+                    if (isSelected) found = true;
+                    options += `<option value="${profile}" ${isSelected}>${profile}</option>`;
                 });
-        }
 
-        document.getElementById('router_id').addEventListener('change', function(){
-            loadProfiles(this.value);
+                if (currentProfile && !found) {
+                    options += `<option value="${currentProfile}" selected>${currentProfile}</option>`;
+                }
+
+                $('#ppp_profile').html(options);
+            }
+        }).fail(function() {
+            // JIKA AJAX GAGAL: Biarkan nilai currentProfile tetap aman di dropdown.
         });
+    }
 
-        document.addEventListener('DOMContentLoaded', function(){
-            loadProfiles(document.getElementById('router_id').value, "{{ $paket->profile_mikrotik }}");
-        });
+    if (initialRouterId) {
+        fetchProfiles(initialRouterId);
+    }
 
-        document.getElementById('profile_mikrotik').addEventListener('change', function () {
-            const profile = this.value;
-            const match = profile.match(/\d+/);
-
-            if (match) {
-                document.getElementById('kecepatan').value = match[0] + ' Mbps';
-            } else {
-                document.getElementById('kecepatan').value = '';
+    $('[name="router_id"]').on('change', function() {
+        let routerId = $(this).val();
+        if (!routerId) return;
+        
+        $.get("{{ url('/router') }}/" + routerId + "/profiles", function(data) {
+            let profiles = data.profiles || data;
+            if (Array.isArray(profiles) && profiles.length > 0) {
+                let options = '<option value="">-- Pilih PPP Profile --</option>';
+                profiles.forEach(function(profile) {
+                    options += `<option value="${profile}">${profile}</option>`;
+                });
+                $('#ppp_profile').html(options);
             }
         });
-    </script>
-</x-app-layout>
+    });
+
+    $('#ppp_profile').on('change', function() {
+        let profile = $(this).val();
+        if (profile) {
+            let match = profile.match(/^C(\d+)/i);
+            if (match) {
+                $('[name="kecepatan"]').val(match[1] + ' Mbps');
+            }
+        }
+    });
+
+    $('form').on('submit', function(){
+        let btn = $(this).find('button[type="submit"]');
+        btn.prop('disabled', true);
+        btn.html('<i class="fas fa-spinner fa-spin mr-1"></i> Mengupdate...');
+    });
+});
+</script>
+@stop

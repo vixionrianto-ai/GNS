@@ -6,88 +6,327 @@ use App\Http\Requests\PembayaranRequest;
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
 use App\Services\PembayaranService;
+use App\Services\WhatsAppService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 
 class PembayaranController extends Controller
 {
     /**
-     * Riwayat pembayaran
+     * Service Pembayaran
+     */
+    protected PembayaranService $pembayaranService;
+    protected WhatsAppService $whatsAppService;
+
+    /**
+     * Constructor
+     */
+    public function __construct(
+        PembayaranService $pembayaranService,
+        WhatsAppService $whatsAppService
+    )
+    {
+        $this->pembayaranService = $pembayaranService;
+        $this->whatsAppService = $whatsAppService;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Helper
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Statistik pembayaran.
+     */
+    private function statistik(): array
+    {
+        $today = now()->toDateString();
+
+        return [
+
+            'totalHariIni' => Pembayaran::whereDate(
+                'tanggal_bayar',
+                $today
+            )
+            ->where(
+                'status',
+                Pembayaran::STATUS_BERHASIL
+            )
+            ->sum('total_bayar'),
+
+            'totalBulanIni' => Pembayaran::whereYear(
+                'tanggal_bayar',
+                now()->year
+            )
+            ->whereMonth(
+                'tanggal_bayar',
+                now()->month
+            )
+            ->where(
+                'status',
+                Pembayaran::STATUS_BERHASIL
+            )
+            ->sum('total_bayar'),
+
+            'jumlahTransaksi' => Pembayaran::count(),
+
+            'jumlahBerhasil' => 
+            Pembayaran::where(
+                'status',
+                Pembayaran::STATUS_BERHASIL
+            )->count(),
+
+            'jumlahPending' => 
+            Pembayaran::where(
+                'status',
+                Pembayaran::STATUS_PENDING
+            )->count(),
+
+            'jumlahBatal' => 
+            Pembayaran::where(
+                'status',
+                Pembayaran::STATUS_DIBATALKAN
+            )->count(),
+
+        ];
+    }
+
+    /**
+     * Load relasi pembayaran.
+     */
+    private function loadPembayaran(
+        Pembayaran $pembayaran
+    ): Pembayaran {
+
+        return $pembayaran->load([
+
+            'tagihan.pelanggan.paket',
+
+            'tagihan.pelanggan.router',
+
+            'user',
+
+        ]);
+
+    }
+
+    /**
+     * Riwayat pembayaran.
      */
     public function index()
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Data Pembayaran dengan Filter & Pencarian Nama Pelanggan / Invoice
+        |--------------------------------------------------------------------------
+        */
+
+        $search = request('search');
+        $periode = request('periode');
+        $status = request('status');
+        $metode = request('metode');
+
         $pembayarans = Pembayaran::with([
             'tagihan.pelanggan',
             'user',
         ])
-        ->latest()
-        ->paginate(15);
+        ->when($search, function ($query, $search) {
+            $query->where('invoice_no', 'like', "%{$search}%")
+                  ->orWhereHas('tagihan.pelanggan', function ($q) use ($search) {
+                      $q->where('nama', 'like', "%{$search}%");
+                  });
+        })
+        ->when($periode, function ($query, $periode) {
+            $query->whereHas('tagihan', function ($q) use ($periode) {
+                $q->where('periode', 'like', "%{$periode}%");
+            });
+        })
+        ->when($status, function ($query, $status) {
+            $query->where('status', $status);
+        })
+        ->when($metode, function ($query, $metode) {
+            $query->where('metode', $metode);
+        })
+        ->latest('id')
+        ->paginate(15)
+        ->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Statistik
+        |--------------------------------------------------------------------------
+        */
+
+        $statistik = $this->statistik();
+
+        /*
+        |--------------------------------------------------------------------------
+        | View
+        |--------------------------------------------------------------------------
+        */
 
         return view(
             'pembayaran.index',
-            compact('pembayarans')
+            array_merge(
+                [
+                    'pembayarans' => $pembayarans,
+                ],
+                $statistik
+            )
         );
     }
 
     /**
-     * Detail pembayaran
+     * Detail pembayaran.
      */
     public function show(Pembayaran $pembayaran)
     {
-        $pembayaran->load([
-            'tagihan.pelanggan.paket',
-            'tagihan.pelanggan.router',
-            'user',
+        $this->loadPembayaran($pembayaran);
+        $waUrl = $this->whatsAppService->pembayaran($pembayaran);
+        return view('pembayaran.show',[
+            'pembayaran'=>$pembayaran,
+            'waUrl'=>$waUrl,
         ]);
-
-        return view(
-            'pembayaran.show',
-            compact('pembayaran')
-        );
     }
+
     /**
-     * Halaman Invoice
+     * Halaman invoice.
      */
     public function invoice(Pembayaran $pembayaran)
     {
-        $pembayaran->load([
-            'tagihan.pelanggan.paket',
-            'tagihan.pelanggan.router',
-            'user',
+        $this->loadPembayaran($pembayaran);
+        $waUrl = $this->whatsAppService->pembayaran($pembayaran);
+        return view('pembayaran.invoice',[
+            'pembayaran'=>$pembayaran,
+            'waUrl'=>$waUrl,
         ]);
-
-        return view(
-            'pembayaran.invoice',
-            compact('pembayaran')
-        );
     }
 
-/**
- * Download PDF
- */
-public function pdf(Pembayaran $pembayaran)
-{
-    $pembayaran->load([
-        'tagihan.pelanggan.paket',
-        'tagihan.pelanggan.router',
-        'user',
-    ]);
-
-    $pdf = Pdf::loadView(
-        'pembayaran.pdf',
-        compact('pembayaran')
-    );
-
-    $pdf->setPaper('A4', 'portrait');
-
-    return $pdf->download(
-        'Invoice-'.$pembayaran->invoice_no.'.pdf'
-    );
-}
     /**
-     * Form pembayaran
+     * Download Invoice PDF.
+     */
+    public function pdf(Pembayaran $pembayaran)
+    {
+        $this->loadPembayaran($pembayaran);
+
+        try {
+
+            $pdf = Pdf::loadView(
+                'pembayaran.pdf',
+                compact('pembayaran')
+            );
+
+            $pdf->setPaper('A4', 'portrait');
+
+            Log::info('Invoice PDF dibuat', [
+
+                'invoice' => $pembayaran->invoice_no,
+
+                'user_id' => auth()->id(),
+
+            ]);
+
+            return $pdf->download(
+                'Invoice-' .
+                $pembayaran->invoice_no .
+                '.pdf'
+            );
+
+        } catch (\Throwable $e) {
+
+            Log::error('Generate PDF gagal', [
+
+                'invoice' => $pembayaran->invoice_no,
+
+                'message' => $e->getMessage(),
+
+            ]);
+
+            return redirect()
+                ->route(
+                    'pembayaran.show',
+                    $pembayaran
+                )
+                ->with(
+                    'error',
+                    'PDF gagal dibuat.'
+                );
+
+        }
+        
+    }
+
+    /**
+     * Public PDF untuk Fonnte.
+     */
+    public function publicPdf(string $token)
+    {
+        $pembayaran = Pembayaran::where(
+            'public_token',
+            $token
+        )->first();
+
+        if (! $pembayaran) {
+            abort(404);
+        }
+
+        $this->loadPembayaran($pembayaran);
+
+        try {
+
+            $pdf = Pdf::loadView(
+                'pembayaran.pdf',
+                compact('pembayaran')
+            );
+
+            $pdf->setPaper('A4', 'portrait');
+
+            Log::info('Public Invoice PDF', [
+
+                'invoice' => $pembayaran->invoice_no,
+
+                'ip' => request()->ip(),
+
+            ]);
+
+            return $pdf->stream(
+                'Invoice-' .
+                $pembayaran->invoice_no .
+                '.pdf'
+            );
+
+        } catch (\Throwable $e) {
+
+            Log::error('Public PDF gagal', [
+
+                'invoice' => $pembayaran->invoice_no,
+
+                'message' => $e->getMessage(),
+
+            ]);
+
+            abort(500);
+
+        }
+    }
+
+    /**
+     * Form pembayaran.
      */
     public function create(Tagihan $tagihan)
     {
+        if ($tagihan->status === Tagihan::STATUS_LUNAS) {
+
+            return redirect()
+                ->route('tagihan.show', $tagihan)
+                ->with(
+                    'warning',
+                    'Tagihan ini sudah lunas.'
+                );
+
+        }
+
         return view(
             'pembayaran.create',
             compact('tagihan')
@@ -95,28 +334,74 @@ public function pdf(Pembayaran $pembayaran)
     }
 
     /**
-     * Simpan pembayaran
+     * Simpan pembayaran.
      */
     public function store(
-    PembayaranRequest $request,
-    PembayaranService $service
-    ) {
+        PembayaranRequest $request
+    )
+    {
         try {
 
-            $pembayaran = $service->bayar(
+            $pembayaran = $this->pembayaranService->bayar(
                 $request->validated()
             );
 
-            return redirect()->route(
-                'pembayaran.invoice',
-                $pembayaran
-            );
+            Log::info('Pembayaran berhasil', [
+
+                'invoice' => $pembayaran->invoice_no,
+
+                'tagihan_id' => $pembayaran->tagihan_id,
+
+                'user_id' => auth()->id(),
+
+            ]);
+
+            if ($pembayaran->wa_berhasil) {
+
+                return redirect()
+                    ->route(
+                        'pembayaran.invoice',
+                        $pembayaran
+                    )
+                    ->with(
+                        'success',
+                        'Pembayaran berhasil disimpan dan WhatsApp berhasil dikirim ke pelanggan.'
+                    );
+
+            }
+
+            return redirect()
+                ->route(
+                    'pembayaran.invoice',
+                    $pembayaran
+                )
+                ->with(
+                    'warning',
+                    'Pembayaran berhasil disimpan, tetapi WhatsApp gagal dikirim. Silakan gunakan tombol Kirim WhatsApp pada halaman invoice.'
+                );
+
         } catch (\Throwable $e) {
-            return back()
+
+            Log::error('Pembayaran gagal', [
+
+                'message' => $e->getMessage(),
+
+                'file' => $e->getFile(),
+
+                'line' => $e->getLine(),
+
+                'user_id' => auth()->id(),
+
+            ]);
+
+            return redirect()
+                ->back()
                 ->withInput()
-                ->withErrors([
-                    'message' => $e->getMessage(),
-                ]);
+                ->with(
+                    'error',
+                    'Pembayaran gagal diproses. Silakan coba kembali.'
+                );
+
         }
     }
 }

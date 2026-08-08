@@ -1,54 +1,257 @@
-<x-app-layout>
+@extends('adminlte::page')
 
-<x-slot name="header">
+@section('title', 'Dashboard Enterprise')
 
-<div class="flex items-center justify-between">
+@section('css')
+
+<link rel="stylesheet" href="{{ asset('css/gns.css') }}">
+
+<style>
+
+:root{
+
+    --radius:18px;
+
+    --shadow:0 10px 28px rgba(0,0,0,.08);
+
+    --shadow-hover:0 16px 35px rgba(0,0,0,.12);
+
+}
+
+body{
+
+    background:#f4f6fb;
+
+}
+
+.dashboard-card{
+
+    border:0;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    overflow:hidden;
+
+}
+
+.dashboard-card .card-header{
+
+    background:#fff;
+
+    border-bottom:1px solid #eef2f7;
+
+    padding:18px 22px;
+
+}
+
+.kpi-card{
+
+    border:0;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    transition:.25s;
+
+    height:170px;
+
+}
+
+.kpi-card:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:var(--shadow-hover);
+
+}
+
+.kpi-card .card-body{
+
+    height:100%;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:space-between;
+
+    padding:22px;
+
+}
+
+.kpi-top{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-start;
+
+}
+
+.kpi-icon{
+
+    width:64px;
+
+    height:64px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:#fff;
+
+    font-size:24px;
+
+    flex-shrink:0;
+
+}
+
+.small-title{
+
+    font-size:12px;
+
+    font-weight:700;
+
+    letter-spacing:.8px;
+
+    color:#6c757d;
+
+    text-transform:uppercase;
+
+}
+
+.kpi-value{
+
+    font-size:44px;
+
+    font-weight:700;
+
+    line-height:1;
+
+    margin-top:8px;
+
+    margin-bottom:8px;
+
+}
+
+.kpi-money{
+
+    font-size:36px;
+
+    font-weight:700;
+
+    line-height:1.15;
+
+    white-space:nowrap;
+
+}
+
+.kpi-desc{
+
+    font-size:13px;
+
+    min-height:20px;
+
+}
+
+.progress-thin{
+
+    height:5px;
+
+    border-radius:20px;
+
+}
+
+.quick-btn{
+
+    height:95px;
+
+    border-radius:12px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-weight:600;
+
+}
+
+.header-title{
+
+    font-size:34px;
+
+    font-weight:700;
+
+}
+
+.header-subtitle{
+
+    color:#6c757d;
+
+    font-size:15px;
+
+}
+
+</style>
+
+@stop
+
+
+@section('content_header')
+
+<div class="d-flex justify-content-between align-items-center flex-wrap">
 
     <div>
 
-        <h2 class="text-3xl font-bold text-slate-800">
+        <div class="header-title">
 
-            GNS NETWORK
-
-        </h2>
-
-        <p class="text-gray-500 mt-1">
-
-            Billing Management System
-
-        </p>
-
-    </div>
-
-    <div class="text-right">
-
-        <div class="text-sm text-gray-500">
-
-            Selamat Datang
+            Dashboard GNS Enterprise
 
         </div>
 
-        <div class="font-bold text-lg">
+        <div class="header-subtitle">
+
+            Billing Management System • Monitoring • MikroTik • Statistik
+
+        </div>
+
+    </div>
+
+    <div class="text-lg-right mt-3 mt-lg-0">
+
+        <div class="font-weight-bold">
 
             {{ Auth::user()->name }}
 
         </div>
 
-        <div class="text-sm text-blue-600">
+        <small class="text-muted">
 
             Administrator
 
-        </div>
+        </small>
 
-        <div class="text-sm text-gray-500">
+        <div class="text-primary mt-2">
 
             {{ now()->translatedFormat('l, d F Y') }}
 
         </div>
 
-        <div
-            id="clock"
-            class="font-bold text-xl text-indigo-600">
+        <div class="font-weight-bold">
+
+            <span id="clock"></span>
 
         </div>
 
@@ -56,894 +259,1368 @@
 
 </div>
 
-</x-slot>
+@stop
 
-<div class="py-6">
 
-<div class="max-w-7xl mx-auto px-6">
+@section('content')
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+{{-- ============================= --}}
+{{-- KPI DASHBOARD --}}
+{{-- ============================= --}}
+
+<div class="row">
 
 {{-- Total Pelanggan --}}
+<div class="col-xl-3 col-lg-6 col-md-6 mb-4">
 
-<div class="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl shadow-lg p-6 text-white">
+    <div class="card kpi-card">
 
-<div class="flex justify-between">
+        <div class="card-body">
 
-<div>
+            <div class="kpi-top">
 
-<div class="text-sm opacity-80">
+                <div>
 
-Total Pelanggan
+                    <div class="small-title">
+                        TOTAL PELANGGAN
+                    </div>
 
-</div>
+                    <div class="kpi-value">
+                        {{ number_format($totalPelanggan) }}
+                    </div>
 
-<div class="text-4xl font-bold mt-3">
+                    <div class="kpi-desc text-success">
+                        {{ number_format($pelangganAktif) }} Aktif
+                    </div>
 
-{{ $totalPelanggan }}
+                </div>
 
-</div>
+                <div class="kpi-icon bg-primary">
+                    <i class="fas fa-users"></i>
+                </div>
 
-</div>
+            </div>
 
-<div class="text-5xl">
+            <div class="progress progress-thin">
 
-👥
+                <div class="progress-bar bg-primary"
+                     style="width:100%">
+                </div>
 
-</div>
+            </div>
 
-</div>
+        </div>
 
-</div>
-
-{{-- Pelanggan Aktif --}}
-
-<div class="bg-gradient-to-r from-green-600 to-green-500 rounded-2xl shadow-lg p-6 text-white">
-
-<div class="flex justify-between">
-
-<div>
-
-<div class="text-sm opacity-80">
-
-Pelanggan Aktif
-
-</div>
-
-<div class="text-4xl font-bold mt-3">
-
-{{ $pelangganAktif }}
+    </div>
 
 </div>
 
-</div>
+{{-- Pendapatan --}}
+<div class="col-xl-3 col-lg-6 col-md-6 mb-4">
 
-<div class="text-5xl">
+    <div class="card kpi-card">
 
-🟢
+        <div class="card-body">
 
-</div>
+            <div class="kpi-top">
 
-</div>
+                <div>
 
-</div>
+                    <div class="small-title">
+                        PENDAPATAN BULAN INI
+                    </div>
 
-{{-- Belum Bayar --}}
+                    <div class="kpi-money">
+                        Rp {{ number_format($pendapatanBulanIni,0,',','.') }}
+                    </div>
 
-<div class="bg-gradient-to-r from-red-600 to-red-500 rounded-2xl shadow-lg p-6 text-white">
+                    <div class="kpi-desc text-primary">
+                        Hari ini :
+                        Rp {{ number_format($pendapatanHariIni,0,',','.') }}
+                    </div>
 
-<div class="flex justify-between">
+                </div>
 
-<div>
+                <div class="kpi-icon bg-success">
+                    <i class="fas fa-wallet"></i>
+                </div>
 
-<div class="text-sm opacity-80">
+            </div>
 
-Belum Bayar
+            <div class="progress progress-thin">
 
-</div>
+                <div class="progress-bar bg-success"
+                     style="width:100%">
+                </div>
 
-<div class="text-4xl font-bold mt-3">
+            </div>
 
-{{ $tagihanBelumBayar }}
+        </div>
 
-</div>
-
-</div>
-
-<div class="text-5xl">
-
-📄
-
-</div>
-
-</div>
-
-</div>
-
-{{-- Pendapatan Bulan Ini --}}
-
-<div class="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-2xl shadow-lg p-6 text-white">
-
-<div class="flex justify-between">
-
-<div>
-
-<div class="text-sm opacity-80">
-
-Pendapatan Bulan Ini
+    </div>
 
 </div>
 
-<div class="text-2xl font-bold mt-3">
+{{-- Belum Lunas --}}
+<div class="col-xl-3 col-lg-6 col-md-6 mb-4">
 
-Rp {{ number_format($pendapatanBulanIni,0,',','.') }}
+    <div class="card kpi-card">
+
+        <div class="card-body">
+
+            <div class="kpi-top">
+
+                <div>
+
+                    <div class="small-title">
+                        TAGIHAN BELUM LUNAS
+                    </div>
+
+                    <div class="kpi-value">
+                        {{ number_format($tagihanBelumLunas) }}
+                    </div>
+
+                    <div class="kpi-desc text-danger">
+                        Menunggu Pembayaran
+                    </div>
+
+                </div>
+
+                <div class="kpi-icon bg-danger">
+                    <i class="fas fa-file-invoice"></i>
+                </div>
+
+            </div>
+
+            <div class="progress progress-thin">
+
+                <div class="progress-bar bg-danger"
+                     style="width:100%">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{{-- Collection --}}
+<div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+
+    <div class="card kpi-card">
+
+        <div class="card-body">
+
+            <div class="kpi-top">
+
+                <div>
+
+                    <div class="small-title">
+                        COLLECTION RATE
+                    </div>
+
+                    <div class="kpi-value">
+                        {{ $collectionRate }}%
+                    </div>
+
+                    <div class="kpi-desc text-success">
+
+                        {{ number_format($tagihanLunas) }}
+
+                        dari
+
+                        {{ number_format($totalTagihan) }}
+
+                        Tagihan
+
+                    </div>
+
+                </div>
+
+                <div class="kpi-icon bg-info">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+
+            </div>
+
+            <div class="progress progress-thin">
+
+                <div class="progress-bar bg-info"
+                     style="width:{{ $collectionRate }}%">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
 
 </div>
 
 </div>
 
-<div class="text-5xl">
+{{-- ========================================================= --}}
+{{-- KPI BISNIS --}}
+{{-- ========================================================= --}}
 
-💰
-
-</div>
-
-</div>
-
-</div>
-
-{{-- Router Aktif --}}
-
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<div class="flex justify-between items-center">
-
-<div>
-
-<div class="text-gray-500">
-
-Router Aktif
-
-</div>
-
-<div class="text-4xl font-bold text-blue-600 mt-2">
-
-{{ $routerAktif }}
-
-</div>
-
-</div>
-
-<div class="text-5xl">
-
-📡
-
-</div>
-
-</div>
-
-</div>
-
+<div class="row">
 {{-- Tagihan Lunas --}}
+<div class="col-lg-3 col-md-6 mb-4">
 
-<div class="bg-white rounded-2xl shadow border p-6">
+    <div class="card kpi-card">
 
-<div class="flex justify-between items-center">
+        <div class="card-body">
 
-<div>
+            <div class="d-flex justify-content-between align-items-center">
 
-<div class="text-gray-500">
+                <div>
 
-Tagihan Lunas
+                    <div class="small-title">
+                        TAGIHAN LUNAS
+                    </div>
 
-</div>
+                    <h2 class="font-weight-bold mb-1">
+                        {{ number_format($tagihanLunas) }}
+                    </h2>
 
-<div class="text-4xl font-bold text-green-600 mt-2">
+                    <small class="text-success">
+                        Sudah Dibayar
+                    </small>
 
-{{ $tagihanLunas }}
+                </div>
 
-</div>
+                <div class="kpi-icon bg-success">
 
-</div>
+                    <i class="fas fa-check-circle"></i>
 
-<div class="text-5xl">
+                </div>
 
-✅
+            </div>
 
-</div>
+            <div class="progress progress-thin mt-3">
 
-</div>
+                <div class="progress-bar bg-success"
+                     style="width:100%">
+                </div>
 
-</div>
+            </div>
 
-{{-- Pendapatan Hari Ini --}}
+        </div>
 
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<div class="flex justify-between items-center">
-
-<div>
-
-<div class="text-gray-500">
-
-Pendapatan Hari Ini
-
-</div>
-
-<div class="text-2xl font-bold text-indigo-600 mt-2">
-
-Rp {{ number_format($pendapatanHariIni,0,',','.') }}
+    </div>
 
 </div>
 
-</div>
+    {{-- Tagihan Sebagian --}}
+    <div class="col-lg-3 col-md-6 mb-4">
 
-<div class="text-5xl">
+        <div class="card kpi-card">
 
-💵
+            <div class="card-body">
 
-</div>
+                <div class="d-flex justify-content-between align-items-center">
 
-</div>
+                    <div>                   
+                        <div class="small-title">
+                            TAGIHAN SEBAGIAN
+                        </div>
 
-</div>
+                        <h2 class="font-weight-bold mb-1">
+                            {{ number_format($tagihanSebagian) }}
+                        </h2>
 
-{{-- Pelanggan Nonaktif --}}
+                        <small class="text-warning">
+                            Pembayaran Bertahap
+                        </small>
 
-<div class="bg-white rounded-2xl shadow border p-6">
+                    </div>
 
-<div class="flex justify-between items-center">
+                    <div class="kpi-icon bg-warning">
 
-<div>
+                        <i class="fas fa-percentage"></i>
 
-<div class="text-gray-500">
+                    </div>
 
-Pelanggan Nonaktif
+                </div>
 
-</div>
+                <div class="progress progress-thin mt-3">
 
-<div class="text-4xl font-bold text-red-600 mt-2">
+                    <div class="progress-bar bg-warning"
+                         style="width:100%">
 
-{{ $pelangganNonaktif }}
+                    </div>
 
-</div>
+                </div>
 
-</div>
+            </div>
 
-<div class="text-5xl">
+        </div>
 
-⛔
+    </div>
 
-</div>
+    {{-- Total Piutang --}}
+    <div class="col-lg-3 col-md-6 mb-4">
 
-</div>
+        <div class="card kpi-card">
 
-</div>
+            <div class="card-body">
 
-</div>
+                <div class="d-flex justify-content-between align-items-center">
 
-<br>
+                    <div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="small-title">
+                            TOTAL PIUTANG
+                        </div>
 
-<div class="lg:col-span-2 bg-white rounded-2xl shadow border p-6">
+                        <h5 class="font-weight-bold mb-1 text-nowrap">
+                            Rp {{ number_format($totalPiutang,0,',','.') }}
+                        </h5>
 
-<h3 class="text-xl font-bold text-gray-700 mb-5">
+                        <small class="text-danger">
+                            Belum Tertagih
+                        </small>
 
-📈 Pendapatan Bulanan
+                    </div>
 
-</h3>
+                    <div class="kpi-icon bg-danger">
 
-<canvas id="pendapatanChart" height="120"></canvas>
+                        <i class="fas fa-hand-holding-usd"></i>
 
-</div>
+                    </div>
 
-<div class="bg-white rounded-2xl shadow border p-6">
+                </div>
 
-<h3 class="text-xl font-bold text-gray-700 mb-5">
+                <div class="progress progress-thin mt-3">
 
-⚡ Quick Menu
+                    <div class="progress-bar bg-danger"
+                         style="width:100%">
 
-</h3>
-<div class="grid grid-cols-2 gap-3">
+                    </div>
 
-<a href="{{ route('pelanggan.create') }}"
-class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white p-4 text-center transition">
+                </div>
 
-<div class="text-3xl mb-2">
+            </div>
 
-👤
+        </div>
 
-</div>
+    </div>
 
-<div class="font-semibold">
+    {{-- Saldo Pelanggan --}}
+    <div class="col-lg-3 col-md-6 mb-4">
 
-Tambah Pelanggan
+        <div class="card kpi-card">
 
-</div>
+            <div class="card-body">
 
-</a>
+                <div class="d-flex justify-content-between align-items-center">
 
-<a href="{{ route('paket.create') }}"
-class="rounded-xl bg-green-600 hover:bg-green-700 text-white p-4 text-center transition">
+                    <div>
 
-<div class="text-3xl mb-2">
+                        <div class="small-title">
+                            SALDO PELANGGAN
+                        </div>
 
-🌐
+                        <h5 class="font-weight-bold mb-1 text-nowrap">
+                            Rp {{ number_format($totalSaldoPelanggan,0,',','.') }}
+                        </h5>
 
-</div>
+                        <small class="text-success">
+                            Deposit Pelanggan
+                        </small>
 
-<div class="font-semibold">
+                    </div>
 
-Tambah Paket
+                    <div class="kpi-icon bg-success">
 
-</div>
+                        <i class="fas fa-wallet"></i>
 
-</a>
+                    </div>
 
-<a href="{{ route('tagihan.generate') }}"
-class="rounded-xl bg-orange-500 hover:bg-orange-600 text-white p-4 text-center transition">
+                </div>
 
-<div class="text-3xl mb-2">
+                <div class="progress progress-thin mt-3">
 
-📄
+                    <div class="progress-bar bg-success"
+                         style="width:100%">
 
-</div>
+                    </div>
 
-<div class="font-semibold">
+                </div>
 
-Generate Tagihan
+            </div>
 
-</div>
+        </div>
 
-</a>
-
-<a href="{{ route('pembayaran.index') }}"
-class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white p-4 text-center transition">
-
-<div class="text-3xl mb-2">
-
-💳
-
-</div>
-
-<div class="font-semibold">
-
-Pembayaran
-
-</div>
-
-</a>
-
-<a href="{{ route('router.index') }}"
-class="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white p-4 text-center transition">
-
-<div class="text-3xl mb-2">
-
-📡
+    </div>
 
 </div>
 
-<div class="font-semibold">
+{{-- ========================================================= --}}
+{{-- GRAFIK + QUICK ACTION --}}
+{{-- ========================================================= --}}
 
-Router
+<div class="row">
+
+    <div class="col-lg-8 mb-4">
+
+        <div class="card dashboard-card">
+
+            <div class="card-header">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <h3 class="card-title mb-0">
+
+                        <i class="fas fa-chart-line text-primary mr-2"></i>
+
+                        Grafik Pendapatan 12 Bulan
+
+                    </h3>
+
+                    <span class="badge badge-success">
+
+                        {{ now()->year }}
+
+                    </span>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <canvas id="incomeChart"
+                        height="120"></canvas>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-lg-4 mb-4">
+
+        <div class="card dashboard-card">
+
+            <div class="card-header">
+
+                <h3 class="card-title">
+
+                    <i class="fas fa-bolt text-warning mr-2"></i>
+
+                    Quick Action
+
+                </h3>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="row">
+
+                    <div class="col-6 mb-3">
+
+                        <a href="{{ route('pelanggan.create') }}"
+                           class="btn btn-primary btn-block quick-btn">
+
+                            <i class="fas fa-user-plus"></i>
+
+                            <br>
+
+                            Pelanggan
+
+                        </a>
+
+                    </div>
+
+                    <div class="col-6 mb-3">
+
+                        <a href="{{ route('paket.create') }}"
+                           class="btn btn-primary btn-block quick-btn">
+
+                            <i class="fas fa-wifi"></i>
+
+                            <br>
+
+                            Paket
+
+                        </a>
+
+                    </div>
+
+                    <div class="col-6">
+
+                        <a href="{{ route('tagihan.index') }}"
+                           class="btn btn-primary btn-block quick-btn">
+
+                            <i class="fas fa-file-invoice"></i>
+
+                            <br>
+
+                            Tagihan
+
+                        </a>
+
+                    </div>
+
+                    <div class="col-6">
+
+                        <a href="{{ route('pembayaran.index') }}"
+                           class="btn btn-primary btn-block quick-btn">
+
+                            <i class="fas fa-money-check-alt"></i>
+
+                            <br>
+
+                            Pembayaran
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <hr>
+
+                <table class="table table-sm mb-0">
+
+                    <tr>
+
+                        <td>Total Pendapatan</td>
+
+                        <td class="text-right">
+
+                            <strong>
+
+                                Rp {{ number_format($totalPendapatan,0,',','.') }}
+
+                            </strong>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Total Pembayaran</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($totalPembayaran) }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Tagihan Hari Ini</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($tagihanHariIni) }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Router Aktif</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($routerAktif) }}
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{{-- ========================================================= --}}
+{{-- STATISTIK • STATUS SISTEM • MIKROTIK --}}
+{{-- ========================================================= --}}
+
+<div class="row">
+
+    {{-- Statistik Tagihan --}}
+    <div class="col-lg-4 mb-4">
+
+        <div class="card dashboard-card h-100">
+
+            <div class="card-header">
+
+                <h3 class="card-title mb-0">
+
+                    <i class="fas fa-file-invoice text-primary mr-2"></i>
+
+                    Statistik Tagihan
+
+                </h3>
+
+            </div>
+
+            <div class="card-body p-0">
+
+                <div class="info-box border-0 mb-0">
+
+                    <span class="info-box-icon bg-success">
+
+                        <i class="fas fa-check-circle"></i>
+
+                    </span>
+
+                    <div class="info-box-content">
+
+                        <span class="info-box-text">
+
+                            Tagihan Lunas
+
+                        </span>
+
+                        <span class="info-box-number">
+
+                            {{ number_format($tagihanLunas) }}
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+                <div class="info-box border-0 mb-0">
+
+                    <span class="info-box-icon bg-danger">
+
+                        <i class="fas fa-times-circle"></i>
+
+                    </span>
+
+                    <div class="info-box-content">
+
+                        <span class="info-box-text">
+
+                            Belum Dibayar
+
+                        </span>
+
+                        <span class="info-box-number">
+
+                            {{ number_format($tagihanBelumBayar) }}
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+                <div class="info-box border-0">
+
+                    <span class="info-box-icon bg-info">
+
+                        <i class="fas fa-calendar-day"></i>
+
+                    </span>
+
+                    <div class="info-box-content">
+
+                        <span class="info-box-text">
+
+                            Tagihan Hari Ini
+
+                        </span>
+
+                        <span class="info-box-number">
+
+                            {{ number_format($tagihanHariIni) }}
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    {{-- Status Sistem --}}
+    <div class="col-lg-4 mb-4">
+
+        <div class="card dashboard-card h-100">
+
+            <div class="card-header">
+
+                <h3 class="card-title mb-0">
+
+                    <i class="fas fa-server text-success mr-2"></i>
+
+                    Status Sistem
+
+                </h3>
+
+            </div>
+
+            <div class="card-body">
+
+                <table class="table table-sm table-borderless mb-0">
+
+                    <tr>
+
+                        <td>Versi GNS</td>
+
+                        <td class="text-right">
+
+                            <strong>Enterprise v4</strong>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Laravel</td>
+
+                        <td class="text-right">
+
+                            {{ app()->version() }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Status</td>
+
+                        <td class="text-right">
+
+                            <span class="badge badge-success">
+
+                                ONLINE
+
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Jam Server</td>
+
+                        <td class="text-right">
+
+                            <span id="serverClock"></span>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Total Router</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($totalRouter) }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Pelanggan Aktif</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($pelangganAktif) }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Tagihan Lunas</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($tagihanLunas) }}
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    {{-- Monitoring MikroTik --}}
+    <div class="col-lg-4 mb-4">
+
+        <div class="card dashboard-card h-100">
+
+            <div class="card-header">
+
+                <h3 class="card-title mb-0">
+
+                    <i class="fas fa-network-wired text-info mr-2"></i>
+
+                    Monitoring MikroTik
+
+                </h3>
+
+            </div>
+
+            <div class="card-body">
+
+                <table class="table table-sm table-borderless mb-0">
+
+                    <tr>
+
+                        <td>Status</td>
+
+                        <td class="text-right">
+
+                            @if($mikrotikStatus)
+
+                                <span class="badge badge-success">
+
+                                    ONLINE
+
+                                </span>
+
+                            @else
+
+                                <span class="badge badge-danger">
+
+                                    OFFLINE
+
+                                </span>
+
+                            @endif
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Identity</td>
+
+                        <td class="text-right">
+
+                            {{ $routerIdentity }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Version</td>
+
+                        <td class="text-right">
+
+                            {{ $routerVersion }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>CPU Load</td>
+
+                        <td class="text-right">
+
+                            {{ $routerCpu }}%
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Memory</td>
+
+                        <td class="text-right">
+
+                            {{ $routerMemory }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>Uptime</td>
+
+                        <td class="text-right">
+
+                            {{ $routerUptime }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>PPP Active</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($pppActive) }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <td>PPP Secret</td>
+
+                        <td class="text-right">
+
+                            {{ number_format($pppSecret) }}
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
 
 </div>
 
-</a>
+{{-- ========================================================= --}}
+{{-- PEMBAYARAN TERAKHIR + AUDIT TRAIL --}}
+{{-- ========================================================= --}}
 
-<a href="{{ route('tagihan.index') }}"
-class="rounded-xl bg-red-600 hover:bg-red-700 text-white p-4 text-center transition">
+<div class="row">
 
-<div class="text-3xl mb-2">
+    {{-- Pembayaran Terakhir --}}
+    <div class="col-lg-7 mb-4">
 
-🧾
+        <div class="card dashboard-card">
+
+            <div class="card-header">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <h3 class="card-title mb-0">
+
+                        <i class="fas fa-money-check-alt text-success mr-2"></i>
+
+                        Pembayaran Terakhir
+
+                    </h3>
+
+                    <a href="{{ route('pembayaran.index') }}"
+                       class="btn btn-sm btn-outline-primary">
+
+                        Lihat Semua
+
+                    </a>
+
+                </div>
+
+            </div>
+
+            <div class="card-body table-responsive p-0">
+
+                <table class="table table-hover mb-0">
+
+                    <thead>
+
+                        <tr>
+
+                        <th>Invoice</th>
+                        <th>Pelanggan</th>
+                        <th>Total</th>
+                        <th>Metode</th>
+                        <th>Tanggal</th>
+                        <th>Status</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        @forelse($pembayaranTerakhir as $item)
+
+                        <tr>
+
+                            <td>
+                                <strong>{{ $item->invoice_no }}</strong>
+                            </td>
+
+                            <td>
+                                {{ data_get($item, 'tagihan.pelanggan.nama', '-') }}
+                            </td>
+
+                            <td>
+                                Rp {{ number_format($item->total_bayar,0,',','.') }}
+                            </td>
+                            <td>
+
+                                @switch($item->metode)
+
+                                    @case('Cash')
+                                        <span class="badge badge-success">Cash</span>
+                                        @break
+
+                                    @case('Transfer')
+                                        <span class="badge badge-primary">Transfer</span>
+                                        @break
+
+                                    @case('Saldo')
+                                        <span class="badge badge-warning">Saldo</span>
+                                        @break
+
+                                    @default
+                                        <span class="badge badge-secondary">
+                                            {{ $item->metode }}
+                                        </span>
+
+                                @endswitch
+
+                            </td>
+                            <td>
+                                {{ optional($item->tanggal_bayar)->format('d M Y H:i') }}
+                            </td>
+
+                            <td>
+
+                                @if($item->status == \App\Models\Pembayaran::STATUS_BERHASIL)
+
+                                    <span class="badge badge-success">
+                                        LUNAS
+                                    </span>
+
+                                @elseif($item->status == \App\Models\Pembayaran::STATUS_PENDING)
+
+                                    <span class="badge badge-warning">
+                                        PENDING
+                                    </span>
+
+                                @else
+
+                                    <span class="badge badge-danger">
+                                        DIBATALKAN
+                                    </span>
+
+                                @endif
+
+                            </td>
+
+                        </tr>
+
+                        @empty
+
+                        <tr>
+
+                            <td colspan="6"
+                                class="text-center text-muted py-4">
+
+                                Belum ada pembayaran.
+
+                            </td>
+
+                        </tr>
+
+                        @endforelse
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {{-- Audit Trail --}}
+    <div class="col-lg-5 mb-4">
+
+        <div class="card dashboard-card">
+
+            <div class="card-header">
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <h3 class="card-title mb-0">
+
+                        <i class="fas fa-history text-primary mr-2"></i>
+
+                        Aktivitas Terbaru
+
+                    </h3>
+
+                </div>
+
+            </div>
+
+            <div class="card-body p-0">
+
+                <div class="list-group list-group-flush">
+
+                    @forelse($auditTerbaru as $audit)
+
+                        <div class="list-group-item">
+
+                            <strong>
+
+                                {{ $audit->module }}
+
+                            </strong>
+
+                            <br>
+
+                            <small>
+
+                                {{ $audit->description }}
+
+                            </small>
+
+                            <br>
+
+                            <small class="text-muted">
+
+                                {{ optional($audit->created_at)->diffForHumans() ?? '-' }}
+
+                            </small>
+
+                        </div>
+
+                    @empty
+
+                        <div class="list-group-item text-center text-muted">
+
+                            Belum ada aktivitas.
+
+                        </div>
+
+                    @endforelse
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
 
 </div>
 
-<div class="font-semibold">
 
-Tagihan
+{{-- ========================================================= --}}
+{{-- TAGIHAN JATUH TEMPO --}}
+{{-- ========================================================= --}}
+
+<div class="card dashboard-card">
+
+    <div class="card-header">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <h3 class="card-title mb-0">
+
+                <i class="fas fa-calendar-times text-danger mr-2"></i>
+
+                Tagihan Jatuh Tempo
+
+            </h3>
+
+            <span class="badge badge-danger">
+
+                {{ count($tagihanJatuhTempo) }}
+
+            </span>
+
+        </div>
+
+    </div>
+
+    <div class="card-body table-responsive p-0">
+
+        <table class="table table-hover mb-0">
+
+            <thead>
+
+                <tr>
+
+                    <th>#</th>
+                    <th>Pelanggan</th>
+                    <th>Invoice</th>
+                    <th>Periode</th>
+                    <th>Jatuh Tempo</th>
+                    <th>Total</th>
+
+                    <th>Status</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                @forelse($tagihanJatuhTempo as $i => $item)
+
+                <tr>
+
+                    <td>{{ $i+1 }}</td>
+
+                    <td>{{ data_get($item, 'pelanggan.nama', '-') }}</td>
+
+                    <td>{{ $item->invoice_no }}</td>
+
+                    <td>{{ $item->periode }}</td>
+
+                    <td>{{ optional($item->tanggal_jatuh_tempo)->format('d M Y') }}</td>
+
+                    <td>
+
+                        Rp {{ number_format($item->total,0,',','.') }}
+
+                    </td>
+
+                    <td>
+
+                        @if($item->status == \App\Models\Tagihan::STATUS_JATUH_TEMPO)
+
+                            <span class="badge badge-danger">
+
+                                JATUH TEMPO
+
+                            </span>
+
+                        @else
+
+                            <span class="badge badge-warning">
+
+                                BELUM BAYAR
+
+                            </span>
+
+                        @endif
+
+                    </td>
+
+                </tr>
+
+                @empty
+
+                <tr>
+
+                    <td colspan="7"
+                        class="text-center text-muted py-4">
+
+                        Tidak ada tagihan jatuh tempo.
+
+                    </td>
+
+                </tr>
+
+                @endforelse
+
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
 
-</a>
+@stop
 
-</div>
 
-</div>
-
-</div>
-
-<br>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<h3 class="text-lg font-bold text-gray-700 mb-5">
-
-📊 Status Pelanggan
-
-</h3>
-
-<canvas
-id="statusChart"
-height="240">
-
-</canvas>
-
-</div>
-
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<h3 class="text-lg font-bold text-gray-700 mb-5">
-
-🚀 Statistik Cepat
-
-</h3>
-
-<div class="space-y-4">
-
-<div class="flex justify-between">
-
-<span>Total Router</span>
-
-<span class="font-bold">
-
-{{ $totalRouter }}
-
-</span>
-
-</div>
-
-<div class="flex justify-between">
-
-<span>Router Aktif</span>
-
-<span class="font-bold text-green-600">
-
-{{ $routerAktif }}
-
-</span>
-
-</div>
-
-<div class="flex justify-between">
-
-<span>Tagihan Lunas</span>
-
-<span class="font-bold text-blue-600">
-
-{{ $tagihanLunas }}
-
-</span>
-
-</div>
-
-<div class="flex justify-between">
-
-<span>Belum Bayar</span>
-
-<span class="font-bold text-red-600">
-
-{{ $tagihanBelumBayar }}
-
-</span>
-
-</div>
-
-<div class="flex justify-between">
-
-<span>Pelanggan Aktif</span>
-
-<span class="font-bold text-green-600">
-
-{{ $pelangganAktif }}
-
-</span>
-
-</div>
-
-<div class="flex justify-between">
-
-<span>Pelanggan Nonaktif</span>
-
-<span class="font-bold text-red-600">
-
-{{ $pelangganNonaktif }}
-
-</span>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="bg-gradient-to-br from-blue-700 to-indigo-700 rounded-2xl shadow-lg text-white p-6">
-
-<h3 class="text-xl font-bold mb-5">
-
-💡 Informasi Sistem
-
-</h3>
-
-<div class="space-y-4">
-
-<div>
-
-<b>Versi</b>
-
-<br>
-
-GNS Billing v2.0
-
-</div>
-
-<div>
-
-<b>Laravel</b>
-
-<br>
-
-13.x
-
-</div>
-
-<div>
-
-<b>Status Sistem</b>
-
-<br>
-
-<span class="text-green-300">
-
-ONLINE
-
-</span>
-
-</div>
-
-<div>
-
-<b>Server Time</b>
-
-<br>
-
-<span id="serverClock"></span>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<br>
-
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<h2 class="text-xl font-bold text-gray-700 mb-4">
-
-💳 Pembayaran Terakhir
-
-</h2>
-
-<div class="overflow-x-auto">
-
-<table class="min-w-full">
-
-<thead>
-
-<tr class="bg-slate-100">
-
-<th class="p-3 text-left">
-
-Invoice
-
-</th>
-
-<th class="p-3 text-left">
-
-Pelanggan
-
-</th>
-
-<th class="p-3 text-right">
-
-Nominal
-
-</th>
-
-<th class="p-3 text-center">
-
-Tanggal
-
-</th>
-
-<th class="p-3 text-center">
-
-Status
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-    @forelse($pembayaranTerakhir as $item)
-
-<tr class="border-b hover:bg-gray-50">
-
-<td class="p-3">
-
-{{ $item->invoice_no ?? $item->tagihan->invoice_no }}
-
-</td>
-
-<td class="p-3">
-
-{{ $item->tagihan->pelanggan->nama }}
-
-</td>
-
-<td class="p-3 text-right font-semibold text-blue-600">
-
-Rp {{ number_format($item->total_bayar,0,',','.') }}
-
-</td>
-
-<td class="p-3 text-center">
-
-{{ \Carbon\Carbon::parse($item->tanggal_bayar)->format('d-m-Y') }}
-
-</td>
-
-<td class="p-3 text-center">
-
-<span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-
-LUNAS
-
-</span>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-
-<td colspan="5" class="text-center p-6 text-gray-500">
-
-Belum ada pembayaran.
-
-</td>
-
-</tr>
-
-@endforelse
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-<br>
-
-<div class="bg-white rounded-2xl shadow border p-6">
-
-<h2 class="text-xl font-bold text-gray-700 mb-4">
-
-📄 Tagihan Jatuh Tempo
-
-</h2>
-
-<div class="overflow-x-auto">
-
-<table class="min-w-full">
-
-<thead>
-
-<tr class="bg-red-50">
-
-<th class="p-3 text-left">
-
-Invoice
-
-</th>
-
-<th class="p-3 text-left">
-
-Pelanggan
-
-</th>
-
-<th class="p-3 text-center">
-
-Jatuh Tempo
-
-</th>
-
-<th class="p-3 text-center">
-
-Status
-
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-@forelse($tagihanJatuhTempo as $item)
-
-<tr class="border-b hover:bg-gray-50">
-
-<td class="p-3">
-
-{{ $item->invoice_no }}
-
-</td>
-
-<td class="p-3">
-
-{{ $item->pelanggan->nama }}
-
-</td>
-
-<td class="p-3 text-center">
-
-{{ \Carbon\Carbon::parse($item->tanggal_jatuh_tempo)->format('d-m-Y') }}
-
-</td>
-
-<td class="p-3 text-center">
-
-<span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
-
-{{ strtoupper($item->status) }}
-
-</span>
-
-</td>
-
-</tr>
-
-@empty
-
-<tr>
-
-<td colspan="4" class="text-center p-6 text-gray-500">
-
-Tidak ada tagihan jatuh tempo.
-
-</td>
-
-</tr>
-
-@endforelse
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-</div>
+@section('js')
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
-function updateClock(){
+document.addEventListener('DOMContentLoaded', function () {
 
-const now=new Date();
+    function updateClock() {
 
-document.getElementById('clock').innerHTML=
+        const now = new Date();
 
-now.toLocaleTimeString('id-ID');
+        const jam = now.toLocaleTimeString('id-ID');
 
-document.getElementById('serverClock').innerHTML=
+        const tanggal = now.toLocaleString('id-ID');
 
-now.toLocaleString('id-ID');
+        document.getElementById('clock').innerHTML = jam;
 
-}
+        document.getElementById('serverClock').innerHTML = tanggal;
 
-setInterval(updateClock,1000);
+    }
 
-updateClock();
+    updateClock();
 
-const pendapatanChart=document.getElementById('pendapatanChart');
+    setInterval(updateClock,1000);
 
-if(pendapatanChart){
+    const ctx = document.getElementById('incomeChart');
 
-new Chart(pendapatanChart,{
+    if(ctx){
 
-type:'bar',
+        new Chart(ctx,{
 
-data:{
+            type:'line',
 
-labels:['Hari Ini','Bulan Ini'],
+            data:{
+                labels:@json($grafikLabel),
+                datasets:[{
+                    data:@json($grafikPendapatan),
+                    borderColor:'#007bff',
+                    backgroundColor:'rgba(0,123,255,.1)',
+                    fill:true,
+                    tension:.35
+                }]
+            },
 
-datasets:[{
+            options:{
+                responsive:true,
+                maintainAspectRatio:false,
+                plugins:{
+                    legend:{display:false}
+                }
+            }
 
-label:'Pendapatan',
+        });
 
-data:[
-
-{{ $pendapatanHariIni }},
-
-{{ $pendapatanBulanIni }}
-
-]
-
-}]
-
-},
-
-options:{
-
-responsive:true,
-
-plugins:{
-
-legend:{display:false}
-
-}
-
-}
+    }
 
 });
-
-}
-
-const statusChart=document.getElementById('statusChart');
-
-if(statusChart){
-
-new Chart(statusChart,{
-
-type:'doughnut',
-
-data:{
-
-labels:['Aktif','Nonaktif'],
-
-datasets:[{
-
-data:[
-
-{{ $pelangganAktif }},
-
-{{ $pelangganNonaktif }}
-
-]
-
-}]
-
-},
-
-options:{
-
-responsive:true
-
-}
-
-});
-
-}
 
 </script>
 
-</x-app-layout>
+@stop

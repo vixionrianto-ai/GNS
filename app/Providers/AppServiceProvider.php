@@ -3,6 +3,11 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Pagination\Paginator;
+use App\Services\WhatsApp\WhatsAppProvider;
+use App\Services\WhatsApp\FonnteProvider;
+use App\Models\Pelanggan;
+use App\Observers\PelangganObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -11,7 +16,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+
+            WhatsAppProvider::class,
+
+            FonnteProvider::class
+
+        );
     }
 
     /**
@@ -19,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // AdminLTE menggunakan Bootstrap 4
+        Paginator::useBootstrapFour();
+
+        // Audit Trail
+        Pelanggan::observe(PelangganObserver::class);
     }
 }

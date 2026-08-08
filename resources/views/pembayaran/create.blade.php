@@ -1,167 +1,193 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-                <h2 class="text-xl font-semibold text-gray-900">Pembayaran Tagihan</h2>
-                <p class="text-sm text-gray-600">Isi data pembayaran dengan tampilan yang lebih rapi dan mudah dibaca.</p>
-            </div>
-        </div>
-    </x-slot>
+@extends('layouts.app')
 
-    <div class="py-6">
-        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div class="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
-                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <h3 class="text-2xl font-bold text-gray-900">{{ $tagihan->invoice_no }}</h3>
-                            <p class="text-base text-gray-700">{{ $tagihan->pelanggan->nama }}</p>
-                        </div>
-                        <div class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
-                            @if($tagihan->status == 'Lunas')
-                                Lunas
-                            @else
-                                Belum Bayar
-                            @endif
-                        </div>
-                    </div>
+@section('content')
+<div class="container-fluid px-3 py-2">
+    <!-- Header Page Compact & Normal Font -->
+    <div class="card border-0 shadow-sm rounded-3 mb-2 text-white overflow-hidden" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+        <div class="card-body px-3 py-2">
+            <div class="row align-items-center g-2">
+                <div class="col-md-7">
+                    <span class="badge bg-white bg-opacity-25 text-white px-2.5 py-1 rounded-pill fw-semibold mb-1">
+                        <i class="fas fa-shield-alt me-1"></i> GNS Billing System
+                    </span>
+                    <h5 class="fw-bold mb-0 text-white"><i class="fas fa-money-bill-wave me-2"></i> Pembayaran Tagihan</h5>
                 </div>
-
-                <div class="mb-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div class="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                        <h4 class="mb-4 text-lg font-semibold text-gray-900">Informasi Pelanggan</h4>
-                        <dl class="space-y-3 text-sm text-gray-700">
-                            <div class="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                                <dt class="font-semibold text-gray-900">Router</dt>
-                                <dd class="text-right">{{ $tagihan->pelanggan->router->nama_router ?? '-' }}</dd>
-                            </div>
-                            <div class="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                                <dt class="font-semibold text-gray-900">Username PPPoE</dt>
-                                <dd class="text-right break-all">{{ $tagihan->pelanggan->username_pppoe }}</dd>
-                            </div>
-                            <div class="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                                <dt class="font-semibold text-gray-900">No HP</dt>
-                                <dd class="text-right">{{ $tagihan->pelanggan->no_hp }}</dd>
-                            </div>
-                            <div class="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                                <dt class="font-semibold text-gray-900">Alamat</dt>
-                                <dd class="text-right">{{ $tagihan->pelanggan->alamat }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <div class="rounded-xl border border-blue-100 bg-blue-50 p-5">
-                        <h4 class="mb-4 text-lg font-semibold text-gray-900">Ringkasan Tagihan</h4>
-                        <div class="space-y-3 text-sm text-gray-700">
-                            <div class="flex items-center justify-between">
-                                <span>Periode</span>
-                                <span class="font-medium text-gray-900">{{ $tagihan->periode }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span>Paket</span>
-                                <span class="font-medium text-gray-900">{{ $tagihan->pelanggan->paket->nama_paket ?? '-' }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span>Nominal</span>
-                                <span class="font-medium text-gray-900">Rp {{ number_format($tagihan->nominal,0,',','.') }}</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span>Denda</span>
-                                <span class="font-medium text-gray-900">Rp {{ number_format($tagihan->denda,0,',','.') }}</span>
-                            </div>
-                        </div>
-                        <div class="mt-4 border-t border-blue-200 pt-4">
-                            <div class="flex items-center justify-between text-lg font-bold text-blue-700">
-                                <span>TOTAL</span>
-                                <span>Rp {{ number_format($tagihan->total,0,',','.') }}</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="col-md-5 text-md-end">
+                    <a href="{{ route('tagihan.index') }}" class="btn btn-light text-primary px-3 py-1.5 rounded-pill fw-bold shadow-sm">
+                        <i class="fas fa-arrow-left me-1"></i> Kembali
+                    </a>
                 </div>
-
-                <form action="{{ route('pembayaran.store') }}" method="POST" class="space-y-6">
-                    @csrf
-
-                    @if ($errors->any())
-                        <div class="rounded-lg border border-red-200 bg-red-50 p-4">
-                            <p class="mb-2 font-semibold text-red-700">Terdapat beberapa masalah:</p>
-                            <ul class="list-disc space-y-1 pl-5 text-sm text-red-700">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
-                    <input type="hidden" name="tagihan_id" value="{{ $tagihan->id }}">
-
-                    <div class="rounded-xl border border-gray-200 p-5">
-                        <div class="grid gap-5 md:grid-cols-2">
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-gray-700">Metode Pembayaran</label>
-                                <select name="metode" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="Cash" {{ old('metode') == 'Cash' ? 'selected' : '' }}>Cash</option>
-                                    <option value="Transfer" {{ old('metode') == 'Transfer' ? 'selected' : '' }}>Transfer</option>
-                                    <option value="QRIS" {{ old('metode') == 'QRIS' ? 'selected' : '' }}>QRIS</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-gray-700">Biaya Admin</label>
-                                <input type="number" name="biaya_admin" value="{{ old('biaya_admin', 0) }}" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-gray-700">Uang Diterima</label>
-                                <input id="dibayar" type="number" name="dibayar" value="{{ old('dibayar', $tagihan->total) }}" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-gray-700">Kembalian</label>
-                                <input id="kembalian" name="kembalian" readonly class="w-full rounded-lg border-gray-300 bg-gray-100 shadow-sm">
-                            </div>
-                        </div>
-
-                        <div class="mt-5">
-                            <label class="mb-1 block text-sm font-semibold text-gray-700">Keterangan</label>
-                            <textarea name="keterangan" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('keterangan') }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center">
-                        <button type="submit" class="rounded-lg bg-green-600 px-5 py-2.5 font-semibold text-white transition hover:bg-green-700">
-                            Simpan Pembayaran
-                        </button>
-                        <a href="{{ route('tagihan.show', $tagihan) }}" class="rounded-lg bg-gray-500 px-5 py-2.5 font-semibold text-white transition hover:bg-gray-600">
-                            Batal
-                        </a>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
 
-    <script>
-        const nominal = {{ $tagihan->nominal }};
-        const denda = {{ $tagihan->denda }};
+    <!-- Layout Utama 2 Kolom -->
+    <div class="row g-2">
+        <!-- Kolom Kiri: Informasi Pelanggan & Form Pembayaran -->
+        <div class="col-lg-8">
+            <!-- Informasi Pelanggan -->
+            <div class="card border-0 shadow-sm rounded-3 mb-2 overflow-hidden">
+                <div class="card-header bg-white py-2 px-3 border-0 d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 text-primary p-1.5 rounded-2 me-2">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold text-dark">Informasi Pelanggan</h6>
+                </div>
+                <div class="card-body bg-light bg-opacity-50 border-top py-2 px-3">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small fw-semibold">Nama Pelanggan</span>
+                            <span class="fw-bold text-dark">{{ optional($tagihan->pelanggan)->nama ?? '-' }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small fw-semibold">Invoice</span>
+                            <span class="fw-bold text-dark">{{ $tagihan->invoice_no ?? '-' }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small fw-semibold">Paket Internet</span>
+                            <span class="fw-semibold text-primary">{{ optional(optional($tagihan->pelanggan)->paket)->nama_paket ?? '-' }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small fw-semibold">Router / No HP</span>
+                            <span class="fw-semibold text-dark">{{ optional(optional($tagihan->pelanggan)->router)->nama_router ?? '-' }} / {{ optional($tagihan->pelanggan)->no_hp ?? '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        const admin = document.querySelector('[name="biaya_admin"]');
-        const dibayar = document.getElementById('dibayar');
-        const kembali = document.getElementById('kembalian');
+            <!-- Form Pembayaran -->
+            <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="card-header bg-white py-2 px-3 border-0 d-flex align-items-center">
+                    <div class="bg-success bg-opacity-10 text-success p-1.5 rounded-2 me-2">
+                        <i class="fas fa-cash-register"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold text-dark">Form Pembayaran</h6>
+                </div>
+                <div class="card-body bg-white border-top py-2 px-3">
+                    <form id="formPembayaran" action="{{ route('pembayaran.store') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="tagihan_id" value="{{ $tagihan->id }}">
 
-        function hitung() {
-            let biayaAdmin = parseFloat(admin.value) || 0;
-            let bayar = parseFloat(dibayar.value) || 0;
-            let total = nominal + denda + biayaAdmin;
-            let hasil = bayar - total;
-            kembali.value = hasil > 0 ? hasil : 0;
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-secondary mb-1">Tanggal Bayar</label>
+                                <input type="date" name="tanggal_bayar" class="form-control form-control-sm rounded-2 shadow-none py-1.5" value="{{ date('Y-m-d') }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-secondary mb-1">Metode Pembayaran</label>
+                                <select name="metode" class="form-select form-select-sm rounded-2 shadow-none py-1.5" required>
+                                    <option value="Cash">Cash / Tunai</option>
+                                    <option value="Transfer">Transfer Bank</option>
+                                    <option value="QRIS">QRIS</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-secondary mb-1">Nominal Dibayar (Rp)</label>
+                                <!-- Input bertipe text dengan format titik -->
+                                <input type="text" id="inputDibayar" name="dibayar" class="form-control form-control-sm rounded-2 shadow-none py-1.5" value="{{ number_format($tagihan->total ?? 0, 0, ',', '.') }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-secondary mb-1">Biaya Admin (Rp)</label>
+                                <input type="text" id="inputAdmin" name="biaya_admin" class="form-control form-control-sm rounded-2 shadow-none py-1.5" value="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-secondary mb-1">Keterangan</label>
+                                <input type="text" name="keterangan" class="form-control form-control-sm rounded-2 shadow-none py-1.5" placeholder="Opsional">
+                            </div>
+                            <div class="col-12 mt-2 text-end">
+                                <button type="submit" class="btn btn-success btn-sm px-4 py-1.5 rounded-pill fw-bold shadow-sm">
+                                    <i class="fas fa-check-circle me-1"></i> Simpan Pembayaran
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kolom Kanan: Total & Ringkasan Tagihan -->
+        <div class="col-lg-4">
+            <div class="d-flex flex-column gap-2 h-100">
+                <!-- Card Total Tagihan -->
+                <div class="p-3 rounded-3 text-white shadow-sm d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #198754 0%, #157347 100%);">
+                    <div>
+                        <span class="text-white-50 fw-bold text-uppercase small" style="font-size: 10px;">Total ({{ $tagihan->periode ?? '-' }})</span>
+                        <h4 class="fw-bold mb-0 mt-0.5">Rp {{ number_format($tagihan->total ?? 0, 0, ',', '.') }}</h4>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-25 rounded-circle" style="width: 42px; height: 42px; min-width: 42px;">
+                        <i class="fas fa-wallet fs-5 text-white"></i>
+                    </div>
+                </div>
+
+                <!-- Card Ringkasan -->
+                <div class="card border-0 shadow-sm rounded-3 flex-grow-1 overflow-hidden">
+                    <div class="card-header bg-white py-2 px-3 border-0">
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-file-invoice text-success me-2"></i> Ringkasan</h6>
+                    </div>
+                    <div class="card-body bg-light bg-opacity-50 border-top py-2 px-3">
+                        <table class="table table-borderless align-middle mb-0 small">
+                            <tr>
+                                <td class="text-muted py-1.5">Nominal</td>
+                                <td class="fw-semibold text-dark text-end py-1.5">Rp {{ number_format($tagihan->nominal ?? 0, 0, ',', '.') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted py-1.5">Denda</td>
+                                <td class="fw-semibold text-danger text-end py-1.5">Rp {{ number_format($tagihan->denda ?? 0, 0, ',', '.') }}</td>
+                            </tr>
+                            <tr class="border-top">
+                                <td class="fw-bold text-dark py-2">Total</td>
+                                <td class="fw-bold text-success text-end py-2">Rp {{ number_format($tagihan->total ?? 0, 0, ',', '.') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted py-1.5">Status</td>
+                                <td class="text-end py-1.5">
+                                    @php $status = strtolower(trim($tagihan->status ?? '')); @endphp
+                                    @if($status == 'lunas' || $status == 'paid')
+                                        <span class="badge bg-success text-white px-2.5 py-1 rounded-pill">Lunas</span>
+                                    @elseif($status == 'jatuh tempo' || $status == 'overdue')
+                                        <span class="badge bg-danger text-white px-2.5 py-1 rounded-pill">Jatuh Tempo</span>
+                                    @else
+                                        <span class="badge bg-warning text-dark px-2.5 py-1 rounded-pill">{{ $tagihan->status ?? 'Belum Bayar' }}</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script Format Titik & Handler Tombol Simpan -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputDibayar = document.getElementById('inputDibayar');
+        const inputAdmin = document.getElementById('inputAdmin');
+        const form = document.getElementById('formPembayaran');
+
+        function formatRupiah(el) {
+            let val = el.value.replace(/[^0-9]/g, '');
+            if (val) {
+                el.value = new Intl.NumberFormat('id-ID').format(val);
+            } else {
+                el.value = '';
+            }
         }
 
-        admin.addEventListener('keyup', hitung);
-        admin.addEventListener('change', hitung);
-        dibayar.addEventListener('keyup', hitung);
-        dibayar.addEventListener('change', hitung);
+        if(inputDibayar) {
+            inputDibayar.addEventListener('input', function() { formatRupiah(this); });
+        }
+        if(inputAdmin) {
+            inputAdmin.addEventListener('input', function() { formatRupiah(this); });
+        }
 
-        window.onload = hitung;
-    </script>
-</x-app-layout>
+        if(form) {
+            form.addEventListener('submit', function() {
+                if(inputDibayar) inputDibayar.value = inputDibayar.value.replace(/\./g, '');
+                if(inputAdmin) inputAdmin.value = inputAdmin.value.replace(/\./g, '');
+            });
+        }
+    });
+</script>
+@endsection

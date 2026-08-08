@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Pembayaran;
+use App\Models\AlokasiPembayaran;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tagihan extends Model
 {
@@ -13,7 +16,7 @@ class Tagihan extends Model
     */
 
     public const STATUS_BELUM_BAYAR = 'Belum Bayar';
-
+    public const STATUS_SEBAGIAN = 'Sebagian';
     public const STATUS_LUNAS = 'Lunas';
 
     public const STATUS_JATUH_TEMPO = 'Jatuh Tempo';
@@ -28,43 +31,65 @@ class Tagihan extends Model
     
     protected $fillable = [
 
-        'pelanggan_id',
+    'pelanggan_id',
 
-        'invoice_no',
+    'invoice_no',
 
-        'periode',
+    'periode',
 
-        'bulan',
+    'bulan',
 
-        'tahun',
+    'tahun',
 
-        'tanggal_tagihan',
+    'tanggal_tagihan',
 
-        'tanggal_jatuh_tempo',
+    'tanggal_jatuh_tempo',
 
-        'nominal',
+    'tanggal_bayar',
 
-        'denda',
+    'nominal',
 
-        'total',
+    'subtotal',
 
-        'status',
+    'tunggakan',
 
-        'tanggal_bayar',
+    'denda',
 
-        'keterangan',
+    'total',
 
-    ];
+    'dibayar',
+
+    'sisa',
+
+    'status',
+
+    'keterangan',
+
+];
 
     protected $casts = [
 
-        'tanggal_tagihan'      => 'date',
+    'tanggal_tagihan'      => 'date',
 
-        'tanggal_jatuh_tempo'  => 'date',
+    'tanggal_jatuh_tempo'  => 'date',
 
-        'tanggal_bayar'        => 'datetime',
+    'tanggal_bayar'        => 'datetime',
 
-    ];
+    'nominal'              => 'decimal:2',
+
+    'subtotal'             => 'decimal:2',
+
+    'tunggakan'            => 'decimal:2',
+
+    'denda'                => 'decimal:2',
+
+    'total'                => 'decimal:2',
+
+    'dibayar'              => 'decimal:2',
+
+    'sisa'                 => 'decimal:2',
+
+];
 
     /**
      * Relasi ke Pelanggan
@@ -74,4 +99,127 @@ class Tagihan extends Model
         return $this->belongsTo(Pelanggan::class);
     }
 
+    /**
+     * Relasi ke Pembayaran
+     */
+    public function pembayaran()
+    {
+        return $this->hasOne(Pembayaran::class);
+    }
+    /**
+     * Apakah tagihan sudah lunas.
+     */
+    public function isLunas(): bool
+    {
+        return $this->status === self::STATUS_LUNAS;
+    }
+
+    /**
+     * Apakah pembayaran sebagian.
+     */
+    public function isSebagian(): bool
+    {
+        return $this->status === self::STATUS_SEBAGIAN;
+    }
+
+    /**
+     * Apakah belum ada pembayaran.
+     */
+    public function isBelumBayar(): bool
+    {
+        return $this->status === self::STATUS_BELUM_BAYAR;
+    }
+    /**
+     * Riwayat pembayaran yang masuk ke tagihan ini
+     */
+    public function alokasi(): HasMany
+    {
+        return $this->hasMany(AlokasiPembayaran::class);
+    }
+    public function saldoUsages(): HasMany
+    {
+        return $this->hasMany(SaldoUsage::class);
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | HELPER PERHITUNGAN TAGIHAN
+    |--------------------------------------------------------------------------
+    */
+
+    public function getTotalTagihan(): float
+    {
+        return (float) (
+            $this->total
+            ?: $this->subtotal
+            ?: $this->nominal
+            ?: 0
+        );
+    }
+
+    public function getTotalDibayar(): float
+    {
+        $alokasi = $this->alokasi()->sum('nominal');
+
+        if ($alokasi > 0) {
+            return (float) $alokasi;
+        }
+
+        $pembayaran = $this->pembayaran()->first();
+
+        if ($pembayaran) {
+            return (float) (
+                $pembayaran->dibayar
+                ?: $pembayaran->nominal
+                ?: $pembayaran->total_bayar
+                ?: 0
+            );
+        }
+
+        return 0;
+    }
+
+    public function getSisaTagihan(): float
+    {
+        return max(
+            0,
+            $this->getTotalTagihan() - $this->getTotalDibayar()
+        );
+    }
+
+    public function refreshStatus(bool $save = true): self
+    {
+        $total = $this->getTotalTagihan();
+
+        $dibayar = $this->getTotalDibayar();
+
+        $sisa = max(0, $total - $dibayar);
+
+        $this->dibayar = $dibayar;
+
+        $this->sisa = $sisa;
+
+        if ($dibayar <= 0) {
+
+            $this->status = self::STATUS_BELUM_BAYAR;
+
+            $this->tanggal_bayar = null;
+
+        } elseif ($sisa <= 0.01) {
+
+            $this->status = self::STATUS_LUNAS;
+
+            $this->tanggal_bayar ??= now();
+
+        } else {
+
+            $this->status = self::STATUS_SEBAGIAN;
+        }
+
+        if ($save) {
+            $this->save();
+        }
+
+        return $this;
+    }
+    
 }

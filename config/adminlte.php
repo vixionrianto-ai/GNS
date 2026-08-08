@@ -14,10 +14,11 @@ return [
     |
     */
 
-    'title' => 'AdminLTE 3',
-    'title_prefix' => '',
-    'title_postfix' => '',
+    'title' => 'GNS Billing',
 
+    'title_prefix' => '',
+
+    'title_postfix' => ' | GNS Network',
     /*
     |--------------------------------------------------------------------------
     | Favicon
@@ -31,6 +32,7 @@ return [
     */
 
     'use_ico_only' => false,
+    'usermenu_image' => true,
     'use_full_favicon' => false,
 
     /*
@@ -63,12 +65,16 @@ return [
     |
     */
 
-    'logo' => '<b>Admin</b>LTE',
-    'logo_img' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
+    'logo' => '<b>GNS</b> Network
+    <br><small style="font-size:11px;font-weight:400;">
+    Billing Management System
+    </small>',
+
+    'logo_img' => 'images/logo.png',
+
     'logo_img_class' => 'brand-image img-circle elevation-3',
-    'logo_img_xl' => null,
-    'logo_img_xl_class' => 'brand-image-xs',
-    'logo_img_alt' => 'Admin Logo',
+
+    'logo_img_alt' => 'GNS Network',
 
     /*
     |--------------------------------------------------------------------------
@@ -110,15 +116,25 @@ return [
     */
 
     'preloader' => [
+
         'enabled' => true,
+
         'mode' => 'fullscreen',
+
         'img' => [
-            'path' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
-            'alt' => 'AdminLTE Preloader Image',
-            'effect' => 'animation__shake',
-            'width' => 60,
-            'height' => 60,
+
+            'path' => 'images/logo.png',
+
+            'alt' => 'GNS Network',
+
+            'effect' => 'animation__pulse',
+
+            'width' => 90,
+
+            'height' => 90,
+
         ],
+
     ],
 
     /*
@@ -134,11 +150,14 @@ return [
     */
 
     'usermenu_enabled' => true,
-    'usermenu_header' => false,
+
+    'usermenu_header' => true,
+
     'usermenu_header_class' => 'bg-primary',
-    'usermenu_image' => false,
-    'usermenu_desc' => false,
-    'usermenu_profile_url' => false,
+
+    'usermenu_image' => true,
+
+    'usermenu_desc' => 'Administrator GNS',
 
     /*
     |--------------------------------------------------------------------------
@@ -157,7 +176,7 @@ return [
     'layout_fixed_sidebar' => null,
     'layout_fixed_navbar' => null,
     'layout_fixed_footer' => null,
-    'layout_dark_mode' => null,
+    'layout_dark_mode' => false,
 
     /*
     |--------------------------------------------------------------------------
@@ -198,7 +217,7 @@ return [
     'classes_content' => '',
     'classes_sidebar' => 'sidebar-dark-primary elevation-4',
     'classes_sidebar_nav' => '',
-    'classes_topnav' => 'navbar-white navbar-light',
+    'classes_topnav' => 'navbar-dark navbar-primary',
     'classes_topnav_nav' => 'navbar-expand',
     'classes_topnav_container' => 'container',
 
@@ -256,8 +275,8 @@ return [
     |
     */
 
-    'use_route_url' => false,
-    'dashboard_url' => 'home',
+    'use_route_url' => true,
+    'dashboard_url' => 'dashboard',
     'logout_url' => 'logout',
     'login_url' => 'login',
     'register_url' => 'register',
@@ -298,101 +317,144 @@ return [
     |
     */
 
-    'menu' => [
-        // Navbar items:
-        [
-            'type' => 'navbar-search',
-            'text' => 'search',
-            'topnav_right' => true,
-        ],
-        [
-            'type' => 'fullscreen-widget',
-            'topnav_right' => true,
-        ],
+    
 
-        // Sidebar items:
-        [
-            'type' => 'sidebar-menu-search',
-            'text' => 'search',
-        ],
-        [
-            'text' => 'blog',
-            'url' => 'admin/blog',
-            'can' => 'manage-blog',
-        ],
-        [
-            'text' => 'pages',
-            'url' => 'admin/pages',
-            'icon' => 'far fa-fw fa-file',
-            'label' => 4,
-            'label_color' => 'success',
-        ],
-        ['header' => 'account_settings'],
-        [
-            'text' => 'profile',
-            'url' => 'admin/settings',
-            'icon' => 'fas fa-fw fa-user',
-        ],
-        [
-            'text' => 'change_password',
-            'url' => 'admin/settings',
-            'icon' => 'fas fa-fw fa-lock',
-        ],
-        [
-            'text' => 'multilevel',
-            'icon' => 'fas fa-fw fa-share',
-            'submenu' => [
-                [
-                    'text' => 'level_one',
-                    'url' => '#',
-                ],
-                [
-                    'text' => 'level_one',
-                    'url' => '#',
-                    'submenu' => [
-                        [
-                            'text' => 'level_two',
-                            'url' => '#',
-                        ],
-                        [
-                            'text' => 'level_two',
-                            'url' => '#',
-                            'submenu' => [
-                                [
-                                    'text' => 'level_three',
-                                    'url' => '#',
-                                ],
-                                [
-                                    'text' => 'level_three',
-                                    'url' => '#',
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-                [
-                    'text' => 'level_one',
-                    'url' => '#',
-                ],
-            ],
-        ],
-        ['header' => 'labels'],
-        [
-            'text' => 'important',
-            'icon_color' => 'red',
-            'url' => '#',
-        ],
-        [
-            'text' => 'warning',
-            'icon_color' => 'yellow',
-            'url' => '#',
-        ],
-        [
-            'text' => 'information',
-            'icon_color' => 'cyan',
-            'url' => '#',
-        ],
+    /*
+    |--------------------------------------------------------------------------
+    | TOP NAVBAR
+    |--------------------------------------------------------------------------
+    */
+'menu' => [
+
+    ['header' => 'MASTER DATA'],
+
+    [
+        'text'  => 'Router',
+        'route' => 'router.index',
+        'icon'  => 'fas fa-network-wired',
     ],
+
+    [
+        'text' => 'Paket Internet',
+        'route' => 'paket.index',
+        'icon' => 'fas fa-wifi',
+    ],
+
+    [
+        'text' => 'Pelanggan',
+        'route' => 'pelanggan.index',
+        'icon' => 'fas fa-users',
+    ],
+
+    ['header' => 'TRANSAKSI'],
+
+    [
+        'text' => 'Tagihan',
+        'route' => 'tagihan.index',
+        'icon' => 'fas fa-file-invoice',
+    ],
+
+    [
+        'text' => 'Pembayaran',
+        'route' => 'pembayaran.index',
+        'icon' => 'fas fa-money-check-alt',
+    ],
+
+    [
+        'text'  => 'Riwayat WhatsApp',
+        'route' => 'whatsapp.index',
+        'icon'  => 'fab fa-whatsapp',
+    ],
+
+    ['header' => 'LAPORAN'],
+
+    [
+        'text' => 'Dashboard Analitik',
+        'route' => 'dashboard',
+        'icon' => 'fas fa-chart-line',
+    ],
+
+    [
+        'text' => 'Laporan',
+        'route' => 'laporan.index',
+        'icon' => 'fas fa-chart-bar',
+    ],
+
+    ['header' => 'MIKROTIK'],
+
+    [
+        'text' => 'Monitoring MikroTik',
+        'route' => 'mikrotik.monitor',
+        'icon' => 'fas fa-network-wired',
+    ],
+
+    ['header' => 'SYSTEM'],
+
+    [
+        'text' => 'User Management',
+        'route' => 'users.index',
+        'icon' => 'fas fa-users-cog',
+    ],
+
+    [
+        'text' => 'Audit Trail',
+        'route' => 'audit.index',
+        'icon' => 'fas fa-history',
+    ],
+
+    [
+        'text' => 'Pengaturan',
+        'route' => 'settings.index',
+        'icon' => 'fas fa-cogs',
+    ],
+
+    [
+        'text' => 'Profile',
+        'route' => 'profile.edit',
+        'icon' => 'fas fa-user',
+    ],
+
+    ['header' => 'SUPER ADMIN'],
+
+    [
+        'text' => 'Backup Database',
+        'url' => '#',
+        'icon' => 'fas fa-database',
+    ],
+
+    [
+        'text' => 'Restore Database',
+        'url' => '#',
+        'icon' => 'fas fa-upload',
+    ],
+
+    [
+        'text' => 'Reset Data',
+        'route' => 'superadmin.index',
+        'icon' => 'fas fa-trash-alt',
+    ],
+
+    [
+        'text' => 'Factory Reset',
+        'url' => '#',
+        'icon' => 'fas fa-radiation',
+    ],
+
+    [
+        'text' => 'Informasi Sistem',
+        'url' => '#',
+        'icon' => 'fas fa-info-circle',
+    ],
+
+    ['header' => 'ACCOUNT'],
+
+    [
+        'text' => 'Logout',
+        'url' => 'logout',
+        'method' => 'post',
+        'icon' => 'fas fa-sign-out-alt',
+    ],
+],
 
     /*
     |--------------------------------------------------------------------------
@@ -428,6 +490,7 @@ return [
     |
     */
 
+    
     'plugins' => [
         'Datatables' => [
             'active' => false,
@@ -465,7 +528,7 @@ return [
             ],
         ],
         'Chartjs' => [
-            'active' => false,
+            'active' => true,
             'files' => [
                 [
                     'type' => 'js',

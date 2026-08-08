@@ -6,230 +6,562 @@ use App\Models\Pelanggan;
 use App\Models\Tagihan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Models\Setting;
+use App\Services\PaymentAllocationService;
 
 class TagihanService
 {
-    /**
-     * Generate nomor invoice
-     * Contoh: INV-202607-00001
-     */
-    public function generateInvoiceNumber(): string
-    {
-        $prefix = 'INV-' . now()->format('Ym') . '-';
+    /*
+    |--------------------------------------------------------------------------
+    | DEPENDENCY
+    |--------------------------------------------------------------------------
+    */
 
-        $last = Tagihan::where('invoice_no', 'like', $prefix . '%')
-            ->orderByDesc('id')
+    protected AuditTrailService $auditTrail;
+    protected PaymentAllocationService $paymentAllocationService;
+    protected WhatsAppService $whatsAppService;
+
+    /**
+     * Constructor.
+     */
+    public function __construct(
+        AuditTrailService $auditTrail,
+        PaymentAllocationService $paymentAllocationService,
+        WhatsAppService $whatsAppService
+    ) {
+        $this->auditTrail = $auditTrail;
+        $this->paymentAllocationService = $paymentAllocationService;
+        $this->whatsAppService = $whatsAppService;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVOICE
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Generate nomor invoice.
+     */
+    public function generateInvoiceNumber(
+        Carbon $tanggal
+    ): string {
+       $prefix = Setting::invoicePrefix()
+        . '-'
+        . $tanggal->format('Ym')
+        . '-';
+
+        $lastInvoice = Tagihan::where(
+                'invoice_no',
+                'like',
+                $prefix . '%'
+            )
+            ->latest('id')
+            ->lockForUpdate()
             ->first();
 
-        if (!$last) {
+        if (!$lastInvoice) {
             return $prefix . '00001';
         }
 
-        $lastNumber = (int) substr($last->invoice_no, -5);
+        $lastNumber = (int) substr(
+            $lastInvoice->invoice_no,
+            -5
+        );
 
-        return $prefix . str_pad(
-            $lastNumber + 1,
-            5,
-            '0',
-            STR_PAD_LEFT
+        return $prefix .
+            str_pad(
+                $lastNumber + 1,
+                5,
+                '0',
+                STR_PAD_LEFT
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HELPER
+    |--------------------------------------------------------------------------
+    */
+
+    private function getPeriode(
+        ?Carbon $tanggal = null
+    ): string {
+        return ($tanggal ?? now())
+            ->format('Y-m');
+    }
+
+    private function sudahAdaTagihan(
+        int $pelangganId,
+        string $periode
+    ): bool {
+        return Tagihan::where(
+                'pelanggan_id',
+                $pelangganId
+            )
+            ->where(
+                'periode',
+                $periode
+            )
+            ->exists();
+    }
+
+    private function hitungJatuhTempo(
+        Carbon $tanggal
+    ): Carbon {
+        $hari = Setting::dueDays();
+
+        return $tanggal
+            ->copy()
+            ->addDays($hari);
+    }
+
+    private function getNominal(
+        Pelanggan $pelanggan
+    ): float {
+        return (float) (
+            $pelanggan->paket->harga ?? 0
         );
     }
 
-        /**
-         * Generate tagihan untuk satu pelanggan
-         */
-        public function generate(Pelanggan $pelanggan): Tagihan
-        {
-            /*
-            |--------------------------------------------------------------------------
-            | CEK TANGGAL AKTIF
-            |--------------------------------------------------------------------------
-            */
+    private function logGenerate(
+        Pelanggan $pelanggan,
+        string $pesan,
+        string $level = 'info'
+    ): void {
+        match ($level) {
+            'warning' => Log::warning(
+                $pesan,
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'pelanggan' => $pelanggan->nama,
+                ]
+            ),
+            'error' => Log::error(
+                $pesan,
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'pelanggan' => $pelanggan->nama,
+                ]
+            ),
+            default => Log::info(
+                $pesan,
+                [
+                    'pelanggan_id' => $pelanggan->id,
+                    'pelanggan' => $pelanggan->nama,
+                ]
+            ),
+        };
+    }
 
-            if (empty($pelanggan->tanggal_aktif)) {
+    /*
+    |--------------------------------------------------------------------------
+    | GENERATE
+    |--------------------------------------------------------------------------
+    */
 
-                throw new \Exception(
-                    "Pelanggan {$pelanggan->nama} belum memiliki tanggal aktif."
-                );
+    public function generate(
+        Pelanggan $pelanggan
+    ): Tagihan {
+        return $this->generateUntukPeriode(
+            $pelanggan,
+            Carbon::today()
+        );
+    }
 
-            }
-
-            $tanggalAktif = Carbon::parse(
-                $pelanggan->tanggal_aktif
+    public function generateUntukPeriode(
+        Pelanggan $pelanggan,
+        Carbon $tanggal
+    ): Tagihan {
+        if (empty($pelanggan->tanggal_aktif)) {
+            throw new \Exception(
+                "Pelanggan {$pelanggan->nama} belum memiliki tanggal aktif."
             );
+        }
 
-            $hariTagihan = $tanggalAktif->day;
+        if (!$pelanggan->paket) {
+            throw new \Exception(
+                "Pelanggan {$pelanggan->nama} belum memiliki paket."
+            );
+        }
 
-            $hariIni = Carbon::today();
+        $hariIni = $tanggal;
+        $periode = $this->getPeriode($hariIni);
 
-            
-            /*
-            |--------------------------------------------------------------------------
-            | Periode Tagihan
-            |--------------------------------------------------------------------------
-            */
+        if (
+            $this->sudahAdaTagihan(
+                $pelanggan->id,
+                $periode
+            )
+        ) {
+            throw new \Exception(
+                "Tagihan periode {$periode} sudah ada."
+            );
+        }
 
-            $periode = $hariIni->format('Y-m');
+        $tanggalAktif = Carbon::parse(
+            $pelanggan->tanggal_aktif
+        );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Cegah Tagihan Ganda
-            |--------------------------------------------------------------------------
-            */
-
-            $exists = Tagihan::where(
-                    'pelanggan_id',
-                    $pelanggan->id
-                )
-                ->where(
-                    'periode',
-                    $periode
-                )
-                ->exists();
-
-            if ($exists) {
-
-                throw new \Exception(
-                    "Tagihan periode {$periode} sudah ada."
-                );
-
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Tanggal Tagihan
-            |--------------------------------------------------------------------------
-            | Jika tanggal aktif melebihi jumlah hari dalam bulan,
-            | gunakan hari terakhir pada bulan tersebut.
-            |--------------------------------------------------------------------------
-            */
-
-            $jumlahHariBulanIni = Carbon::create(
+        $hariTagihan = min(
+            $tanggalAktif->day,
+            Carbon::create(
                 $hariIni->year,
                 $hariIni->month,
                 1
-            )->daysInMonth;
+            )->daysInMonth
+        );
 
-            $hariTagihan = min(
-                $hariTagihan,
-                $jumlahHariBulanIni
-            );
+        $tanggalTagihan = Carbon::create(
+            $hariIni->year,
+            $hariIni->month,
+            $hariTagihan
+        );
 
-            $tanggalTagihan = Carbon::create(
-                $hariIni->year,
-                $hariIni->month,
-                $hariTagihan
-            );
+        $tanggalJatuhTempo = $this->hitungJatuhTempo(
+            $tanggalTagihan
+        );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Jatuh Tempo
-            |--------------------------------------------------------------------------
-            | Sementara 10 hari setelah tanggal tagihan.
-            | Nanti akan diambil dari tabel settings.
-            |--------------------------------------------------------------------------
-            */
+        $nominal = $this->getNominal(
+            $pelanggan
+        );
 
-            $tanggalJatuhTempo = $tanggalTagihan
-                ->copy()
-                ->addDays(10);
+        return DB::transaction(function () use (
+            $pelanggan,
+            $periode,
+            $tanggalTagihan,
+            $tanggalJatuhTempo,
+            $nominal
+        ) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Nominal
-            |--------------------------------------------------------------------------
-            */
+            $tagihan = Tagihan::create([
+                'pelanggan_id'        => $pelanggan->id,
+                'invoice_no'          => $this->generateInvoiceNumber($tanggalTagihan),
+                'periode'             => $periode,
+                'bulan'               => $tanggalTagihan->month,
+                'tahun'               => $tanggalTagihan->year,
+                'tanggal_tagihan'     => $tanggalTagihan,
+                'tanggal_jatuh_tempo' => $tanggalJatuhTempo,
+                'nominal'             => $nominal,
+                'subtotal'            => $nominal,
+                'tunggakan'           => 0,
+                'denda'               => 0,
+                'total'               => $nominal,
+                'dibayar'             => 0,
+                'sisa'                => $nominal,
+                'status'              => Tagihan::STATUS_BELUM_BAYAR,
+                'keterangan'          => 'Tagihan Internet Periode ' . $periode,
+            ]);
 
-            $nominal = $pelanggan
-                ->paket
-                ->harga;
-
-            return DB::transaction(function () use (
-
+            $this->logGenerate(
                 $pelanggan,
+                "Generate invoice {$tagihan->invoice_no}"
+            );
 
-                $periode,
-
-                $tanggalTagihan,
-
-                $tanggalJatuhTempo,
-
-                $nominal
-
-            ) {
-
-                return Tagihan::create([
-
+            $this->auditTrail->tagihan(
+                'generate',
+                'Generate tagihan ' . $tagihan->invoice_no,
+                [
+                    'tagihan_id'   => $tagihan->id,
                     'pelanggan_id' => $pelanggan->id,
+                    'invoice_no'   => $tagihan->invoice_no,
+                    'periode'      => $tagihan->periode,
+                    'nominal'      => $tagihan->nominal,
+                ]
+            );
 
-                    'invoice_no' => $this->generateInvoiceNumber(),
+            if (Setting::autoApplySaldo()) {
+                $this->paymentAllocationService
+                    ->applySaldo($tagihan);
 
-                    'periode' => $periode,
-
-                    'bulan' => $tanggalTagihan->month,
-
-                    'tahun' => $tanggalTagihan->year,
-
-                    'tanggal_tagihan' => $tanggalTagihan,
-
-                    'tanggal_jatuh_tempo' => $tanggalJatuhTempo,
-
-                    'nominal' => $nominal,
-
-                    'denda' => 0,
-
-                    'total' => $nominal,
-
-                    'status' => Tagihan::STATUS_BELUM_BAYAR,
-
-                    'keterangan' => 'Tagihan Internet Periode ' . $periode,
-
-                ]);
-
-            });
-        }
-        /**
-         * Generate tagihan otomatis
-         * berdasarkan tanggal aktif pelanggan
-         */
-        public function generateHarian(): int
-        {
-            $hariIni = now()->day;
-
-            $pelanggans = Pelanggan::with('paket')
-            ->where('status', 'Aktif')
-            ->get();
-
-            $jumlah = 0;
-
-            foreach ($pelanggans as $pelanggan) {
-
-            if (empty($pelanggan->tanggal_aktif)) {
-                continue;
-            }
-
-            if (
-                Carbon::parse($pelanggan->tanggal_aktif)->day
-                != $hariIni
-            ) {
-                continue;
+                $tagihan->refresh();
             }
 
             try {
-
-                $this->generate($pelanggan);
-
-                $jumlah++;
-
-            } catch (\Exception $e) {
-
-                continue;
-
+                $this->whatsAppService->sendTagihan($tagihan);
+            } catch (\Throwable $e) {
+                Log::error(
+                    'Gagal mengirim WhatsApp invoice.',
+                    [
+                        'invoice'      => $tagihan->invoice_no,
+                        'pelanggan_id' => $pelanggan->id,
+                        'error'        => $e->getMessage(),
+                    ]
+                );
             }
 
+            return $tagihan;
+        });
+    }
+
+    public function generateHarian(): array
+    {
+        return $this->generateSemua();
+    }
+
+    public function generateSemua(?Carbon $periode = null): array
+    {
+        $pelanggans = Pelanggan::with('paket')
+            ->where('status', 'Aktif')
+            ->orderBy('nama')
+            ->get();
+
+        $berhasil = 0;
+        $sudahAda = 0;
+        $gagal = 0;
+
+        foreach ($pelanggans as $pelanggan) {
+            try {
+                $this->generateUntukPeriode(
+                    $pelanggan,
+                    $periode ?? Carbon::today()
+                );
+
+                $berhasil++;
+            } catch (\Throwable $e) {
+                if (
+                    str_contains(
+                        strtolower($e->getMessage()),
+                        'sudah ada'
+                    )
+                ) {
+                    $sudahAda++;
+                } else {
+                    $gagal++;
+
+                    $this->logGenerate(
+                        $pelanggan,
+                        $e->getMessage(),
+                        'error'
+                    );
+                }
+            }
         }
 
-            return $jumlah;
+        $this->auditTrail->tagihan(
+            'generate_mass',
+            'Generate seluruh tagihan bulanan',
+            [
+                'berhasil'  => $berhasil,
+                'sudah_ada' => $sudahAda,
+                'gagal'     => $gagal,
+                'periode'   => ($periode ?? Carbon::today())->format('Y-m'),
+            ]
+        );
+
+        Log::info(
+            'Generate Semua Tagihan',
+            [
+                'berhasil'  => $berhasil,
+                'sudah_ada' => $sudahAda,
+                'gagal'     => $gagal,
+            ]
+        );
+
+        return [
+            'berhasil'  => $berhasil,
+            'sudah_ada' => $sudahAda,
+            'gagal'     => $gagal,
+        ];
+    }
+
+    public function generatePeriode(
+        Carbon $periode
+    ): array {
+        $hasil = $this->generateSemua($periode);
+        $hasil['periode'] = $periode->format('Y-m');
+
+        $this->auditTrail->tagihan(
+            'generate_period',
+            'Generate tagihan periode ' .
+            $periode->format('Y-m'),
+            $hasil
+        );
+
+        return $hasil;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REGENERATE
+    |--------------------------------------------------------------------------
+    */
+
+    public function regenerate(
+        Tagihan $tagihan
+    ): Tagihan {
+        return DB::transaction(function () use ($tagihan) {
+            if (
+                $tagihan->alokasi()->exists() ||
+                $tagihan->saldoUsages()->exists() ||
+                $tagihan->pembayaran()->exists()
+            ) {
+                throw new \Exception(
+                    'Invoice sudah memiliki histori transaksi dan tidak dapat diregenerate.'
+                );
+            }
+
+            $pelanggan = $tagihan
+                ->pelanggan()
+                ->with('paket')
+                ->first();
+
+            $invoiceLama = $tagihan->invoice_no;
+
+            $tagihan->delete();
+
+            $baru = $this->generate(
+                $pelanggan
+            );
+
+            $this->auditTrail->tagihan(
+                'regenerate',
+                'Regenerate invoice ' .
+                $invoiceLama,
+                [
+                    'invoice_lama' => $invoiceLama,
+                    'invoice_baru' => $baru->invoice_no,
+                    'pelanggan_id' => $pelanggan->id,
+                ]
+            );
+
+            return $baru;
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Update status tagihan otomatis.
+     *
+     * Belum Bayar -> Jatuh Tempo
+     */
+    public function updateStatusOtomatis(): int
+    {
+        $tagihans = Tagihan::where(
+                'status',
+                Tagihan::STATUS_BELUM_BAYAR
+            )
+            ->whereDate(
+                'tanggal_jatuh_tempo',
+                '<',
+                today()
+            )
+            ->get();
+
+        $jumlah = 0;
+
+        foreach ($tagihans as $tagihan) {
+
+            $tagihan->update([
+                'status' => Tagihan::STATUS_JATUH_TEMPO,
+            ]);
+
+            $jumlah++;
+
+            $this->auditTrail->tagihan(
+                'jatuh_tempo',
+                'Tagihan jatuh tempo ' .
+                $tagihan->invoice_no,
+                [
+                    'tagihan_id'   => $tagihan->id,
+                    'invoice_no'   => $tagihan->invoice_no,
+                    'pelanggan_id' => $tagihan->pelanggan_id,
+                ]
+            );
+
         }
 
+        return $jumlah;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE DENDA
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Update denda otomatis.
+     */
+    public function updateDenda(): int
+    {
+        $jumlah = 0;
+
+        $tagihans = Tagihan::where(
+                'status',
+                Tagihan::STATUS_JATUH_TEMPO
+            )->get();
+
+        foreach ($tagihans as $tagihan) {
+
+            $hariTerlambat = Carbon::parse(
+                $tagihan->tanggal_jatuh_tempo
+            )->diffInDays(today());
+
+            $dendaPerHari = Setting::finePerDay();
+
+            $denda = $hariTerlambat * $dendaPerHari;
+
+            $tagihan->update([
+                'denda' => $denda,
+                'total' =>
+                    $tagihan->nominal +
+                    $denda,
+            ]);
+
+            $jumlah++;
+
+        }
+
+        Log::info(
+            'Update Denda',
+            [
+                'jumlah' => $jumlah,
+            ]
+        );
+
+        return $jumlah;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAINTENANCE
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Maintenance harian.
+     */
+    public function maintenanceHarian(): void
+    {
+        $jatuhTempo =
+            $this->updateStatusOtomatis();
+
+        $updateDenda =
+            $this->updateDenda();
+
+        $this->auditTrail->tagihan(
+            'maintenance',
+            'Maintenance harian tagihan',
+            [
+                'status_updated' => $jatuhTempo,
+                'denda_updated'  => $updateDenda,
+                'tanggal'        => now()->toDateString(),
+            ]
+        );
+
+        Log::info(
+            'Maintenance Harian',
+            [
+                'status' => $jatuhTempo,
+                'denda'  => $updateDenda,
+            ]
+        );
+    }
 }

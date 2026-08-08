@@ -1,83 +1,473 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Tambah Router MikroTik
-        </h2>
-    </x-slot>
+@extends('adminlte::page')
 
-<div class="py-6">
+@section('title', 'Tambah Router')
 
-<div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+@section('content_header')
 
-<div class="bg-white shadow rounded p-6">
+<div class="d-flex justify-content-between align-items-center">
 
-<form action="{{ route('router.store') }}" method="POST">
+    <div>
 
-@csrf
+        <h1>
 
-<label>Nama Router</label>
-<input type="text" name="nama_router" class="border rounded w-full p-2 mb-3" required>
+            <i class="fas fa-server text-primary"></i>
 
-<label>IP Router</label>
-<input type="text" name="ip_router" class="border rounded w-full p-2 mb-3" placeholder="192.168.88.1">
+            Tambah Router
 
-<label>API Port</label>
-<input type="number" name="api_port" value="8728" class="border rounded w-full p-2 mb-3">
+        </h1>
 
-<label>Username</label>
-<input type="text" name="username" class="border rounded w-full p-2 mb-3">
+        <small class="text-muted">
 
-<label>Password</label>
-<input type="password" name="password" class="border rounded w-full p-2 mb-3">
+            Tambahkan Router MikroTik baru ke sistem GNS.
 
-<label>Lokasi</label>
-<input type="text" name="lokasi" class="border rounded w-full p-2 mb-3">
+        </small>
 
-<label>Versi RouterOS</label>
-<input type="text" name="versi_routeros" class="border rounded w-full p-2 mb-3" placeholder="7.19">
+    </div>
 
-<div class="mb-4">
+    <div>
 
-<label>
+        <a
 
-<input type="checkbox" name="ssl">
+            href="{{ route('router.index') }}"
 
-Gunakan SSL
+            class="btn btn-secondary">
 
-</label>
+            <i class="fas fa-arrow-left"></i>
+
+            Kembali
+
+        </a>
+
+    </div>
 
 </div>
 
-<label>Status</label>
+@stop
 
-<select name="status" class="border rounded w-full p-2 mb-4">
 
-<option value="Aktif">Aktif</option>
+@section('content')
+@if ($errors->any())
 
-<option value="Nonaktif">Nonaktif</option>
+<div class="alert alert-danger">
 
-</select>
+    <h5>
 
-<button type="submit"
-style="background:#16a34a;color:white;padding:10px 20px;border:none;border-radius:6px;">
+        <i class="icon fas fa-ban"></i>
 
-Simpan
+        Terjadi Kesalahan
 
-</button>
+    </h5>
 
-<a href="{{ route('router.index') }}"
-style="background:#6b7280;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;">
+    <ul class="mb-0">
 
-Kembali
+        @foreach($errors->all() as $error)
 
-</a>
+            <li>{{ $error }}</li>
+
+        @endforeach
+
+    </ul>
+
+</div>
+
+@endif
+<form
+
+    action="{{ route('router.store') }}"
+
+    method="POST">
+
+    @csrf
+
+    <div class="row">
+
+        <div class="col-lg-8">
+
+            <div class="card card-primary card-outline shadow">
+
+                <div class="card-header">
+
+                    <h3 class="card-title">
+
+                        Informasi Router
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+                    <div class="row">
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                Nama Router
+
+            </label>
+
+            <input
+
+                type="text"
+
+                name="nama_router"
+
+                class="form-control @error('nama_router') is-invalid @enderror"
+
+                value="{{ old('nama_router') }}"
+
+                required>
+
+            @error('nama_router')
+
+                <div class="invalid-feedback">
+
+                    {{ $message }}
+
+                </div>
+
+            @enderror
+
+        </div>
+
+    </div>
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                IP Router
+
+            </label>
+
+            <input
+
+                type="text"
+
+                name="ip_router"
+
+                class="form-control @error('ip_router') is-invalid @enderror"
+
+                value="{{ old('ip_router') }}"
+
+                placeholder="192.168.88.1"
+
+                required>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="row">
+
+    <div class="col-md-4">
+
+        <div class="form-group">
+
+            <label>
+
+                API Port
+
+            </label>
+
+            <input
+
+                type="number"
+
+                name="api_port"
+
+                class="form-control"
+
+                value="{{ old('api_port',8728) }}">
+
+        </div>
+
+    </div>
+
+    <div class="col-md-4">
+
+        <div class="form-group">
+
+            <label>
+
+                Username
+
+            </label>
+
+            <input
+
+                type="text"
+
+                name="username"
+
+                class="form-control"
+
+                value="{{ old('username') }}">
+
+        </div>
+
+    </div>
+
+    <div class="col-md-4">
+
+        <div class="form-group">
+
+            <label>
+
+                Password
+
+            </label>
+
+            <input
+
+                type="password"
+
+                name="password"
+
+                class="form-control">
+
+        </div>
+
+    </div>
+
+</div>
+<div class="row">
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                Lokasi
+
+            </label>
+
+            <input
+
+                type="text"
+
+                name="lokasi"
+
+                class="form-control"
+
+                value="{{ old('lokasi') }}"
+
+                placeholder="Contoh : Kantor Pusat">
+
+        </div>
+
+    </div>
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                Versi RouterOS
+
+            </label>
+
+            <input
+
+                type="text"
+
+                name="versi_routeros"
+
+                class="form-control"
+
+                value="{{ old('versi_routeros') }}"
+
+                placeholder="Contoh : 7.19">
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="row">
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                SSL
+
+            </label>
+
+            <div class="custom-control custom-switch">
+
+                <input
+
+                    type="checkbox"
+
+                    class="custom-control-input"
+
+                    id="ssl"
+
+                    name="ssl"
+
+                    value="1"
+
+                    {{ old('ssl') ? 'checked' : '' }}>
+
+                <label
+
+                    class="custom-control-label"
+
+                    for="ssl">
+
+                    Gunakan SSL
+
+                </label>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col-md-6">
+
+        <div class="form-group">
+
+            <label>
+
+                Status
+
+            </label>
+
+            <select
+
+                name="status"
+
+                class="form-control">
+
+                <option value="Aktif"
+
+                    {{ old('status')=='Aktif' ? 'selected' : '' }}>
+
+                    Aktif
+
+                </option>
+
+                <option value="Nonaktif"
+
+                    {{ old('status')=='Nonaktif' ? 'selected' : '' }}>
+
+                    Nonaktif
+
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+</div>
+                </div>
+
+                <div class="card-footer">
+
+                    <button
+
+                        type="submit"
+
+                        class="btn btn-primary">
+
+                        <i class="fas fa-save"></i>
+
+                        Simpan Router
+
+                    </button>
+
+                    <a
+
+                        href="{{ route('router.index') }}"
+
+                        class="btn btn-secondary">
+
+                        <i class="fas fa-times"></i>
+
+                        Batal
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <div class="card card-info card-outline shadow">
+
+                <div class="card-header">
+
+                    <h3 class="card-title">
+
+                        Informasi
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <p>
+
+                        <strong>API Port Default</strong>
+
+                    </p>
+
+                    <p>
+
+                        8728 (Non SSL)
+
+                    </p>
+
+                    <hr>
+
+                    <p>
+
+                        <strong>API SSL</strong>
+
+                    </p>
+
+                    <p>
+
+                        8729 (SSL)
+
+                    </p>
+
+                    <hr>
+
+                    <p class="text-muted">
+
+                        Pastikan service API pada MikroTik sudah aktif sebelum melakukan koneksi.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
 
 </form>
 
-</div>
-
-</div>
-
-</div>
-
-</x-app-layout>
+@stop

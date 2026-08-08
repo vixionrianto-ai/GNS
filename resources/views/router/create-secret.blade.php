@@ -1,103 +1,305 @@
-<x-app-layout>
+@extends('adminlte::page')
 
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+@section('title', 'Tambah PPP Secret')
+
+@section('content_header')
+
+<div class="d-flex justify-content-between align-items-center">
+
+    <div>
+
+        <h1>
+
+            <i class="fas fa-user-plus text-primary"></i>
+
             Tambah PPP Secret
-        </h2>
-    </x-slot>
 
-    <div class="py-6">
+        </h1>
 
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <small class="text-muted">
 
-            <div class="bg-white shadow rounded p-6">
+            Router :
 
-                <form action="{{ route('router.pppsecret.store',$router->id) }}" method="POST">
+            <strong>
 
-                    @csrf
+                {{ $router->nama_router }}
 
-                    <div class="mb-4">
+            </strong>
 
-                        <label class="block font-semibold">
-                            Username
-                        </label>
+        </small>
 
-                        <input type="text"
-                            name="username"
-                            class="border rounded w-full p-2"
-                            required>
+    </div>
+
+    <div>
+
+        <a
+
+            href="{{ route('router.pppsecret',$router->id) }}"
+
+            class="btn btn-secondary">
+
+            <i class="fas fa-arrow-left"></i>
+
+            Kembali
+
+        </a>
+
+    </div>
+
+</div>
+
+@stop
+
+@section('content')
+
+@if($errors->any())
+
+<div class="alert alert-danger">
+
+    <h5>
+
+        <i class="fas fa-ban"></i>
+
+        Terjadi Kesalahan
+
+    </h5>
+
+    <ul class="mb-0">
+
+        @foreach($errors->all() as $error)
+
+            <li>{{ $error }}</li>
+
+        @endforeach
+
+    </ul>
+
+</div>
+
+@endif
+
+<form
+
+    action="{{ route('router.pppsecret.store',$router->id) }}"
+
+    method="POST">
+
+    @csrf
+
+    <div class="row">
+
+        <div class="col-lg-8">
+
+            <div class="card card-primary card-outline shadow">
+
+                <div class="card-header">
+
+                    <h3 class="card-title">
+
+                        Informasi PPP Secret
+
+                    </h3>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>
+
+                                    Username
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    name="username"
+
+                                    class="form-control"
+
+                                    value="{{ old('username') }}"
+
+                                    required>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>
+
+                                    Password
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    name="password"
+
+                                    class="form-control"
+
+                                    value="{{ old('password') }}"
+
+                                    required>
+
+                            </div>
+
+                        </div>
 
                     </div>
 
-                    <div class="mb-4">
+                    <div class="row">
+                                                <div class="col-md-6">
 
-                        <label class="block font-semibold">
-                            Password
-                        </label>
+                            <div class="form-group">
 
-                        <input type="text"
-                            name="password"
-                            class="border rounded w-full p-2"
-                            required>
+                                <label>
+
+                                    Service
+
+                                </label>
+
+                                <select
+
+                                    name="service"
+
+                                    class="form-control">
+
+                                    <option value="pppoe">
+
+                                        PPPoE
+
+                                    </option>
+
+                                    <option value="any">
+
+                                        Any
+
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>
+
+                                    Profile
+
+                                </label>
+
+                                <select
+
+                                    name="profile"
+
+                                    class="form-control">
+
+                                    @foreach($profiles as $profile)
+
+                                        <option value="{{ $profile['name'] }}">
+
+                                            {{ $profile['name'] }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                        </div>
 
                     </div>
 
-                    <div class="mb-4">
+                </div>
 
-                        <label class="block font-semibold">
-                            Service
-                        </label>
+                <div class="card-footer">
 
-                        <select name="service"
-                            class="border rounded w-full p-2">
+                    <button
 
-                            <option value="pppoe">PPPoE</option>
-                            <option value="any">Any</option>
+                        type="submit"
 
-                        </select>
+                        class="btn btn-primary">
 
-                    </div>
+                        <i class="fas fa-save"></i>
 
-                    <div class="mb-4">
+                        Simpan PPP Secret
 
-                        <label class="block font-semibold">
-                            Profile
-                        </label>
+                    </button>
 
-                        <select name="profile"
-                            class="border rounded w-full p-2">
+                    <a
 
-                            @foreach($profiles as $profile)
+                        href="{{ route('router.pppsecret',$router->id) }}"
 
-                                <option value="{{ $profile['name'] }}">
-                                    {{ $profile['name'] }}
-                                </option>
+                        class="btn btn-secondary">
 
-                            @endforeach
+                        Batal
 
-                        </select>
+                    </a>
 
-                    </div>
+                </div>
 
-                    <div class="mt-5">
+            </div>
 
-                        <button type="submit"
-                            style="background:#16a34a;color:white;padding:10px 20px;border:none;border-radius:5px;">
+        </div>
 
-                            Simpan
+        <div class="col-lg-4">
 
-                        </button>
+            <div class="card card-info card-outline shadow">
 
-                        <a href="{{ route('router.pppsecret',$router->id) }}"
-                            style="background:#6b7280;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;margin-left:10px;">
+                <div class="card-header">
 
-                            Kembali
+                    <h3 class="card-title">
 
-                        </a>
+                        Informasi
 
-                    </div>
+                    </h3>
 
-                </form>
+                </div>
+
+                <div class="card-body">
+
+                    <p>
+
+                        Username harus unik pada Router MikroTik.
+
+                    </p>
+
+                    <hr>
+
+                    <p>
+
+                        Pilih Profile sesuai paket pelanggan.
+
+                    </p>
+
+                    <hr>
+
+                    <p class="text-muted mb-0">
+
+                        PPP Secret akan langsung dibuat di Router MikroTik setelah disimpan.
+
+                    </p>
+
+                </div>
 
             </div>
 
@@ -105,4 +307,6 @@
 
     </div>
 
-</x-app-layout>
+</form>
+
+@stop
