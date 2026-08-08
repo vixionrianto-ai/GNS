@@ -443,16 +443,19 @@ class TagihanService
      */
     public function updateStatusOtomatis(): int
     {
-        $tagihans = Tagihan::where(
-                'status',
-                Tagihan::STATUS_BELUM_BAYAR
-            )
-            ->whereDate(
-                'tanggal_jatuh_tempo',
-                '<',
-                today()
-            )
-            ->get();
+        $tagihans = Tagihan::whereIn(
+            'status',
+            [
+                Tagihan::STATUS_BELUM_BAYAR,
+                Tagihan::STATUS_SEBAGIAN,
+            ]
+        )
+        ->whereDate(
+            'tanggal_jatuh_tempo',
+            '<',
+            today()
+        )
+        ->get();
 
         $jumlah = 0;
 
