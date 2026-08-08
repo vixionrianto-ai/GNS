@@ -60,6 +60,11 @@ class PaymentAllocationService
                 $pelanggan->id
             );
 
+            // Kunci saldo selama transaksi agar pembayaran bersamaan tidak overspend saldo.
+            $saldo = SaldoPelanggan::where('id', $saldo->id)
+                ->lockForUpdate()
+                ->first();
+
             /*
             |--------------------------------------------------------------------------
             | Ambil semua tagihan yang boleh menerima pembayaran
@@ -242,6 +247,11 @@ class PaymentAllocationService
             $saldo = SaldoPelanggan::milik(
                 $tagihan->pelanggan_id
             );
+
+            // Kunci saldo selama transaksi agar tidak dapat dipakai dua kali secara bersamaan.
+            $saldo = SaldoPelanggan::where('id', $saldo->id)
+                ->lockForUpdate()
+                ->first();
 
             // Tidak ada saldo
             if ($saldo->saldo <= 0) {
