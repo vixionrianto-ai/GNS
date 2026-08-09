@@ -49,11 +49,9 @@ class PembayaranController extends Controller
                 'tanggal_bayar',
                 $today
             )
-            ->where(
-                'status',
-                Pembayaran::STATUS_BERHASIL
-            )
-            ->sum('total_bayar'),
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->where('metode', '!=', 'Saldo')
+            ->sum('nominal'),
 
             'totalBulanIni' => Pembayaran::whereYear(
                 'tanggal_bayar',
@@ -63,11 +61,9 @@ class PembayaranController extends Controller
                 'tanggal_bayar',
                 now()->month
             )
-            ->where(
-                'status',
-                Pembayaran::STATUS_BERHASIL
-            )
-            ->sum('total_bayar'),
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->where('metode', '!=', 'Saldo')
+            ->sum('nominal'),
 
             'jumlahTransaksi' => Pembayaran::count(),
 
