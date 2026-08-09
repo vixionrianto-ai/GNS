@@ -30,6 +30,12 @@ Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
     ]);
 });
 
+/*
+|--------------------------------------------------------------------------
+| PUBLIC
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('dashboard');
@@ -38,10 +44,22 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
+/*
+|--------------------------------------------------------------------------
+| PUBLIC INVOICE PDF
+|--------------------------------------------------------------------------
+*/
+
 Route::get(
     '/public-invoice/{token}/pdf',
     [PembayaranController::class, 'publicPdf']
 )->name('pembayaran.public.pdf');
+
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATED
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware('auth')->group(function () {
 
@@ -57,24 +75,41 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings', [SettingController::class, 'update'])
         ->name('settings.update');
 
-    Route::get('/super-admin/reset', [SuperAdminController::class, 'index'])
-        ->name('superadmin.index');
+    /* SUPER ADMIN */
 
-    Route::post('/super-admin/reset', [SuperAdminController::class, 'reset'])
-        ->name('superadmin.reset');
+    Route::get(
+        '/super-admin/reset',
+        [SuperAdminController::class, 'index']
+    )->name('superadmin.index');
 
-    Route::get('/laporan', [LaporanController::class, 'index'])
-        ->name('laporan.index');
+    Route::post(
+        '/super-admin/reset',
+        [SuperAdminController::class, 'reset']
+    )->name('superadmin.reset');
 
-    Route::get('/laporan/export/pdf', [LaporanController::class, 'exportPdf'])
-        ->name('laporan.export.pdf');
+    /* LAPORAN */
 
-    Route::get('/laporan/export/excel', [LaporanController::class, 'exportExcel'])
-        ->name('laporan.export.excel');
+    Route::get(
+        '/laporan',
+        [LaporanController::class, 'index']
+    )->name('laporan.index');
 
+    Route::get(
+        '/laporan/export/pdf',
+        [LaporanController::class, 'exportPdf']
+    )->name('laporan.export.pdf');
+
+    Route::get(
+        '/laporan/export/excel',
+        [LaporanController::class, 'exportExcel']
+    )->name('laporan.export.excel');
+
+    // TEST ADMINLTE
     Route::get('/test-adminlte', function () {
         return view('test-adminlte');
     })->name('test.adminlte');
+
+    /* BACKUP DATABASE */
 
     Route::get('/backup', [BackupController::class, 'index'])
         ->name('backup.index');
@@ -91,10 +126,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/backup/{file}', [BackupController::class, 'destroy'])
         ->name('backup.destroy');
 
+    /* ROUTER & MIKROTIK */
+
     Route::resource('router', RouterController::class);
 
     Route::get('/router/{id}/test', [RouterController::class, 'test'])
         ->name('router.test');
+
+    /* PPP SECRET */
 
     Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])
         ->name('router.pppsecret');
@@ -120,11 +159,15 @@ Route::middleware('auth')->group(function () {
     Route::put('/router/{id}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret'])
         ->name('router.pppsecret.disable');
 
+    /* PPP ACTIVE */
+
     Route::get('/router/{id}/ppp-active', [RouterController::class, 'pppActive'])
         ->name('router.pppactive');
 
     Route::delete('/router/{id}/ppp-active/{session}/disconnect', [RouterController::class, 'disconnectSession'])
         ->name('router.pppactive.disconnect');
+
+    /* PPP PROFILE */
 
     Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])
         ->name('router.pppprofile');
@@ -140,3 +183,85 @@ Route::middleware('auth')->group(function () {
 
     Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])
         ->name('router.pppprofile.update');
+
+    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])
+        ->name('router.pppprofile.delete');
+
+    /* PAKET */
+
+    Route::resource('paket', PaketController::class);
+
+    Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])
+        ->name('paket.getProfiles');
+
+    /* PELANGGAN */
+
+    Route::resource('pelanggan', PelangganController::class);
+
+    Route::post('/pelanggan/sync', [PelangganController::class, 'sync'])
+        ->name('pelanggan.sync');
+
+    /* TAGIHAN */
+
+    Route::resource('tagihan', TagihanController::class)
+        ->except(['create', 'store', 'edit', 'update']);
+
+    Route::post('/tagihan/generate-harian', [TagihanController::class, 'generate'])
+        ->name('tagihan.generate');
+
+    Route::post('/tagihan/generate-semua', [TagihanController::class, 'generateSemua'])
+        ->name('tagihan.generate.semua');
+
+    Route::post('/tagihan/generate-periode', [TagihanController::class, 'generatePeriode'])
+        ->name('tagihan.generate.periode');
+
+    Route::get('/tagihan/{tagihan}/whatsapp', [TagihanController::class, 'sendWhatsapp'])
+        ->name('tagihan.whatsapp');
+
+    /* PEMBAYARAN */
+
+    Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create'])
+        ->name('pembayaran.create');
+
+    Route::resource('pembayaran', PembayaranController::class)
+        ->only(['index', 'show', 'store']);
+
+    Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice'])
+        ->name('pembayaran.invoice');
+
+    Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf'])
+        ->name('pembayaran.pdf');
+
+    /* RIWAYAT WHATSAPP */
+
+    Route::get('whatsapp', [WhatsAppLogController::class, 'index'])
+        ->name('whatsapp.index');
+
+    Route::get('whatsapp/{whatsapp}', [WhatsAppLogController::class, 'show'])
+        ->name('whatsapp.show');
+
+    /* USER MANAGEMENT */
+
+    Route::resource('users', UserController::class)
+        ->middleware('permission:user.view');
+
+    /* AUDIT TRAIL */
+
+    Route::get('/audit', [AuditTrailController::class, 'index'])
+        ->middleware('permission:audit.view')
+        ->name('audit.index');
+
+    /* PROFILE */
+
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
+
+});
+
+require __DIR__.'/auth.php';
