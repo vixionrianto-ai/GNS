@@ -54,57 +54,56 @@ class LaporanService
      */
     public function dashboard(?Request $request = null): array
     {
-        $tanggalAwal  = $request?->tanggal_awal;
-        $tanggalAkhir = $request?->tanggal_akhir;
-        $bulan        = $request?->bulan;
-        $tahun        = $request?->tahun;
-        $status       = $request?->status;
+        $request ??= request();
+
+        $tanggalAwal  = $request->tanggal_awal;
+        $tanggalAkhir = $request->tanggal_akhir;
+        $bulan        = $request->bulan;
+        $tahun        = $request->tahun;
+        $status       = $request->status;
+
+        // Filter tagihan adalah sumber periode laporan.
+        // Semua KPI pembayaran mengikuti tagihan yang sama agar tidak terjadi
+        // kondisi seperti Total Tagihan = Rp0 tetapi Pendapatan masih terisi.
+        $filterTagihan = function ($q) use ($tanggalAwal, $tanggalAkhir, $bulan, $tahun, $status) {
+            $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
+                ->when($tanggalAwal, fn($q) =>
+                    $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
+                ->when($tanggalAkhir, fn($q) =>
+                    $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
+                ->when($bulan, fn($q) =>
+                    $q->where('bulan', $bulan))
+                ->when($tahun, fn($q) =>
+                    $q->where('tahun', $tahun))
+                ->when($status, fn($q) =>
+                    $q->where('status', $status));
+        };
 
         $pembayaran = Pembayaran::query()
             ->where('status', Pembayaran::STATUS_BERHASIL)
             ->where('metode', '!=', 'Saldo')
-            ->when($status, fn($q) =>
-                $q->whereHas('tagihan', fn($tagihan) =>
-                    $tagihan->where('status', $status)));
+            ->whereHas('tagihan', $filterTagihan);
 
-        // Semua metrik pembayaran harus mengikuti filter laporan yang sama.
-        $pembayaranTerfilter = (clone $pembayaran)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
-            ->when($bulan, fn($q) =>
-                $q->whereMonth('tanggal_bayar', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->whereYear('tanggal_bayar', $tahun));
+        $adaFilterPeriode = $tanggalAwal || $tanggalAkhir || $bulan || $tahun;
 
-        $tagihan = Tagihan::query()
-            ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-            ->when($bulan, fn($q) =>
-                $q->where('bulan', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->where('tahun', $tahun))
-            ->when($status, fn($q) =>
-                $q->where('status', $status));
+        // Bila laporan memakai filter periode, periode ditentukan oleh
+        // tanggal/bulan/tahun TAGIHAN. Tanggal pembayaran hanya dipakai
+        // untuk laporan default tanpa filter periode.
+        $pembayaranTerfilter = (clone $pembayaran);
+
+        if (!$adaFilterPeriode) {
+            $pembayaranTerfilter
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month);
+        }
+
+        $tagihan = Tagihan::query()->where('status', '!=', Tagihan::STATUS_DIBATALKAN);
+        $filterTagihan($tagihan);
 
         $pelanggan = Pelanggan::query();
 
-        $kpiTagihan = Tagihan::query()
-            ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
-            ->when($bulan, fn($q) =>
-                $q->where('bulan', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->where('tahun', $tahun))
-            ->when($status, fn($q) =>
-                $q->where('status', $status));
+        $kpiTagihan = Tagihan::query()->where('status', '!=', Tagihan::STATUS_DIBATALKAN);
+        $filterTagihan($kpiTagihan);
 
         $laporan = $this->laporanQuery($request)->paginate(15)->withQueryString();
 
@@ -154,20 +153,12 @@ class LaporanService
             ->limit(10)
             ->get();
 
-        $adaFilterPeriode = $tanggalAwal || $tanggalAkhir || $bulan || $tahun;
-
         if ($adaFilterPeriode) {
             $kasMasukBulanIni = (clone $pembayaranTerfilter)->sum('total_bayar');
             $biayaAdminBulanIni = (clone $pembayaranTerfilter)->sum('biaya_admin');
         } else {
-            $kasMasukBulanIni = (clone $pembayaranTerfilter)
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month)
-                ->sum('total_bayar');
-            $biayaAdminBulanIni = (clone $pembayaranTerfilter)
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month)
-                ->sum('biaya_admin');
+            $kasMasukBulanIni = (clone $pembayaranTerfilter)->sum('total_bayar');
+            $biayaAdminBulanIni = (clone $pembayaranTerfilter)->sum('biaya_admin');
         }
 
         $saldoMasukBulanIni = max(
@@ -182,12 +173,7 @@ class LaporanService
                 ->whereDate('tanggal_bayar', today())
                 ->sum('nominal'),
 
-            'pendapatanBulanIni' => $adaFilterPeriode
-                ? (clone $pembayaranTerfilter)->sum('nominal')
-                : (clone $pembayaranTerfilter)
-                    ->whereYear('tanggal_bayar', now()->year)
-                    ->whereMonth('tanggal_bayar', now()->month)
-                    ->sum('nominal'),
+            'pendapatanBulanIni' => (clone $pembayaranTerfilter)->sum('nominal'),
 
             'biayaAdminHariIni' => (clone $pembayaranTerfilter)
                 ->whereDate('tanggal_bayar', today())
