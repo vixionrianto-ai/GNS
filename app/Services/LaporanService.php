@@ -64,6 +64,17 @@ class LaporanService
             ->where('status', Pembayaran::STATUS_BERHASIL)
             ->where('metode', '!=', 'Saldo');
 
+        // Semua metrik pembayaran harus mengikuti filter laporan yang sama.
+        $pembayaranTerfilter = (clone $pembayaran)
+            ->when($tanggalAwal, fn($q) =>
+                $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+            ->when($tanggalAkhir, fn($q) =>
+                $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
+            ->when($bulan, fn($q) =>
+                $q->whereMonth('tanggal_bayar', $bulan))
+            ->when($tahun, fn($q) =>
+                $q->whereYear('tanggal_bayar', $tahun));
+
         $tagihan = Tagihan::query()
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
             ->when($tanggalAwal, fn($q) =>
@@ -93,10 +104,12 @@ class LaporanService
         $labelChart = [];
         $dataChart = [];
 
+        $chartYear = $tahun ?: now()->year;
+
         for ($i = 1; $i <= 12; $i++) {
             $labelChart[] = date('M', mktime(0, 0, 0, $i, 1));
 
-            $dataChart[] = Pembayaran::whereYear('tanggal_bayar', now()->year)
+            $dataChart[] = Pembayaran::whereYear('tanggal_bayar', $chartYear)
                 ->whereMonth('tanggal_bayar', $i)
                 ->where('status', Pembayaran::STATUS_BERHASIL)
                 ->where('metode', '!=', 'Saldo')
@@ -131,45 +144,46 @@ class LaporanService
             ->limit(10)
             ->get();
 
-        $kasMasukBulanIni = (clone $pembayaran)
-            ->whereYear('tanggal_bayar', now()->year)
-            ->whereMonth('tanggal_bayar', now()->month)
-            ->sum('total_bayar');
+        $adaFilterPeriode = $tanggalAwal || $tanggalAkhir || $bulan || $tahun;
+
+        if ($adaFilterPeriode) {
+            $kasMasukBulanIni = (clone $pembayaranTerfilter)->sum('total_bayar');
+            $biayaAdminBulanIni = (clone $pembayaranTerfilter)->sum('biaya_admin');
+        } else {
+            $kasMasukBulanIni = (clone $pembayaranTerfilter)
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('total_bayar');
+            $biayaAdminBulanIni = (clone $pembayaranTerfilter)
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('biaya_admin');
+        }
 
         $saldoMasukBulanIni = max(
             0,
             $kasMasukBulanIni
-            - (clone $pembayaran)
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month)
-                ->sum('nominal')
-            - (clone $pembayaran)
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month)
-                ->sum('biaya_admin')
+            - (clone $pembayaranTerfilter)->sum('nominal')
+            - (clone $pembayaranTerfilter)->sum('biaya_admin')
         );
 
         return [
-            'pendapatanHariIni' => (clone $pembayaran)
-                ->when($tanggalAwal, fn($q) => $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-                ->when($tanggalAkhir, fn($q) => $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
-                ->when($bulan, fn($q) => $q->whereMonth('tanggal_bayar', $bulan))
-                ->when($tahun, fn($q) => $q->whereYear('tanggal_bayar', $tahun))
+            'pendapatanHariIni' => (clone $pembayaranTerfilter)
                 ->whereDate('tanggal_bayar', today())
                 ->sum('nominal'),
 
-            'pendapatanBulanIni' => (clone $pembayaran)
-                ->when($tanggalAwal, fn($q) => $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-                ->when($tanggalAkhir, fn($q) => $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir))
-                ->when($bulan, fn($q) => $q->whereMonth('tanggal_bayar', $bulan))
-                ->when($tahun, fn($q) => $q->whereYear('tanggal_bayar', $tahun))
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month)
-                ->sum('nominal'),
+            'pendapatanBulanIni' => $adaFilterPeriode
+                ? (clone $pembayaranTerfilter)->sum('nominal')
+                : (clone $pembayaranTerfilter)
+                    ->whereYear('tanggal_bayar', now()->year)
+                    ->whereMonth('tanggal_bayar', now()->month)
+                    ->sum('nominal'),
 
-            'biayaAdminHariIni' => (clone $pembayaran)->whereDate('tanggal_bayar', today())->sum('biaya_admin'),
-            'biayaAdminBulanIni' => (clone $pembayaran)->whereYear('tanggal_bayar', now()->year)->whereMonth('tanggal_bayar', now()->month)->sum('biaya_admin'),
-            'totalBiayaAdmin' => (clone $pembayaran)->sum('biaya_admin'),
+            'biayaAdminHariIni' => (clone $pembayaranTerfilter)
+                ->whereDate('tanggal_bayar', today())
+                ->sum('biaya_admin'),
+            'biayaAdminBulanIni' => $biayaAdminBulanIni,
+            'totalBiayaAdmin' => (clone $pembayaranTerfilter)->sum('biaya_admin'),
             'kasMasukBulanIni' => $kasMasukBulanIni,
             'saldoMasukBulanIni' => $saldoMasukBulanIni,
             'totalTagihan' => $totalTagihan,
