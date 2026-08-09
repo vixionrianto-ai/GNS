@@ -63,7 +63,7 @@
                     <td>{{ optional($item->tanggal_tagihan)->format('d-m-Y') }}</td>
                     <td>{{ $item->invoice_no }}</td>
                     <td>{{ optional($item->pelanggan)->nama }}</td>
-                    <td>{{ optional(optional($item->pelanggan)->paket)->nama ?? '-' }}</td>
+                    <td>{{ optional(optional($item->pelanggan)->paket)->nama_paket ?? '-' }}</td>
                     <td>{{ $item->periode }}</td>
                     <td class="right">Rp {{ number_format($item->total, 0, ',', '.') }}</td>
                     <td class="right">Rp {{ number_format($item->dibayar, 0, ',', '.') }}</td>
