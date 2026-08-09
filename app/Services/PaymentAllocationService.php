@@ -81,6 +81,10 @@ class PaymentAllocationService
                     Tagihan::STATUS_SEBAGIAN,
                     Tagihan::STATUS_JATUH_TEMPO,
                 ])
+                ->orderByRaw(
+                    'CASE WHEN id = ? THEN 0 ELSE 1 END',
+                    [$tagihanAwal->id]
+                )
                 ->orderBy('tahun')
                 ->orderBy('bulan')
                 ->lockForUpdate()
