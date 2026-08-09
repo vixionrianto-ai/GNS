@@ -62,7 +62,10 @@ class LaporanService
 
         $pembayaran = Pembayaran::query()
             ->where('status', Pembayaran::STATUS_BERHASIL)
-            ->where('metode', '!=', 'Saldo');
+            ->where('metode', '!=', 'Saldo')
+            ->when($status, fn($q) =>
+                $q->whereHas('tagihan', fn($tagihan) =>
+                    $tagihan->where('status', $status)));
 
         // Semua metrik pembayaran harus mengikuti filter laporan yang sama.
         $pembayaranTerfilter = (clone $pembayaran)
@@ -84,7 +87,9 @@ class LaporanService
             ->when($bulan, fn($q) =>
                 $q->where('bulan', $bulan))
             ->when($tahun, fn($q) =>
-                $q->where('tahun', $tahun));
+                $q->where('tahun', $tahun))
+            ->when($status, fn($q) =>
+                $q->where('status', $status));
 
         $pelanggan = Pelanggan::query();
 
@@ -97,7 +102,9 @@ class LaporanService
             ->when($bulan, fn($q) =>
                 $q->where('bulan', $bulan))
             ->when($tahun, fn($q) =>
-                $q->where('tahun', $tahun));
+                $q->where('tahun', $tahun))
+            ->when($status, fn($q) =>
+                $q->where('status', $status));
 
         $laporan = $this->laporanQuery($request)->paginate(15)->withQueryString();
 
@@ -113,6 +120,9 @@ class LaporanService
                 ->whereMonth('tanggal_bayar', $i)
                 ->where('status', Pembayaran::STATUS_BERHASIL)
                 ->where('metode', '!=', 'Saldo')
+                ->when($status, fn($q) =>
+                    $q->whereHas('tagihan', fn($tagihan) =>
+                        $tagihan->where('status', $status)))
                 ->sum('nominal');
         }
 
