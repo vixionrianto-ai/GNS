@@ -14,22 +14,7 @@ use Illuminate\Support\Str;
 
 class PembayaranService
 {
-    /*
-    |--------------------------------------------------------------------------
-    | CONSTANT
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Default biaya admin.
-     */
     private const DEFAULT_BIAYA_ADMIN = 0;
-
-    /*
-    |--------------------------------------------------------------------------
-    | DEPENDENCY
-    |--------------------------------------------------------------------------
-    */
 
     protected MikroTikService $mikroTikService;
     protected InvoiceService $invoiceService;
@@ -37,9 +22,6 @@ class PembayaranService
     protected WhatsAppService $whatsAppService;
     protected PaymentAllocationService $paymentAllocationService;
 
-    /**
-     * Constructor.
-     */
     public function __construct(
         MikroTikService $mikroTikService,
         InvoiceService $invoiceService,
@@ -54,15 +36,6 @@ class PembayaranService
         $this->paymentAllocationService = $paymentAllocationService;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HELPER
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Ambil tagihan beserta relasi yang dibutuhkan.
-     */
     private function getTagihan(int $tagihanId): Tagihan
     {
         return Tagihan::with([
@@ -71,9 +44,6 @@ class PembayaranService
         ])->findOrFail($tagihanId);
     }
 
-    /**
-     * Hitung biaya admin.
-     */
     private function getBiayaAdmin(array $data): float
     {
         return (float) (
@@ -82,9 +52,6 @@ class PembayaranService
         );
     }
 
-    /**
-     * Hitung total pembayaran.
-     */
     private function hitungTotal(
         Tagihan $tagihan,
         float $biayaAdmin
@@ -95,25 +62,13 @@ class PembayaranService
             $biayaAdmin;
     }
 
-    /**
-     * Validasi pembayaran.
-     *
-     * Mendukung:
-     * - pembayaran sebagian
-     * - pembayaran penuh
-     * - pembayaran lebih
-     *
-     * @throws Exception
-     */
     private function validatePembayaran(
         Tagihan $tagihan,
         float $total,
         float $dibayar
     ): void {
         if ($tagihan->status === Tagihan::STATUS_LUNAS) {
-            throw new Exception(
-                'Tagihan sudah lunas.'
-            );
+            throw new Exception('Tagihan sudah lunas.');
         }
 
         if (! in_array(
@@ -124,27 +79,18 @@ class PembayaranService
                 Tagihan::STATUS_JATUH_TEMPO,
             ]
         )) {
-            throw new Exception(
-                'Status tagihan tidak dapat diproses untuk pembayaran.'
-            );
+            throw new Exception('Status tagihan tidak dapat diproses untuk pembayaran.');
         }
 
         if ($dibayar <= 0) {
-            throw new Exception(
-                'Nominal pembayaran harus lebih besar dari nol.'
-            );
+            throw new Exception('Nominal pembayaran harus lebih besar dari nol.');
         }
 
         if (! is_numeric($dibayar)) {
-            throw new Exception(
-                'Nominal pembayaran tidak valid.'
-            );
+            throw new Exception('Nominal pembayaran tidak valid.');
         }
     }
 
-    /**
-     * Logging pembayaran.
-     */
     private function logPembayaran(
         string $message,
         array $context = [],
@@ -157,75 +103,41 @@ class PembayaranService
         };
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PEMBAYARAN
-    |--------------------------------------------------------------------------
-    */
-
     /**
-     * Proses pembayaran tagihan.
-     *
-     * @throws \Exception
+     * Generate nomor transaksi pembayaran eksternal yang unik.
      */
+    private function generateInvoiceNo(): string
+    {
+        $prefix = 'GNSM-' . now()->format('Ym') . '-';
+
+        do {
+            $number = strtoupper(Str::random(8));
+            $invoiceNo = $prefix . $number;
+        } while (Pembayaran::where('invoice_no', $invoiceNo)->exists());
+
+        return $invoiceNo;
+    }
+
     public function bayar(array $data): Pembayaran
     {
         return DB::transaction(function () use ($data) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Ambil Tagihan
-            |--------------------------------------------------------------------------
-            */
-
-            $tagihan = $this->getTagihan(
-                $data['tagihan_id']
-            );
+            $tagihan = $this->getTagihan($data['tagihan_id']);
 
             if (empty($data['metode'])) {
                 throw new Exception('Metode pembayaran wajib diisi.');
             }
 
             $dibayar = (float) $data['dibayar'];
-
-            /*
-            |--------------------------------------------------------------------------
-            | Hitung Total
-            |--------------------------------------------------------------------------
-            */
-
             $biayaAdmin = $this->getBiayaAdmin($data);
+            $total = $this->hitungTotal($tagihan, $biayaAdmin);
 
-            $total = $this->hitungTotal(
-                $tagihan,
-                $biayaAdmin
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Validasi Pembayaran
-            |--------------------------------------------------------------------------
-            */
-
-            $this->validatePembayaran(
-                $tagihan,
-                $total,
-                $dibayar
-            );
+            $this->validatePembayaran($tagihan, $total, $dibayar);
 
             $nominalBersih = $dibayar - $biayaAdmin;
 
             if ($nominalBersih <= 0) {
-                throw new Exception(
-                    'Nominal pembayaran harus lebih besar dari biaya admin.'
-                );
+                throw new Exception('Nominal pembayaran harus lebih besar dari biaya admin.');
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Simpan Pembayaran
-            |--------------------------------------------------------------------------
-            */
 
             $pembayaran = $this->simpanPembayaran(
                 $tagihan,
@@ -234,43 +146,15 @@ class PembayaranService
                 $total
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Alokasi Pembayaran (FIFO / Cicilan / Saldo)
-            |--------------------------------------------------------------------------
-            | Yang dialokasikan hanya nominal bersih setelah biaya admin.
-            | Biaya admin tidak boleh mengurangi sisa tagihan.
-            */
-
             $this->paymentAllocationService->allocate(
                 $pembayaran,
                 $tagihan,
                 (float) $pembayaran->nominal
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Update kembalian setelah proses alokasi
-            |--------------------------------------------------------------------------
-            */
-
             $pembayaran->update([
-                /*
-                * Untuk GNS:
-                * Seluruh kelebihan pembayaran dipakai
-                * melunasi tagihan berikutnya atau menjadi
-                * saldo pelanggan.
-                *
-                * Jadi bukan kembalian tunai.
-                */
                 'kembalian' => 0,
             ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Aktifkan PPPoE MikroTik
-            |--------------------------------------------------------------------------
-            */
 
             $masihAdaTagihan = Tagihan::where(
                 'pelanggan_id',
@@ -282,12 +166,6 @@ class PembayaranService
             if (! $masihAdaTagihan) {
                 $this->aktifkanSecretMikrotik($tagihan);
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Kirim WhatsApp + Invoice PDF
-            |--------------------------------------------------------------------------
-            */
 
             $waBerhasil = false;
 
@@ -306,16 +184,10 @@ class PembayaranService
                 );
             } catch (\Throwable $e) {
                 Log::warning('WhatsApp pembayaran gagal dikirim.', [
-                    'invoice' => $tagihan->invoice_no,
+                    'invoice' => $pembayaran->invoice_no,
                     'message' => $e->getMessage(),
                 ]);
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Logging
-            |--------------------------------------------------------------------------
-            */
 
             $this->logPembayaran(
                 'Pembayaran berhasil',
@@ -332,14 +204,14 @@ class PembayaranService
                 'create',
                 'Pembayaran invoice ' . $pembayaran->invoice_no,
                 [
-                    'invoice_no'  => $pembayaran->invoice_no,
-                    'tagihan_id'  => $tagihan->id,
-                    'pelanggan_id'=> $tagihan->pelanggan_id,
-                    'user_id'     => Auth::id(),
-                    'nominal'     => $pembayaran->nominal,
-                    'biaya_admin' => $pembayaran->biaya_admin,
-                    'total_bayar' => $pembayaran->total_bayar,
-                    'metode'      => $pembayaran->metode,
+                    'invoice_no'   => $pembayaran->invoice_no,
+                    'tagihan_id'   => $tagihan->id,
+                    'pelanggan_id' => $tagihan->pelanggan_id,
+                    'user_id'      => Auth::id(),
+                    'nominal'      => $pembayaran->nominal,
+                    'biaya_admin'  => $pembayaran->biaya_admin,
+                    'total_bayar'  => $pembayaran->total_bayar,
+                    'metode'       => $pembayaran->metode,
                 ]
             );
 
@@ -349,30 +221,17 @@ class PembayaranService
         });
     }
 
-    /**
-     * Batalkan pembayaran yang sebelumnya berhasil.
-     *
-     * Alokasi pembayaran tidak dihapus agar histori transaksi tetap tersimpan.
-     * Tagihan hanya menghitung alokasi dari pembayaran berstatus Berhasil.
-     *
-     * @throws Exception
-     */
     public function batalkan(Pembayaran $pembayaran): Pembayaran
     {
         return DB::transaction(function () use ($pembayaran) {
-
             $pembayaran->refresh();
 
             if ($pembayaran->status === Pembayaran::STATUS_DIBATALKAN) {
-                throw new Exception(
-                    'Pembayaran sudah dibatalkan.'
-                );
+                throw new Exception('Pembayaran sudah dibatalkan.');
             }
 
             if ($pembayaran->status !== Pembayaran::STATUS_BERHASIL) {
-                throw new Exception(
-                    'Hanya pembayaran yang berhasil yang dapat dibatalkan.'
-                );
+                throw new Exception('Hanya pembayaran yang berhasil yang dapat dibatalkan.');
             }
 
             $tagihanIds = $pembayaran->alokasi()
@@ -407,15 +266,6 @@ class PembayaranService
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SIMPAN PEMBAYARAN
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Simpan data pembayaran.
-     */
     private function simpanPembayaran(
         Tagihan $tagihan,
         array $data,
@@ -423,7 +273,7 @@ class PembayaranService
         float $total
     ): Pembayaran {
         return Pembayaran::create([
-            'invoice_no'    => $tagihan->invoice_no,
+            'invoice_no'    => $this->generateInvoiceNo(),
             'invoice_date'  => now(),
             'invoice_pdf'   => null,
             'public_token'  => Str::uuid()->toString(),
@@ -444,62 +294,28 @@ class PembayaranService
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MIKROTIK
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * Aktifkan kembali PPP Secret MikroTik
-     * setelah pembayaran berhasil.
-     */
-    private function aktifkanSecretMikrotik(
-        Tagihan $tagihan
-    ): void {
+    private function aktifkanSecretMikrotik(Tagihan $tagihan): void
+    {
         $pelanggan = $tagihan->pelanggan;
 
-        if (
-            !$pelanggan ||
-            !$pelanggan->mikrotik_secret_id
-        ) {
+        if (!$pelanggan || !$pelanggan->mikrotik_secret_id) {
             return;
         }
 
         try {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Enable Secret
-            |--------------------------------------------------------------------------
-            */
-
             $this->mikroTikService->enableSecretById(
                 $pelanggan->router,
                 $pelanggan->mikrotik_secret_id
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Disconnect Active Session
-            |--------------------------------------------------------------------------
-            */
-
-            $this->mikroTikService
-                ->disconnectActiveSessionBySecretId(
-                    $pelanggan->router,
-                    $pelanggan->mikrotik_secret_id
-                );
+            $this->mikroTikService->disconnectActiveSessionBySecretId(
+                $pelanggan->router,
+                $pelanggan->mikrotik_secret_id
+            );
 
             $pelanggan->is_isolated = false;
             $pelanggan->isolated_at = null;
             $pelanggan->save();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Logging Success
-            |--------------------------------------------------------------------------
-            */
 
             $this->logPembayaran(
                 'PPPoE berhasil diaktifkan',
@@ -509,9 +325,7 @@ class PembayaranService
                     'router_id'    => $pelanggan->router_id,
                 ]
             );
-
         } catch (\Throwable $e) {
-
             $this->logPembayaran(
                 'Gagal mengaktifkan PPP Secret',
                 [
@@ -519,9 +333,8 @@ class PembayaranService
                     'secret_id'    => $pelanggan->mikrotik_secret_id,
                     'message'      => $e->getMessage(),
                 ],
-                'warning'
+                'error'
             );
-
         }
     }
 }
