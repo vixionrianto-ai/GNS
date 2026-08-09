@@ -168,7 +168,7 @@
                         <div class="text-xs text-info text-uppercase font-weight-bold">Kas Masuk Bulan Ini</div>
                         <div class="h4 font-weight-bold mb-2 laporan-kpi-value">Rp {{ number_format($kasMasukBulanIni,0,',','.') }}</div>
                         <small class="text-muted d-block">Tagihan Rp {{ number_format($pendapatanBulanIni,0,',','.') }}</small>
-                        <small class="text-muted d-block">Admin Rp {{ number_format($biayaAdminBulanIni,0,',','.') }} · Saldo Rp {{ number_format($saldoMasukBulanIni,0,',','.') }}</small>
+                        <small class="text-muted d-block">Admin Rp {{ number_format($biayaAdminBulanIni,0,',','.') }} · Saldo Terbentuk Rp {{ number_format($saldoMasukBulanIni,0,',','.') }}</small>
                     </div>
                     <i class="fas fa-cash-register fa-2x text-info ml-3"></i>
                 </div>
