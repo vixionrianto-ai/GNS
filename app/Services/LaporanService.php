@@ -172,6 +172,35 @@ class LaporanService
             ->limit(10)
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Rekonsiliasi Kas
+        |--------------------------------------------------------------------------
+        | Kas masuk = total_bayar dari pembayaran eksternal.
+        | Pendapatan tagihan = nominal.
+        | Biaya admin = biaya_admin.
+        | Selisihnya adalah kelebihan pembayaran yang masuk saldo pelanggan.
+        |--------------------------------------------------------------------------
+        */
+
+        $kasMasukBulanIni = (clone $pembayaran)
+            ->whereYear('tanggal_bayar', now()->year)
+            ->whereMonth('tanggal_bayar', now()->month)
+            ->sum('total_bayar');
+
+        $saldoMasukBulanIni = max(
+            0,
+            $kasMasukBulanIni
+            - (clone $pembayaran)
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('nominal')
+            - (clone $pembayaran)
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month)
+                ->sum('biaya_admin')
+        );
+
         return [
             /*
             |--------------------------------------------------------------------------
@@ -193,12 +222,6 @@ class LaporanService
                 ->whereDate('tanggal_bayar', today())
                 ->sum('nominal'),
 
-            /*
-            |--------------------------------------------------------------------------
-            | Pendapatan Bulan Ini
-            |--------------------------------------------------------------------------
-            */
-
             'pendapatanBulanIni' => (clone $pembayaran)
                 ->when($tanggalAwal, fn($q) =>
                     $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
@@ -212,12 +235,6 @@ class LaporanService
                 ->whereMonth('tanggal_bayar', now()->month)
                 ->sum('nominal'),
 
-            /*
-            |--------------------------------------------------------------------------
-            | Biaya Admin Terpisah
-            |--------------------------------------------------------------------------
-            */
-
             'biayaAdminHariIni' => (clone $pembayaran)
                 ->whereDate('tanggal_bayar', today())
                 ->sum('biaya_admin'),
@@ -229,6 +246,9 @@ class LaporanService
 
             'totalBiayaAdmin' => (clone $pembayaran)
                 ->sum('biaya_admin'),
+
+            'kasMasukBulanIni' => $kasMasukBulanIni,
+            'saldoMasukBulanIni' => $saldoMasukBulanIni,
 
             'totalTagihan' => $totalTagihan,
             'totalDibayar' => $totalDibayar,
