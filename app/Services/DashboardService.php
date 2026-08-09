@@ -81,51 +81,44 @@ class DashboardService
 
         /*
         |--------------------------------------------------------------------------
-        | Statistik Pembayaran
+        | Statistik Pembayaran Eksternal
+        |
+        | Saldo adalah perpindahan internal pelanggan dan tidak dihitung
+        | sebagai pembayaran kas baru.
         |--------------------------------------------------------------------------
         */
 
-        $totalPembayaran = Pembayaran::where(
+        $pembayaranEksternal = Pembayaran::where(
             'status',
             Pembayaran::STATUS_BERHASIL
-        )->count();
+        )->where('metode', '!=', 'Saldo');
 
-        $pembayaranHariIni = Pembayaran::whereDate(
-            'tanggal_bayar',
-            today()
-        )
-        ->where(
-            'status',
-            Pembayaran::STATUS_BERHASIL
-        )
-        ->count();
+        $totalPembayaran = (clone $pembayaranEksternal)->count();
 
-        $pendapatanHariIni = Pembayaran::whereDate(
-            'tanggal_bayar',
-            today()
-        )
-        ->where('status', Pembayaran::STATUS_BERHASIL)
-        ->where('metode', '!=', 'Saldo')
-        ->sum('total_bayar');
+        $pembayaranHariIni = (clone $pembayaranEksternal)
+            ->whereDate('tanggal_bayar', today())
+            ->count();
 
-        $pendapatanBulanIni = Pembayaran::whereYear(
-            'tanggal_bayar',
-            now()->year
-        )
-        ->whereMonth(
-            'tanggal_bayar',
-            now()->month
-        )
-        ->where('status', Pembayaran::STATUS_BERHASIL)
-        ->where('metode', '!=', 'Saldo')
-        ->sum('total_bayar');
+        /*
+        |--------------------------------------------------------------------------
+        | Pendapatan
+        |
+        | Gunakan nominal pembayaran tagihan, bukan total_bayar.
+        | total_bayar dapat mengandung biaya admin dan kelebihan pembayaran.
+        |--------------------------------------------------------------------------
+        */
 
-        $totalPendapatan = Pembayaran::where(
-            'status',
-            Pembayaran::STATUS_BERHASIL
-        )
-        ->where('metode', '!=', 'Saldo')
-        ->sum('total_bayar');
+        $pendapatanHariIni = (clone $pembayaranEksternal)
+            ->whereDate('tanggal_bayar', today())
+            ->sum('nominal');
+
+        $pendapatanBulanIni = (clone $pembayaranEksternal)
+            ->whereYear('tanggal_bayar', now()->year)
+            ->whereMonth('tanggal_bayar', now()->month)
+            ->sum('nominal');
+
+        $totalPendapatan = (clone $pembayaranEksternal)
+            ->sum('nominal');
 
         /*
         |--------------------------------------------------------------------------
