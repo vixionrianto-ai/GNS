@@ -24,12 +24,8 @@ class LaporanService
         $tahun        = $request->tahun;
         $status       = $request->status;
 
-        return Tagihan::with(['pelanggan.paket'])
+        $query = Tagihan::with(['pelanggan.paket'])
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-            ->when($tanggalAwal, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-            ->when($tanggalAkhir, fn($q) =>
-                $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
             ->when($bulan, fn($q) =>
                 $q->where('bulan', $bulan))
             ->when($tahun, fn($q) =>
@@ -46,8 +42,38 @@ class LaporanService
                                 ->orWhere('kode_pelanggan', 'like', "%{$search}%");
                         });
                 });
-            })
-            ->latest('tanggal_tagihan');
+            });
+
+        /*
+         * Laporan keuangan untuk tagihan yang sudah menerima pembayaran
+         * harus mengikuti tanggal uang masuk (tanggal_bayar), bukan
+         * tanggal tagihan. Contoh: tagihan 272 dibuat 13-08 tetapi dibayar
+         * sebagian pada 09-08; pembayaran tersebut harus muncul saat filter
+         * 09-08 + status Sebagian.
+         *
+         * Untuk Belum Bayar/Jatuh Tempo, tidak ada tanggal pembayaran,
+         * sehingga tetap memakai tanggal_tagihan.
+         */
+        if ($tanggalAwal || $tanggalAkhir) {
+            if (in_array($status, [Tagihan::STATUS_LUNAS, Tagihan::STATUS_SEBAGIAN], true)) {
+                $query->whereHas('pembayaran', function ($q) use ($tanggalAwal, $tanggalAkhir) {
+                    $q->where('status', Pembayaran::STATUS_BERHASIL)
+                        ->where('metode', '!=', 'Saldo')
+                        ->when($tanggalAwal, fn($q) =>
+                            $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                        ->when($tanggalAkhir, fn($q) =>
+                            $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                });
+            } else {
+                $query
+                    ->when($tanggalAwal, fn($q) =>
+                        $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
+                    ->when($tanggalAkhir, fn($q) =>
+                        $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
+            }
+        }
+
+        return $query->latest('tanggal_tagihan');
     }
 
     /**
@@ -73,16 +99,30 @@ class LaporanService
 
         $filterTagihan = function ($q) use ($tanggalAwal, $tanggalAkhir, $bulan, $tahun, $status) {
             $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-                ->when($tanggalAwal, fn($q) =>
-                    $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-                ->when($tanggalAkhir, fn($q) =>
-                    $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir))
                 ->when($bulan, fn($q) =>
                     $q->where('bulan', $bulan))
                 ->when($tahun, fn($q) =>
                     $q->where('tahun', $tahun))
                 ->when($status, fn($q) =>
                     $q->where('status', $status));
+
+            if ($tanggalAwal || $tanggalAkhir) {
+                if (in_array($status, [Tagihan::STATUS_LUNAS, Tagihan::STATUS_SEBAGIAN], true)) {
+                    $q->whereHas('pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
+                        $p->where('status', Pembayaran::STATUS_BERHASIL)
+                            ->where('metode', '!=', 'Saldo')
+                            ->when($tanggalAwal, fn($p) =>
+                                $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                            ->when($tanggalAkhir, fn($p) =>
+                                $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                    });
+                } else {
+                    $q->when($tanggalAwal, fn($q) =>
+                        $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
+                        ->when($tanggalAkhir, fn($q) =>
+                            $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
+                }
+            }
         };
 
         $pembayaran = Pembayaran::query()
