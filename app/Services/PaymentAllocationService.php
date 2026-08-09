@@ -12,9 +12,6 @@ use Illuminate\Support\Facades\Auth;
 
 class PaymentAllocationService
 {
-    /**
-     * Generate nomor pembayaran saldo dengan prefix GNSM.
-     */
     protected function generateSaldoInvoiceNo(): string
     {
         $prefix = 'GNSM-SALDO-' . now()->format('Ym') . '-';
@@ -33,23 +30,13 @@ class PaymentAllocationService
         return $prefix . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 
-    public function allocate(
-        Pembayaran $pembayaran,
-        Tagihan $tagihanAwal,
-        float $nominalBayar
-    ): array {
-        return DB::transaction(function () use (
-            $pembayaran,
-            $tagihanAwal,
-            $nominalBayar
-        ) {
+    public function allocate(Pembayaran $pembayaran, Tagihan $tagihanAwal, float $nominalBayar): array
+    {
+        return DB::transaction(function () use ($pembayaran, $tagihanAwal, $nominalBayar) {
             $pelanggan = $tagihanAwal->pelanggan;
 
             $saldo = SaldoPelanggan::milik($pelanggan->id);
-
-            $saldo = SaldoPelanggan::where('id', $saldo->id)
-                ->lockForUpdate()
-                ->first();
+            $saldo = SaldoPelanggan::where('id', $saldo->id)->lockForUpdate()->first();
 
             $tagihans = Tagihan::where('pelanggan_id', $pelanggan->id)
                 ->whereIn('status', [
@@ -57,10 +44,7 @@ class PaymentAllocationService
                     Tagihan::STATUS_SEBAGIAN,
                     Tagihan::STATUS_JATUH_TEMPO,
                 ])
-                ->orderByRaw(
-                    'CASE WHEN id = ? THEN 0 ELSE 1 END',
-                    [$tagihanAwal->id]
-                )
+                ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$tagihanAwal->id])
                 ->orderBy('tahun')
                 ->orderBy('bulan')
                 ->lockForUpdate()
@@ -70,24 +54,16 @@ class PaymentAllocationService
             $teralokasi = [];
 
             foreach ($tagihans as $tagihan) {
-                if ($sisaUang <= 0) {
-                    break;
-                }
+                if ($sisaUang <= 0) break;
+                if ($tagihan->sisa <= 0) continue;
 
-                if ($tagihan->sisa <= 0) {
-                    continue;
-                }
-
-                $nominalDialokasikan = min(
-                    $tagihan->sisa,
-                    $sisaUang
-                );
+                $nominalDialokasikan = min($tagihan->sisa, $sisaUang);
 
                 AlokasiPembayaran::create([
                     'pembayaran_id' => $pembayaran->id,
-                    'tagihan_id'    => $tagihan->id,
-                    'nominal'       => $nominalDialokasikan,
-                    'keterangan'    => 'Alokasi FIFO',
+                    'tagihan_id' => $tagihan->id,
+                    'nominal' => $nominalDialokasikan,
+                    'keterangan' => 'Alokasi FIFO',
                 ]);
 
                 $tagihan->refresh();
@@ -95,71 +71,58 @@ class PaymentAllocationService
 
                 $teralokasi[] = [
                     'tagihan_id' => $tagihan->id,
-                    'nominal'    => $nominalDialokasikan,
+                    'nominal' => $nominalDialokasikan,
                 ];
 
                 $sisaUang -= $nominalDialokasikan;
             }
 
             if ($sisaUang > 0) {
-                $saldo->tambah(
-                    $sisaUang,
-                    'Kelebihan pembayaran'
-                );
+                $saldo->tambah($sisaUang, 'Kelebihan pembayaran');
 
                 AlokasiPembayaran::create([
                     'pembayaran_id' => $pembayaran->id,
-                    'tagihan_id'    => null,
-                    'nominal'       => $sisaUang,
-                    'keterangan'    => 'Masuk saldo pelanggan',
+                    'tagihan_id' => null,
+                    'nominal' => $sisaUang,
+                    'keterangan' => 'Masuk saldo pelanggan',
                 ]);
             }
 
-            return [
-                'alokasi' => $teralokasi,
-                'saldo' => $sisaUang,
-            ];
+            return ['alokasi' => $teralokasi, 'saldo' => $sisaUang];
         });
     }
 
-    protected function applyToSingleTagihan(
-        Tagihan $tagihan,
-        float $nominal
-    ): float {
-        if ($nominal <= 0) {
-            return 0;
-        }
+    protected function applyToSingleTagihan(Tagihan $tagihan, float $nominal): float
+    {
+        if ($nominal <= 0) return 0;
 
         $tagihan->refresh();
         $sisa = $tagihan->getSisaTagihan();
-
-        if ($sisa <= 0) {
-            return 0;
-        }
+        if ($sisa <= 0) return 0;
 
         $dipakai = min($sisa, $nominal);
 
         $pembayaran = Pembayaran::create([
-            'invoice_no'    => $this->generateSaldoInvoiceNo(),
-            'invoice_date'  => now(),
-            'tagihan_id'    => $tagihan->id,
-            'user_id'       => Auth::id() ?? 1,
+            'invoice_no' => $this->generateSaldoInvoiceNo(),
+            'invoice_date' => now(),
+            'tagihan_id' => $tagihan->id,
+            'user_id' => Auth::id() ?? 1,
             'tanggal_bayar' => now(),
-            'metode'        => 'Saldo',
-            'nominal'       => $dipakai,
-            'biaya_admin'   => 0,
-            'total_bayar'   => $dipakai,
-            'dibayar'       => $dipakai,
-            'kembalian'     => 0,
-            'status'        => Pembayaran::STATUS_BERHASIL,
-            'keterangan'    => 'Pembayaran otomatis menggunakan saldo pelanggan',
+            'metode' => 'Saldo',
+            'nominal' => $dipakai,
+            'biaya_admin' => 0,
+            'total_bayar' => $dipakai,
+            'dibayar' => $dipakai,
+            'kembalian' => 0,
+            'status' => Pembayaran::STATUS_BERHASIL,
+            'keterangan' => 'Pembayaran otomatis menggunakan saldo pelanggan',
         ]);
 
         AlokasiPembayaran::create([
             'pembayaran_id' => $pembayaran->id,
-            'tagihan_id'    => $tagihan->id,
-            'nominal'       => $dipakai,
-            'keterangan'    => 'Pemakaian saldo pelanggan',
+            'tagihan_id' => $tagihan->id,
+            'nominal' => $dipakai,
+            'keterangan' => 'Pemakaian saldo pelanggan',
         ]);
 
         $tagihan->refresh();
@@ -172,47 +135,28 @@ class PaymentAllocationService
     {
         return DB::transaction(function () use ($tagihan) {
             $saldo = SaldoPelanggan::milik($tagihan->pelanggan_id);
+            $saldo = SaldoPelanggan::where('id', $saldo->id)->lockForUpdate()->first();
 
-            $saldo = SaldoPelanggan::where('id', $saldo->id)
-                ->lockForUpdate()
-                ->first();
-
-            if ($saldo->saldo <= 0) {
-                return 0;
-            }
+            if ($saldo->saldo <= 0) return 0;
 
             $tagihan->refresh();
 
-            if (! in_array(
-                $tagihan->status,
-                [
-                    Tagihan::STATUS_BELUM_BAYAR,
-                    Tagihan::STATUS_SEBAGIAN,
-                    Tagihan::STATUS_JATUH_TEMPO,
-                ]
-            )) {
-                return 0;
-            }
+            if (! in_array($tagihan->status, [
+                Tagihan::STATUS_BELUM_BAYAR,
+                Tagihan::STATUS_SEBAGIAN,
+                Tagihan::STATUS_JATUH_TEMPO,
+            ])) return 0;
 
-            $dipakai = $this->applyToSingleTagihan(
-                $tagihan,
-                (float) $saldo->saldo
-            );
+            $dipakai = $this->applyToSingleTagihan($tagihan, (float) $saldo->saldo);
+            if ($dipakai <= 0) return 0;
 
-            if ($dipakai <= 0) {
-                return 0;
-            }
-
-            $saldo->kurangi(
-                $dipakai,
-                'Pembayaran tagihan ' . $tagihan->invoice_no
-            );
+            $saldo->kurangi($dipakai, 'Pembayaran tagihan ' . $tagihan->invoice_no);
 
             SaldoUsage::create([
                 'saldo_pelanggan_id' => $saldo->id,
-                'tagihan_id'         => $tagihan->id,
-                'nominal'            => $dipakai,
-                'keterangan'         => 'Pembayaran tagihan menggunakan saldo pelanggan',
+                'tagihan_id' => $tagihan->id,
+                'nominal' => $dipakai,
+                'keterangan' => 'Pembayaran tagihan menggunakan saldo pelanggan',
             ]);
 
             return $dipakai;
