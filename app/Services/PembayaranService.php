@@ -349,6 +349,64 @@ class PembayaranService
         });
     }
 
+    /**
+     * Batalkan pembayaran yang sebelumnya berhasil.
+     *
+     * Alokasi pembayaran tidak dihapus agar histori transaksi tetap tersimpan.
+     * Tagihan hanya menghitung alokasi dari pembayaran berstatus Berhasil.
+     *
+     * @throws Exception
+     */
+    public function batalkan(Pembayaran $pembayaran): Pembayaran
+    {
+        return DB::transaction(function () use ($pembayaran) {
+
+            $pembayaran->refresh();
+
+            if ($pembayaran->status === Pembayaran::STATUS_DIBATALKAN) {
+                throw new Exception(
+                    'Pembayaran sudah dibatalkan.'
+                );
+            }
+
+            if ($pembayaran->status !== Pembayaran::STATUS_BERHASIL) {
+                throw new Exception(
+                    'Hanya pembayaran yang berhasil yang dapat dibatalkan.'
+                );
+            }
+
+            $tagihanIds = $pembayaran->alokasi()
+                ->whereNotNull('tagihan_id')
+                ->pluck('tagihan_id')
+                ->unique();
+
+            $pembayaran->update([
+                'status' => Pembayaran::STATUS_DIBATALKAN,
+            ]);
+
+            foreach ($tagihanIds as $tagihanId) {
+                $tagihan = Tagihan::find($tagihanId);
+
+                if ($tagihan) {
+                    $tagihan->refreshStatus();
+                }
+            }
+
+            $this->auditTrailService->pembayaran(
+                'cancel',
+                'Pembayaran dibatalkan: ' . $pembayaran->invoice_no,
+                [
+                    'invoice_no' => $pembayaran->invoice_no,
+                    'tagihan_id' => $pembayaran->tagihan_id,
+                    'user_id'    => Auth::id(),
+                    'nominal'    => $pembayaran->nominal,
+                ]
+            );
+
+            return $pembayaran->fresh();
+        });
+    }
+
     /*
     |--------------------------------------------------------------------------
     | SIMPAN PEMBAYARAN
