@@ -13,15 +13,9 @@
                             Rp {{ number_format($pendapatanHariIni,0,',','.') }}
                         </div>
                         <div class="progress mt-3" style="height:6px;">
-                            <div class="progress-bar bg-dark"
-                                role="progressbar"
-                                style="width:100%">
-                            </div>
+                            <div class="progress-bar bg-dark" role="progressbar" style="width:100%"></div>
                         </div>
-
-                        <small class="text-muted">
-                            Nilai seluruh tagihan pada filter yang dipilih
-                        </small>
+                        <small class="text-muted">Nilai pembayaran tagihan hari ini</small>
                     </div>
                     <i class="fas fa-wallet fa-2x text-success"></i>
                 </div>
@@ -42,22 +36,37 @@
                             Rp {{ number_format($pendapatanBulanIni,0,',','.') }}
                         </div>
                         <div class="progress mt-3" style="height:6px;">
-
-                            <div class="progress-bar bg-primary"
-                                role="progressbar"
-                                style="width: {{ $persenLunas }}%">
-
-                            </div>
-
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $persenLunas }}%"></div>
                         </div>
-
-                        <small class="text-muted">
-
-                            {{ $persenLunas }}% dari total tagihan telah dibayar
-
-                        </small>
+                        <small class="text-muted">{{ $persenLunas }}% dari total tagihan telah dibayar</small>
                     </div>
                     <i class="fas fa-chart-line fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Kas Masuk --}}
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-xs text-info text-uppercase font-weight-bold">
+                            Kas Masuk Bulan
+                        </div>
+                        <div class="h4 font-weight-bold">
+                            Rp {{ number_format($kasMasukBulanIni,0,',','.') }}
+                        </div>
+                        <small class="text-muted d-block">
+                            Tagihan Rp {{ number_format($pendapatanBulanIni,0,',','.') }}
+                        </small>
+                        <small class="text-muted d-block">
+                            Admin Rp {{ number_format($biayaAdminBulanIni,0,',','.') }}
+                            · Saldo Rp {{ number_format($saldoMasukBulanIni,0,',','.') }}
+                        </small>
+                    </div>
+                    <i class="fas fa-cash-register fa-2x text-info"></i>
                 </div>
             </div>
         </div>
@@ -88,28 +97,12 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-xs text-warning text-uppercase font-weight-bold">
-                            Piutang
-                        </div>
-                        <div class="h4 font-weight-bold">
-                            Rp {{ number_format($piutang,0,',','.') }}
-                        </div>
+                        <div class="text-xs text-warning text-uppercase font-weight-bold">Piutang</div>
+                        <div class="h4 font-weight-bold">Rp {{ number_format($piutang,0,',','.') }}</div>
                         <div class="progress mt-3" style="height:6px;">
-
-                            <div class="progress-bar bg-warning"
-                                role="progressbar"
-                                style="width: {{ $persenPiutang }}%">
-
-                            </div>
-
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: {{ $persenPiutang }}%"></div>
                         </div>
-
-                        <small class="text-muted">
-
-                            {{ $persenPiutang }}% dari total tagihan
-
-                        </small>
-
+                        <small class="text-muted">{{ $persenPiutang }}% dari total tagihan</small>
                     </div>
                     <i class="fas fa-file-invoice-dollar fa-2x text-warning"></i>
                 </div>
