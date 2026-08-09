@@ -1047,7 +1047,7 @@
 
                             <td>
 
-                                {{ optional($item->tanggal_bayar)->format('d M Y H:i') }}
+                                {{ optional($item->created_at)->format('d M Y H:i') }}
 
                             </td>
 
