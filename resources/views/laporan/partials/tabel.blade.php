@@ -1,224 +1,109 @@
-{{-- ================= DATA LAPORAN ================= --}}
-
-<div class="card shadow-sm mt-4">
-
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-
-        <h5 class="mb-0">
-            <i class="fas fa-table text-primary"></i>
-            Data Laporan Pembayaran
-        </h5>
-
+<div class="card shadow-sm mt-4 laporan-table-card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap">
         <div>
-
-            <button class="btn btn-sm btn-outline-secondary">
-
-                <i class="fas fa-print"></i>
-
-                Print
-
-            </button>
-
-            <button class="btn btn-sm btn-danger">
-
-                <i class="fas fa-file-pdf"></i>
-
-                PDF
-
-            </button>
-
-            <button class="btn btn-sm btn-success">
-
-                <i class="fas fa-file-excel"></i>
-
-                Excel
-
-            </button>
-
+            <h5 class="mb-1 font-weight-bold">
+                <i class="fas fa-table text-primary mr-2"></i>
+                Data Laporan Tagihan
+            </h5>
+            <small class="text-muted">Data mengikuti filter yang sedang aktif</small>
         </div>
 
+        <div class="mt-2 mt-md-0 d-flex align-items-center">
+            <span class="badge badge-light border mr-2 px-2 py-1">
+                {{ number_format($laporan->total(), 0, ',', '.') }} Data
+            </span>
+            <a href="{{ route('laporan.export.pdf', request()->query()) }}"
+               class="btn btn-sm btn-danger mr-1" target="_blank">
+                <i class="fas fa-file-pdf mr-1"></i> PDF
+            </a>
+            <a href="{{ route('laporan.export.excel', request()->query()) }}"
+               class="btn btn-sm btn-success">
+                <i class="fas fa-file-excel mr-1"></i> Excel
+            </a>
+        </div>
     </div>
 
-    <div class="card-body">
-
-        <form
-    method="GET"
-    action="{{ route('laporan.index') }}">
-
-    <div class="row mb-3">
-
-        <div class="col-md-4">
-
-            <input
-                type="text"
-                name="search"
-                class="form-control"
-                placeholder="Cari pelanggan / invoice ..."
-                value="{{ request('search') }}">
-
-        </div>
-
-        <div class="col-md-2">
-
-            <button
-                class="btn btn-primary">
-
-                <i class="fas fa-search"></i>
-
-                Cari
-
-            </button>
-
-        </div>
-
-    </div>
-
-</form>
-
+    <div class="card-body p-0">
         <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 laporan-table">
+                <thead>
+                    <tr>
+                        <th width="55">No</th>
+                        <th>Invoice</th>
+                        <th>Pelanggan</th>
+                        <th>Periode</th>
+                        <th class="text-right">Total</th>
+                        <th class="text-right">Dibayar</th>
+                        <th class="text-right">Sisa</th>
+                        <th>Status</th>
+                        <th width="60" class="text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($laporan as $item)
+                        <tr>
+                            <td class="text-muted">
+                                {{ $loop->iteration + (($laporan->currentPage() - 1) * $laporan->perPage()) }}
+                            </td>
+                            <td>
+                                <strong class="d-block">{{ $item->invoice_no }}</strong>
+                                <small class="text-muted">
+                                    {{ optional($item->tanggal_tagihan)->format('d-m-Y') }}
+                                </small>
+                            </td>
+                            <td>
+                                <strong>{{ optional($item->pelanggan)->nama }}</strong>
+                                <small class="text-muted d-block">
+                                    {{ optional(optional($item->pelanggan)->paket)->nama ?? '-' }}
+                                </small>
+                            </td>
+                            <td>{{ $item->periode }}</td>
+                            <td class="text-right font-weight-bold">
+                                Rp {{ number_format($item->total, 0, ',', '.') }}
+                            </td>
+                            <td class="text-right text-success">
+                                Rp {{ number_format($item->dibayar, 0, ',', '.') }}
+                            </td>
+                            <td class="text-right {{ $item->sisa > 0 ? 'text-danger' : 'text-muted' }}">
+                                Rp {{ number_format($item->sisa, 0, ',', '.') }}
+                            </td>
+                            <td>
+                                @switch($item->status)
+                                    @case('Lunas')
+                                        <span class="badge badge-success px-2 py-1">Lunas</span>
+                                        @break
+                                    @case('Sebagian')
+                                        <span class="badge badge-warning px-2 py-1">Sebagian</span>
+                                        @break
+                                    @case('Jatuh Tempo')
+                                        <span class="badge badge-danger px-2 py-1">Jatuh Tempo</span>
+                                        @break
+                                    @default
+                                        <span class="badge badge-secondary px-2 py-1">{{ $item->status }}</span>
+                                @endswitch
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ route('tagihan.show', $item) }}"
+                                   class="btn btn-sm btn-light border"
+                                   title="Lihat tagihan">
+                                    <i class="fas fa-eye text-primary"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <i class="fas fa-folder-open fa-2x mb-2"></i>
+                                <div>Tidak ada data tagihan.</div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
 
-<table class="table table-hover table-bordered align-middle">
-
-    <thead class="thead-light">
-
-        <tr>
-
-            <th width="60">No</th>
-
-            <th>Tanggal Tagihan</th>
-            <th>Invoice</th>
-            <th>Pelanggan</th>
-            <th>Paket</th>
-            <th>Periode</th>
-            <th class="text-end">Total</th>
-            <th class="text-end">Dibayar</th>
-            <th class="text-end">Sisa</th>
-            <th>Status</th>
-            <th>Jatuh Tempo</th>
-            <th width="90">Aksi</th>
-
-        </tr>
-
-    </thead>
-
-    <tbody>
-
-        @forelse($laporan as $item)
-
-        <tr>
-
-            <td>
-                {{ $loop->iteration + (($laporan->currentPage()-1) * $laporan->perPage()) }}
-            </td>
-
-            <td>
-                {{ optional($item->tanggal_tagihan)->format('d-m-Y') }}
-            </td>
-
-            <td>
-                <strong>{{ $item->invoice_no }}</strong>
-            </td>
-
-            <td>
-                {{ optional($item->pelanggan)->nama }}
-            </td>
-
-            <td>
-                {{ optional(optional($item->pelanggan)->paket)->nama ?? '-' }}
-            </td>
-
-            <td>
-                {{ $item->periode }}
-            </td>
-
-            <td class="text-end">
-                Rp {{ number_format($item->total,0,',','.') }}
-            </td>
-
-            <td class="text-end">
-                Rp {{ number_format($item->dibayar,0,',','.') }}
-            </td>
-
-            <td class="text-end">
-                Rp {{ number_format($item->sisa,0,',','.') }}
-            </td>
-
-            <td>
-
-                @switch($item->status)
-
-                    @case('Lunas')
-                        <span class="badge badge-success">Lunas</span>
-                        @break
-
-                    @case('Sebagian')
-                        <span class="badge badge-warning">Sebagian</span>
-                        @break
-
-                    @case('Jatuh Tempo')
-                        <span class="badge badge-danger">Jatuh Tempo</span>
-                        @break
-
-                    @default
-                        <span class="badge badge-secondary">
-                            {{ $item->status }}
-                        </span>
-
-                @endswitch
-
-            </td>
-
-            <td>
-
-                {{ optional($item->tanggal_jatuh_tempo)->format('d-m-Y') }}
-
-            </td>
-
-            <td>
-
-                <a
-                    href="{{ route('tagihan.show',$item) }}"
-                    class="btn btn-sm btn-primary">
-
-                    <i class="fas fa-eye"></i>
-
-                </a>
-
-            </td>
-
-        </tr>
-
-        @empty
-
-        <tr>
-
-            <td colspan="11" class="text-center text-muted py-5">
-
-                <i class="fas fa-folder-open fa-3x mb-3"></i>
-
-                <br>
-
-                Tidak ada data tagihan.
-
-            </td>
-
-        </tr>
-
-        @endforelse
-
-    </tbody>
-
-</table>
-
-</div>
-
-<div class="mt-3">
-
-    {{ $laporan->links() }}
-
-</div>
-
-</div>
+        <div class="px-3 py-3">
+            {{ $laporan->links() }}
+        </div>
     </div>
-
 </div>
