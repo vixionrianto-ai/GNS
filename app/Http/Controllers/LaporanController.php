@@ -75,7 +75,7 @@ class LaporanController extends Controller
                     optional($item->tanggal_tagihan)->format('d-m-Y'),
                     $item->invoice_no,
                     optional($item->pelanggan)->nama,
-                    optional(optional($item->pelanggan)->paket)->nama ?? '-',
+                    optional(optional($item->pelanggan)->paket)->nama_paket ?? '-',
                     $item->periode,
                     $item->total,
                     $item->dibayar,
