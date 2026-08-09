@@ -158,13 +158,19 @@ class Tagihan extends Model
 
     public function getTotalDibayar(): float
     {
-        $alokasi = $this->alokasi()->sum('nominal');
+        $alokasi = $this->alokasi()
+            ->whereHas('pembayaran', function ($q) {
+                $q->where('status', Pembayaran::STATUS_BERHASIL);
+            })
+            ->sum('nominal');
 
         if ($alokasi > 0) {
             return (float) $alokasi;
         }
 
-        $pembayaran = $this->pembayaran()->first();
+        $pembayaran = $this->pembayaran()
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->first();
 
         if ($pembayaran) {
             return (float) (
@@ -200,7 +206,12 @@ class Tagihan extends Model
 
         if ($dibayar <= 0) {
 
-            $this->status = self::STATUS_BELUM_BAYAR;
+            $this->status = (
+                $this->tanggal_jatuh_tempo
+                && $this->tanggal_jatuh_tempo->isPast()
+            )
+                ? self::STATUS_JATUH_TEMPO
+                : self::STATUS_BELUM_BAYAR;
 
             $this->tanggal_bayar = null;
 
