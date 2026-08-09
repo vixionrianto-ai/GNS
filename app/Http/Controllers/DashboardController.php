@@ -31,7 +31,12 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $totalTagihan = Tagihan::count();
+        // Hanya tagihan aktif yang masuk KPI Dashboard.
+        $totalTagihan = Tagihan::where(
+            'status',
+            '!=',
+            Tagihan::STATUS_DIBATALKAN
+        )->count();
 
         $persenLunas = $totalTagihan > 0
             ? round(($tagihanLunas / $totalTagihan) * 100)
@@ -51,18 +56,24 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Collection Rate berdasarkan nominal
+        | Collection Rate berdasarkan tagihan yang sudah dialokasikan
+        |
+        | Tidak memakai Pembayaran::total_bayar karena nilai tersebut dapat
+        | mengandung biaya admin dan kelebihan pembayaran.
         |--------------------------------------------------------------------------
         */
 
-        $totalNominalTagihan = Tagihan::sum('total');
+        $totalNominalTagihan = Tagihan::where(
+            'status',
+            '!=',
+            Tagihan::STATUS_DIBATALKAN
+        )->sum('total');
 
-        $totalNominalTerbayar = Pembayaran::where(
-                'status',
-                Pembayaran::STATUS_BERHASIL
-            )
-            ->where('metode', '!=', 'Saldo')
-            ->sum('total_bayar');
+        $totalNominalTerbayar = Tagihan::where(
+            'status',
+            '!=',
+            Tagihan::STATUS_DIBATALKAN
+        )->sum('dibayar');
 
         $collectionRate = $totalNominalTagihan > 0
             ? round(($totalNominalTerbayar / $totalNominalTagihan) * 100, 1)
@@ -78,6 +89,7 @@ class DashboardController extends Controller
             'tagihan.pelanggan',
             'user',
         ])
+        ->where('metode', '!=', 'Saldo')
         ->latest('tanggal_bayar')
         ->take(10)
         ->get();
@@ -136,7 +148,7 @@ class DashboardController extends Controller
                     Pembayaran::STATUS_BERHASIL
                 )
                 ->where('metode', '!=', 'Saldo')
-                ->sum('total_bayar');
+                ->sum('nominal');
         }
 
         /*
