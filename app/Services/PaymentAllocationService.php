@@ -155,7 +155,8 @@ class PaymentAllocationService
             SaldoUsage::create([
                 'saldo_pelanggan_id' => $saldo->id,
                 'tagihan_id' => $tagihan->id,
-                'nominal' => $dipakai,
+                'jumlah' => $dipakai,
+                'tipe' => 'auto',
                 'keterangan' => 'Pembayaran tagihan menggunakan saldo pelanggan',
             ]);
 
