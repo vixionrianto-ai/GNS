@@ -25,7 +25,12 @@ class DashboardService
         $tagihanJatuhTempoCount = Tagihan::where('status', Tagihan::STATUS_JATUH_TEMPO)->count();
         $tagihanLunas = Tagihan::where('status', Tagihan::STATUS_LUNAS)->count();
 
-        $tagihanBelumLunas = $tagihanBelumBayar + $tagihanSebagian + $tagihanJatuhTempoCount;
+        // Belum lunas harus merupakan jumlah status yang memang belum lunas.
+        // Jangan memakai totalTagihan - tagihanLunas karena tagihan dibatalkan
+        // tidak boleh ikut dihitung sebagai tagihan aktif.
+        $tagihanBelumLunas = $tagihanBelumBayar
+            + $tagihanSebagian
+            + $tagihanJatuhTempoCount;
 
         $tagihanHariIni = Tagihan::whereDate('created_at', today())
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
