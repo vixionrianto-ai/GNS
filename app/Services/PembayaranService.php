@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
+use App\Models\SaldoPelanggan;
+use App\Models\SaldoUsage;
 use Exception;
 use App\Services\AuditTrailService;
 use App\Services\PaymentAllocationService;
@@ -190,10 +192,58 @@ class PembayaranService
                 throw new Exception('Hanya pembayaran yang berhasil yang dapat dibatalkan.');
             }
 
-            $tagihanIds = $pembayaran->alokasi()
+            $alokasis = $pembayaran->alokasi()->get(['id', 'tagihan_id', 'nominal']);
+            $tagihanIds = $alokasis
                 ->whereNotNull('tagihan_id')
                 ->pluck('tagihan_id')
-                ->unique();
+                ->unique()
+                ->values();
+
+            $tagihanAwal = Tagihan::with('pelanggan')
+                ->find($pembayaran->tagihan_id);
+
+            if (! $tagihanAwal) {
+                throw new Exception('Tagihan asal pembayaran tidak ditemukan.');
+            }
+
+            $saldoDikembalikan = 0.0;
+
+            if ($pembayaran->metode === 'Saldo') {
+                $saldoDikembalikan = (float) $alokasis
+                    ->whereNotNull('tagihan_id')
+                    ->sum('nominal');
+            } else {
+                $saldoDikembalikan = (float) $alokasis
+                    ->whereNull('tagihan_id')
+                    ->sum('nominal');
+            }
+
+            if ($saldoDikembalikan > 0) {
+                $saldo = SaldoPelanggan::milik($tagihanAwal->pelanggan_id);
+                $saldo = SaldoPelanggan::where('id', $saldo->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $saldo->tambah(
+                    $saldoDikembalikan,
+                    'Pengembalian pembatalan pembayaran ' . $pembayaran->invoice_no
+                );
+
+                if ($pembayaran->metode === 'Saldo') {
+                    foreach ($alokasis->whereNotNull('tagihan_id') as $alokasi) {
+                        $usage = SaldoUsage::where('saldo_pelanggan_id', $saldo->id)
+                            ->where('tagihan_id', $alokasi->tagihan_id)
+                            ->where('jumlah', $alokasi->nominal)
+                            ->where('tipe', 'auto')
+                            ->latest('id')
+                            ->first();
+
+                        if ($usage) {
+                            $usage->delete();
+                        }
+                    }
+                }
+            }
 
             $pembayaran->update(['status' => Pembayaran::STATUS_DIBATALKAN]);
 
@@ -212,6 +262,7 @@ class PembayaranService
                     'tagihan_id' => $pembayaran->tagihan_id,
                     'user_id'    => Auth::id(),
                     'nominal'    => $pembayaran->nominal,
+                    'saldo_dikembalikan' => $saldoDikembalikan,
                 ]
             );
 
