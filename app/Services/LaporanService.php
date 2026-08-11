@@ -101,7 +101,6 @@ class LaporanService
             }
         };
 
-        // Filter tagihan tetap dipakai untuk status, piutang, dan tabel laporan.
         $tagihan = Tagihan::query();
         $filterTagihan($tagihan);
 
@@ -152,7 +151,6 @@ class LaporanService
             ->whereDate('tanggal_bayar', today())
             ->sum('biaya_admin');
 
-        // Saldo masuk tetap dipisahkan dari kas pembayaran.
         $alokasiSaldo = AlokasiPembayaran::query()
             ->whereNull('tagihan_id')
             ->whereHas('pembayaran', function ($q) use ($pembayaranMasuk) {
@@ -161,6 +159,9 @@ class LaporanService
 
         $saldoMasukBulanIni = (float) $alokasiSaldo->sum('nominal');
 
+        // Grafik Uang Masuk: gunakan total pembayaran berhasil berdasarkan
+        // tanggal pembayaran. Jangan gunakan AlokasiPembayaran karena alokasi
+        // hanya menunjukkan uang yang sudah ditempelkan ke tagihan tertentu.
         $labelChart = [];
         $dataChart = [];
         $chartYear = $tahun ?: now()->year;
@@ -168,15 +169,12 @@ class LaporanService
         for ($i = 1; $i <= 12; $i++) {
             $labelChart[] = date('M', mktime(0, 0, 0, $i, 1));
 
-            $dataChart[] = AlokasiPembayaran::query()
-                ->whereNotNull('tagihan_id')
-                ->whereHas('pembayaran', function ($q) use ($chartYear, $i) {
-                    $q->where('status', Pembayaran::STATUS_BERHASIL)
-                        ->where('metode', '!=', 'Saldo')
-                        ->whereYear('tanggal_bayar', $chartYear)
-                        ->whereMonth('tanggal_bayar', $i);
-                })
-                ->sum('nominal');
+            $dataChart[] = Pembayaran::query()
+                ->where('status', Pembayaran::STATUS_BERHASIL)
+                ->where('metode', '!=', 'Saldo')
+                ->whereYear('tanggal_bayar', $chartYear)
+                ->whereMonth('tanggal_bayar', $i)
+                ->sum('total_bayar');
         }
 
         $totalTagihan = (clone $tagihan)->sum('total');
