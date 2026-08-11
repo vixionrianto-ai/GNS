@@ -128,7 +128,15 @@ class LaporanService
         $pembayaran = Pembayaran::query()
             ->where('status', Pembayaran::STATUS_BERHASIL)
             ->where('metode', '!=', 'Saldo')
-            ->whereHas('tagihan', $filterTagihan);
+            ->where(function ($q) use ($filterTagihan) {
+                // Pembayaran lama/normal: tagihan utama cocok dengan filter.
+                $q->whereHas('tagihan', $filterTagihan)
+                    // Pembayaran FIFO juga bisa membayar tagihan lain melalui
+                    // AlokasiPembayaran. Gunakan alokasi sebagai sumber relasi
+                    // agar pembayaran Rp200.000 pada tagihan 35 + 241 tetap
+                    // masuk ketika laporan difilter ke tagihan 241 (Agustus).
+                    ->orWhereHas('alokasi.tagihan', $filterTagihan);
+            });
 
         $adaFilterPeriode = (bool) ($tanggalAwal || $tanggalAkhir || $bulan || $tahun);
 
