@@ -121,6 +121,9 @@ class DashboardController extends Controller
         /*
         |--------------------------------------------------------------------------
         | Grafik Pendapatan 12 Bulan
+        |
+        | Mengikuti definisi Pendapatan Dashboard: uang yang benar-benar masuk
+        | berdasarkan tanggal pembayaran, yaitu Pembayaran::total_bayar.
         |--------------------------------------------------------------------------
         */
 
@@ -148,7 +151,7 @@ class DashboardController extends Controller
                     Pembayaran::STATUS_BERHASIL
                 )
                 ->where('metode', '!=', 'Saldo')
-                ->sum('nominal');
+                ->sum('total_bayar');
         }
 
         /*
