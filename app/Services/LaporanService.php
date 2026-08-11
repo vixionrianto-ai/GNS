@@ -101,23 +101,7 @@ class LaporanService
             }
         };
 
-        $pembayaran = Pembayaran::query()
-            ->where('status', Pembayaran::STATUS_BERHASIL)
-            ->where('metode', '!=', 'Saldo')
-            ->where(function ($q) use ($filterTagihan) {
-                $q->whereHas('tagihan', $filterTagihan)
-                    ->orWhereHas('alokasi.tagihan', $filterTagihan);
-            });
-
-        $adaFilterPeriode = (bool) ($tanggalAwal || $tanggalAkhir || $bulan || $tahun);
-        $pembayaranTerfilter = clone $pembayaran;
-
-        if (!$adaFilterPeriode) {
-            $pembayaranTerfilter
-                ->whereYear('tanggal_bayar', now()->year)
-                ->whereMonth('tanggal_bayar', now()->month);
-        }
-
+        // Filter tagihan tetap dipakai untuk status, piutang, dan tabel laporan.
         $tagihan = Tagihan::query();
         $filterTagihan($tagihan);
 
@@ -128,34 +112,54 @@ class LaporanService
 
         $laporan = $this->laporanQuery($request)->paginate(15)->withQueryString();
 
-        $alokasiTagihan = AlokasiPembayaran::query()
-            ->whereNotNull('tagihan_id')
-            ->whereHas('pembayaran', function ($q) use ($pembayaranTerfilter) {
-                $q->whereIn('id', $pembayaranTerfilter->select('id'));
-            })
-            ->whereHas('tagihan', $filterTagihan);
+        // UANG MASUK: berdasarkan tanggal pembayaran, bukan periode tagihan.
+        // Status filter laporan tidak membatasi uang masuk karena pembayaran
+        // untuk tagihan Juli/September/Oktober tetap merupakan uang yang masuk
+        // pada bulan pembayaran tersebut.
+        $pembayaranMasuk = Pembayaran::query()
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->where('metode', '!=', 'Saldo');
 
-        $pendapatanTerfilter = (clone $alokasiTagihan)->sum('nominal');
+        if ($tanggalAwal || $tanggalAkhir) {
+            $pembayaranMasuk
+                ->when($tanggalAwal, fn($q) => $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                ->when($tanggalAkhir, fn($q) => $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+        }
 
+        if ($bulan) {
+            $pembayaranMasuk->whereMonth('tanggal_bayar', $bulan);
+        }
+
+        if ($tahun) {
+            $pembayaranMasuk->whereYear('tanggal_bayar', $tahun);
+        }
+
+        if (!$tanggalAwal && !$tanggalAkhir && !$bulan && !$tahun) {
+            $pembayaranMasuk
+                ->whereYear('tanggal_bayar', now()->year)
+                ->whereMonth('tanggal_bayar', now()->month);
+        }
+
+        $kasMasukBulanIni = (float) (clone $pembayaranMasuk)->sum('total_bayar');
+        $biayaAdminBulanIni = (float) (clone $pembayaranMasuk)->sum('biaya_admin');
+        $pendapatanBulanIni = $kasMasukBulanIni;
+
+        $pendapatanHariIni = (float) (clone $pembayaranMasuk)
+            ->whereDate('tanggal_bayar', today())
+            ->sum('total_bayar');
+
+        $biayaAdminHariIni = (float) (clone $pembayaranMasuk)
+            ->whereDate('tanggal_bayar', today())
+            ->sum('biaya_admin');
+
+        // Saldo masuk tetap dipisahkan dari kas pembayaran.
         $alokasiSaldo = AlokasiPembayaran::query()
             ->whereNull('tagihan_id')
-            ->whereHas('pembayaran', function ($q) use ($pembayaranTerfilter) {
-                $q->whereIn('id', $pembayaranTerfilter->select('id'));
+            ->whereHas('pembayaran', function ($q) use ($pembayaranMasuk) {
+                $q->whereIn('id', $pembayaranMasuk->select('id'));
             });
 
         $saldoMasukBulanIni = (float) $alokasiSaldo->sum('nominal');
-        $kasMasukBulanIni = (float) (clone $pembayaranTerfilter)->sum('total_bayar');
-        $biayaAdminBulanIni = (float) (clone $pembayaranTerfilter)->sum('biaya_admin');
-
-        $pendapatanHariIni = (clone $alokasiTagihan)
-            ->whereHas('pembayaran', function ($q) {
-                $q->whereDate('tanggal_bayar', today());
-            })
-            ->sum('nominal');
-
-        $biayaAdminHariIni = (clone $pembayaranTerfilter)
-            ->whereDate('tanggal_bayar', today())
-            ->sum('biaya_admin');
 
         $labelChart = [];
         $dataChart = [];
@@ -166,15 +170,11 @@ class LaporanService
 
             $dataChart[] = AlokasiPembayaran::query()
                 ->whereNotNull('tagihan_id')
-                ->whereHas('pembayaran', function ($q) {
+                ->whereHas('pembayaran', function ($q) use ($chartYear, $i) {
                     $q->where('status', Pembayaran::STATUS_BERHASIL)
-                        ->where('metode', '!=', 'Saldo');
-                })
-                ->whereHas('tagihan', function ($q) use ($i, $chartYear, $status) {
-                    $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-                        ->whereYear('tanggal_tagihan', $chartYear)
-                        ->whereMonth('tanggal_tagihan', $i)
-                        ->when($status, fn($q) => $q->where('status', $status));
+                        ->where('metode', '!=', 'Saldo')
+                        ->whereYear('tanggal_bayar', $chartYear)
+                        ->whereMonth('tanggal_bayar', $i);
                 })
                 ->sum('nominal');
         }
@@ -200,10 +200,10 @@ class LaporanService
 
         return [
             'pendapatanHariIni' => $pendapatanHariIni,
-            'pendapatanBulanIni' => $pendapatanTerfilter,
+            'pendapatanBulanIni' => $pendapatanBulanIni,
             'biayaAdminHariIni' => $biayaAdminHariIni,
             'biayaAdminBulanIni' => $biayaAdminBulanIni,
-            'totalBiayaAdmin' => (clone $pembayaranTerfilter)->sum('biaya_admin'),
+            'totalBiayaAdmin' => (clone $pembayaranMasuk)->sum('biaya_admin'),
             'kasMasukBulanIni' => $kasMasukBulanIni,
             'saldoMasukBulanIni' => $saldoMasukBulanIni,
             'totalTagihan' => $totalTagihan,
