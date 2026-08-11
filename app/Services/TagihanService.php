@@ -241,14 +241,12 @@ class TagihanService
     /**
      * Update status tagihan otomatis.
      *
-     * Belum Bayar/Sebagian -> Jatuh Tempo
+     * Hanya tagihan yang belum dibayar sama sekali yang berubah menjadi Jatuh Tempo.
+     * Tagihan yang sudah dibayar sebagian tetap Sebagian meskipun melewati jatuh tempo.
      */
     public function updateStatusOtomatis(): int
     {
-        $tagihans = Tagihan::whereIn('status', [
-                Tagihan::STATUS_BELUM_BAYAR,
-                Tagihan::STATUS_SEBAGIAN,
-            ])
+        $tagihans = Tagihan::where('status', Tagihan::STATUS_BELUM_BAYAR)
             ->whereDate('tanggal_jatuh_tempo', '<', today())
             ->get();
 
