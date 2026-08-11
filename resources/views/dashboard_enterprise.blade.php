@@ -562,7 +562,7 @@
 
                 <strong>
 
-                    {{ count($tagihanJatuhTempo) }}
+                    {{ number_format($tagihanJatuhTempoCount) }}
 
                 </strong>
 
