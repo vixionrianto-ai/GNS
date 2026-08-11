@@ -193,11 +193,6 @@ class PembayaranService
             }
 
             $alokasis = $pembayaran->alokasi()->get(['id', 'tagihan_id', 'nominal']);
-            $tagihanIds = $alokasis
-                ->whereNotNull('tagihan_id')
-                ->pluck('tagihan_id')
-                ->unique()
-                ->values();
 
             $tagihanAwal = Tagihan::with('pelanggan')
                 ->find($pembayaran->tagihan_id);
@@ -206,12 +201,44 @@ class PembayaranService
                 throw new Exception('Tagihan asal pembayaran tidak ditemukan.');
             }
 
+            $tagihanIds = $alokasis
+                ->whereNotNull('tagihan_id')
+                ->pluck('tagihan_id')
+                ->unique()
+                ->values();
+
+            // Pembayaran lama (terutama pembayaran Saldo) dapat tidak memiliki
+            // AlokasiPembayaran. Tagihan asal tetap harus ikut di-refresh.
+            if (! $tagihanIds->contains($tagihanAwal->id)) {
+                $tagihanIds->push($tagihanAwal->id);
+            }
+
             $saldoDikembalikan = 0.0;
+            $saldoUsagesToDelete = collect();
 
             if ($pembayaran->metode === 'Saldo') {
                 $saldoDikembalikan = (float) $alokasis
                     ->whereNotNull('tagihan_id')
                     ->sum('nominal');
+
+                // Kompatibilitas dengan pembayaran Saldo lama yang belum
+                // mempunyai AlokasiPembayaran. Hubungkan berdasarkan tagihan,
+                // nominal, dan usage auto terbaru.
+                if ($saldoDikembalikan <= 0) {
+                    $saldo = SaldoPelanggan::milik($tagihanAwal->pelanggan_id);
+
+                    $usage = SaldoUsage::where('saldo_pelanggan_id', $saldo->id)
+                        ->where('tagihan_id', $tagihanAwal->id)
+                        ->where('jumlah', $pembayaran->nominal)
+                        ->where('tipe', 'auto')
+                        ->latest('id')
+                        ->first();
+
+                    if ($usage) {
+                        $saldoDikembalikan = (float) $usage->jumlah;
+                        $saldoUsagesToDelete->push($usage);
+                    }
+                }
             } else {
                 $saldoDikembalikan = (float) $alokasis
                     ->whereNull('tagihan_id')
@@ -239,8 +266,12 @@ class PembayaranService
                             ->first();
 
                         if ($usage) {
-                            $usage->delete();
+                            $saldoUsagesToDelete->push($usage);
                         }
+                    }
+
+                    foreach ($saldoUsagesToDelete->unique('id') as $usage) {
+                        $usage->delete();
                     }
                 }
             }
