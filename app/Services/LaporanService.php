@@ -11,9 +11,6 @@ use Illuminate\Http\Request;
 
 class LaporanService
 {
-    /**
-     * Query utama laporan tagihan, dipakai dashboard dan export.
-     */
     public function laporanQuery(?Request $request = null): Builder
     {
         $request ??= request();
@@ -26,12 +23,9 @@ class LaporanService
 
         $query = Tagihan::with(['pelanggan.paket'])
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-            ->when($bulan, fn($q) =>
-                $q->where('bulan', $bulan))
-            ->when($tahun, fn($q) =>
-                $q->where('tahun', $tahun))
-            ->when($status, fn($q) =>
-                $q->where('status', $status))
+            ->when($bulan, fn($q) => $q->where('bulan', $bulan))
+            ->when($tahun, fn($q) => $q->where('tahun', $tahun))
+            ->when($status, fn($q) => $q->where('status', $status))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $search = trim($request->search);
 
@@ -44,49 +38,31 @@ class LaporanService
                 });
             });
 
-        /*
-         * Laporan keuangan untuk tagihan yang sudah menerima pembayaran
-         * harus mengikuti tanggal uang masuk (tanggal_bayar), bukan
-         * tanggal tagihan. Contoh: tagihan 272 dibuat 13-08 tetapi dibayar
-         * sebagian pada 09-08; pembayaran tersebut harus muncul saat filter
-         * 09-08 + status Sebagian.
-         *
-         * Untuk Belum Bayar/Jatuh Tempo, tidak ada tanggal pembayaran,
-         * sehingga tetap memakai tanggal_tagihan.
-         */
         if ($tanggalAwal || $tanggalAkhir) {
             if (in_array($status, [Tagihan::STATUS_LUNAS, Tagihan::STATUS_SEBAGIAN], true)) {
-                $query->whereHas('pembayaran', function ($q) use ($tanggalAwal, $tanggalAkhir) {
-                    $q->where('status', Pembayaran::STATUS_BERHASIL)
-                        ->where('metode', '!=', 'Saldo')
-                        ->when($tanggalAwal, fn($q) =>
-                            $q->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-                        ->when($tanggalAkhir, fn($q) =>
-                            $q->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                $query->where(function ($q) use ($tanggalAwal, $tanggalAkhir) {
+                    $q->whereHas('pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
+                        $p->where('status', Pembayaran::STATUS_BERHASIL)
+                            ->where('metode', '!=', 'Saldo')
+                            ->when($tanggalAwal, fn($p) => $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                            ->when($tanggalAkhir, fn($p) => $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                    })->orWhereHas('alokasi.pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
+                        $p->where('status', Pembayaran::STATUS_BERHASIL)
+                            ->where('metode', '!=', 'Saldo')
+                            ->when($tanggalAwal, fn($p) => $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                            ->when($tanggalAkhir, fn($p) => $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                    });
                 });
             } else {
                 $query
-                    ->when($tanggalAwal, fn($q) =>
-                        $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-                    ->when($tanggalAkhir, fn($q) =>
-                        $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
+                    ->when($tanggalAwal, fn($q) => $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
+                    ->when($tanggalAkhir, fn($q) => $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
             }
         }
 
         return $query->latest('tanggal_tagihan');
     }
 
-    /**
-     * Data dashboard laporan.
-     *
-     * Prinsip keuangan:
-     * - Tagihan tetap menjadi sumber periode laporan.
-     * - Pendapatan tagihan dihitung dari AlokasiPembayaran yang benar-benar
-     *   masuk ke tagihan, bukan Pembayaran::nominal mentah.
-     * - Saldo pelanggan dihitung dari alokasi tanpa tagihan.
-     * - Kas masuk tetap memakai total_bayar dari pembayaran yang terkait
-     *   dengan dataset tagihan terpilih.
-     */
     public function dashboard(?Request $request = null): array
     {
         $request ??= request();
@@ -99,28 +75,28 @@ class LaporanService
 
         $filterTagihan = function ($q) use ($tanggalAwal, $tanggalAkhir, $bulan, $tahun, $status) {
             $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-                ->when($bulan, fn($q) =>
-                    $q->where('bulan', $bulan))
-                ->when($tahun, fn($q) =>
-                    $q->where('tahun', $tahun))
-                ->when($status, fn($q) =>
-                    $q->where('status', $status));
+                ->when($bulan, fn($q) => $q->where('bulan', $bulan))
+                ->when($tahun, fn($q) => $q->where('tahun', $tahun))
+                ->when($status, fn($q) => $q->where('status', $status));
 
             if ($tanggalAwal || $tanggalAkhir) {
                 if (in_array($status, [Tagihan::STATUS_LUNAS, Tagihan::STATUS_SEBAGIAN], true)) {
-                    $q->whereHas('pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
-                        $p->where('status', Pembayaran::STATUS_BERHASIL)
-                            ->where('metode', '!=', 'Saldo')
-                            ->when($tanggalAwal, fn($p) =>
-                                $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
-                            ->when($tanggalAkhir, fn($p) =>
-                                $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                    $q->where(function ($q) use ($tanggalAwal, $tanggalAkhir) {
+                        $q->whereHas('pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
+                            $p->where('status', Pembayaran::STATUS_BERHASIL)
+                                ->where('metode', '!=', 'Saldo')
+                                ->when($tanggalAwal, fn($p) => $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                                ->when($tanggalAkhir, fn($p) => $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                        })->orWhereHas('alokasi.pembayaran', function ($p) use ($tanggalAwal, $tanggalAkhir) {
+                            $p->where('status', Pembayaran::STATUS_BERHASIL)
+                                ->where('metode', '!=', 'Saldo')
+                                ->when($tanggalAwal, fn($p) => $p->whereDate('tanggal_bayar', '>=', $tanggalAwal))
+                                ->when($tanggalAkhir, fn($p) => $p->whereDate('tanggal_bayar', '<=', $tanggalAkhir));
+                        });
                     });
                 } else {
-                    $q->when($tanggalAwal, fn($q) =>
-                        $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
-                        ->when($tanggalAkhir, fn($q) =>
-                            $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
+                    $q->when($tanggalAwal, fn($q) => $q->whereDate('tanggal_tagihan', '>=', $tanggalAwal))
+                        ->when($tanggalAkhir, fn($q) => $q->whereDate('tanggal_tagihan', '<=', $tanggalAkhir));
                 }
             }
         };
@@ -129,17 +105,11 @@ class LaporanService
             ->where('status', Pembayaran::STATUS_BERHASIL)
             ->where('metode', '!=', 'Saldo')
             ->where(function ($q) use ($filterTagihan) {
-                // Pembayaran lama/normal: tagihan utama cocok dengan filter.
                 $q->whereHas('tagihan', $filterTagihan)
-                    // Pembayaran FIFO juga bisa membayar tagihan lain melalui
-                    // AlokasiPembayaran. Gunakan alokasi sebagai sumber relasi
-                    // agar pembayaran Rp200.000 pada tagihan 35 + 241 tetap
-                    // masuk ketika laporan difilter ke tagihan 241 (Agustus).
                     ->orWhereHas('alokasi.tagihan', $filterTagihan);
             });
 
         $adaFilterPeriode = (bool) ($tanggalAwal || $tanggalAkhir || $bulan || $tahun);
-
         $pembayaranTerfilter = clone $pembayaran;
 
         if (!$adaFilterPeriode) {
@@ -158,11 +128,6 @@ class LaporanService
 
         $laporan = $this->laporanQuery($request)->paginate(15)->withQueryString();
 
-        /*
-         * Pendapatan = nominal alokasi yang benar-benar masuk ke tagihan.
-         * Ini mencegah uang yang langsung menjadi saldo pelanggan dihitung
-         * sebagai pendapatan tagihan.
-         */
         $alokasiTagihan = AlokasiPembayaran::query()
             ->whereNotNull('tagihan_id')
             ->whereHas('pembayaran', function ($q) use ($pembayaranTerfilter) {
@@ -179,7 +144,6 @@ class LaporanService
             });
 
         $saldoMasukBulanIni = (float) $alokasiSaldo->sum('nominal');
-
         $kasMasukBulanIni = (float) (clone $pembayaranTerfilter)->sum('total_bayar');
         $biayaAdminBulanIni = (float) (clone $pembayaranTerfilter)->sum('biaya_admin');
 
@@ -210,8 +174,7 @@ class LaporanService
                     $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
                         ->whereYear('tanggal_tagihan', $chartYear)
                         ->whereMonth('tanggal_tagihan', $i)
-                        ->when($status, fn($q) =>
-                            $q->where('status', $status));
+                        ->when($status, fn($q) => $q->where('status', $status));
                 })
                 ->sum('nominal');
         }
