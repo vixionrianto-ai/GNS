@@ -104,11 +104,6 @@ Route::middleware('auth')->group(function () {
         [LaporanController::class, 'exportExcel']
     )->name('laporan.export.excel');
 
-    // TEST ADMINLTE
-    Route::get('/test-adminlte', function () {
-        return view('test-adminlte');
-    })->name('test.adminlte');
-
     /* BACKUP DATABASE */
 
     Route::get('/backup', [BackupController::class, 'index'])
