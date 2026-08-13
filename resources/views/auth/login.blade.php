@@ -1,46 +1,84 @@
 <x-guest-layout>
-    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div class="mb-6 text-center">
-            <h2 class="text-2xl font-semibold text-gray-900">Masuk ke GNS</h2>
-            <p class="mt-2 text-sm text-gray-600">Silakan gunakan email dan password Anda untuk masuk.</p>
-        </div>
+    <div class="card border-0 shadow-sm" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4 p-md-5">
 
-        <x-auth-session-status class="mb-4" :status="session('status')" />
-
-        <form method="POST" action="{{ route('login') }}" class="space-y-5">
-            @csrf
-
-            <div>
-                <x-input-label for="email" :value="__('Email')" />
-                <x-text-input id="email" class="mt-1 block w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-                <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <div class="text-center mb-4">
+                <h2 class="h4 fw-semibold text-dark mb-2">Masuk ke GNS</h2>
+                <p class="small text-muted mb-0">
+                    Silakan gunakan email dan password Anda untuk masuk.
+                </p>
             </div>
 
-            <div>
-                <x-input-label for="password" :value="__('Password')" />
-                <x-text-input id="password" class="mt-1 block w-full"
-                    type="password"
-                    name="password"
-                    required autocomplete="current-password" />
-                <x-input-error :messages="$errors->get('password')" class="mt-2" />
-            </div>
+            <x-auth-session-status class="mb-3" :status="session('status')" />
 
-            <div class="flex items-center justify-between">
-                <label for="remember_me" class="inline-flex items-center">
-                    <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                    <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-                </label>
+            <form method="POST" action="{{ route('login') }}">
+                @csrf
 
-                @if (Route::has('password.request'))
-                    <a class="text-sm font-medium text-blue-600 hover:text-blue-700" href="{{ route('password.request') }}">
-                        {{ __('Forgot your password?') }}
+                <div class="mb-3">
+                    <x-input-label for="email" :value="__('Email')" />
+                    <x-text-input
+                        id="email"
+                        class="w-100"
+                        type="email"
+                        name="email"
+                        :value="old('email')"
+                        required
+                        autofocus
+                        autocomplete="username"
+                    />
+                    <x-input-error :messages="$errors->get('email')" class="mt-1" />
+                </div>
+
+                <div class="mb-3">
+                    <x-input-label for="password" :value="__('Password')" />
+                    <x-text-input
+                        id="password"
+                        class="w-100"
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                    />
+                    <x-input-error :messages="$errors->get('password')" class="mt-1" />
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="form-check">
+                        <input
+                            id="remember_me"
+                            type="checkbox"
+                            class="form-check-input"
+                            name="remember"
+                        >
+                        <label class="form-check-label small" for="remember_me">
+                            {{ __('Remember me') }}
+                        </label>
+                    </div>
+
+                    @if (Route::has('password.request'))
+                        <a
+                            class="small text-decoration-none"
+                            href="{{ route('password.request') }}"
+                        >
+                            {{ __('Forgot your password?') }}
+                        </a>
+                    @endif
+                </div>
+
+                <x-primary-button class="w-100">
+                    {{ __('Log in') }}
+                </x-primary-button>
+                <div class="text-center mt-3">
+                    <span class="small text-muted">Belum punya akun?</span>
+                    <a
+                        href="{{ route('register') }}"
+                        class="small text-decoration-none fw-semibold"
+                    >
+                        Daftar
                     </a>
-                @endif
-            </div>
+                </div>
+            </form>
 
-            <x-primary-button class="w-full justify-center">
-                {{ __('Log in') }}
-            </x-primary-button>
-        </form>
+        </div>
     </div>
 </x-guest-layout>

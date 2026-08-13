@@ -71,9 +71,7 @@
                 </div>
 
                 <div class="dashboard-subtitle">
-
-                    Administrator
-
+                    {{ Auth::user()->getRoleNames()->join(', ') ?: 'Belum ada role' }}
                 </div>
 
                 <div class="mt-3">

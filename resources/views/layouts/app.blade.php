@@ -118,7 +118,19 @@
                 <div class="container-fluid px-0">
                     <span class="navbar-brand fw-bold fs-6 text-secondary">Billing Management System</span>
                     <div class="ms-auto d-flex align-items-center">
-                        <span class="fw-semibold text-dark small"><i class="fas fa-user-circle me-1 fs-5 text-primary align-middle"></i> Administrator</span>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-user-circle me-2 fs-4 text-primary"></i>
+
+                            <div class="lh-sm">
+                                <div class="fw-semibold text-dark small">
+                                    {{ auth()->user()->name }}
+                                </div>
+
+                                <div class="text-muted" style="font-size: 11px;">
+                                    {{ auth()->user()->getRoleNames()->first() ?? 'Belum ada role' }}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </nav>
