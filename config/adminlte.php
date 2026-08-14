@@ -105,9 +105,9 @@ return [
         ['text' => 'Profile', 'route' => 'profile.edit', 'icon' => 'fas fa-user'],
 
         ['header' => 'SUPER ADMIN'],
-        ['text' => 'Backup Database', 'route' => 'backup.index', 'icon' => 'fas fa-database', 'can' => 'role:Super Admin'],
-        ['text' => 'Restore Database', 'route' => 'backup.index', 'icon' => 'fas fa-upload', 'can' => 'role:Super Admin'],
-        ['text' => 'Reset Data', 'route' => 'superadmin.index', 'icon' => 'fas fa-trash-alt', 'can' => 'role:Super Admin'],
+        ['text' => 'Backup Database', 'route' => 'backup.index', 'icon' => 'fas fa-database'],
+        ['text' => 'Restore Database', 'route' => 'backup.index', 'icon' => 'fas fa-upload'],
+        ['text' => 'Reset Data', 'route' => 'superadmin.index', 'icon' => 'fas fa-trash-alt'],
 
         ['header' => 'ACCOUNT'],
         ['text' => 'Logout', 'url' => 'logout', 'method' => 'post', 'icon' => 'fas fa-sign-out-alt'],
