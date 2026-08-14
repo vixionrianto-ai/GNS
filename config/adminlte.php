@@ -326,6 +326,7 @@ return [
     */
 'menu' => [
 
+
     ['header' => 'MASTER DATA'],
 
     [
@@ -394,6 +395,7 @@ return [
         'text' => 'User Management',
         'route' => 'users.index',
         'icon' => 'fas fa-users-cog',
+        'can' => 'user.view',
     ],
 
     [

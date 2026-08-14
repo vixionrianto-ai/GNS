@@ -62,6 +62,7 @@ Route::get(
 */
 
 Route::middleware('auth')->group(function () {
+    Route::resource('roles', \App\Http\Controllers\RoleController::class);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
