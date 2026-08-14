@@ -10,13 +10,32 @@
     <style>
         html, body { min-height:100%; }
         body { background-color:#f4f6f9; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; overflow-y:auto; }
-        .sidebar { width:260px; min-height:100vh; background:#0f172a; color:#fff; position:fixed; top:0; left:0; z-index:100; overflow-y:auto; box-shadow:4px 0 20px rgba(0,0,0,.05); }
+        .sidebar {
+            width:260px;
+            height:100vh;
+            background:#0f172a;
+            color:#fff;
+            position:fixed;
+            top:0;
+            left:0;
+            bottom:0;
+            z-index:100;
+            overflow-y:auto;
+            overflow-x:hidden;
+            box-sizing:border-box;
+            box-shadow:4px 0 20px rgba(0,0,0,.05);
+            scrollbar-width:auto;
+        }
+        .sidebar::-webkit-scrollbar { width:8px; }
+        .sidebar::-webkit-scrollbar-track { background:#0f172a; }
+        .sidebar::-webkit-scrollbar-thumb { background:#475569; border-radius:8px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background:#64748b; }
         .main-content { margin-left:260px; min-height:100vh; overflow:visible; padding-bottom:40px; }
         .main-content main { min-height:calc(100vh - 73px); }
         .sidebar .nav-link { color:#94a3b8; padding:11px 16px; border-radius:10px; margin-bottom:6px; font-weight:500; transition:all .2s ease-in-out; }
         .sidebar .nav-link:hover { background-color:rgba(255,255,255,.05); color:#fff; }
         .sidebar .nav-link.active { background:linear-gradient(135deg,#0d6efd 0%,#0b5ed7 100%); color:#fff; box-shadow:0 4px 12px rgba(13,110,253,.3); }
-        @media (max-width:768px) { .sidebar{width:100%;position:relative;min-height:auto;} .main-content{margin-left:0;} }
+        @media (max-width:768px) { .sidebar{width:100%;height:auto;position:relative;min-height:auto;overflow:visible;} .main-content{margin-left:0;} }
     </style>
 </head>
 <body>
@@ -70,7 +89,7 @@
         @endrole
 
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Account</div>
-        <ul class="nav flex-column mb-3"><li class="nav-item"><form method="POST" action="{{ route('logout') }}" class="m-0"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="nav-link border-0 bg-transparent w-100 text-start"><i class="fas fa-sign-out-alt me-2"></i> Logout</button></form></li></ul>
+        <ul class="nav flex-column mb-3"><li class="nav-item"><form method="POST" action="{{ route('logout') }}" class="m-0">@csrf<button type="submit" class="nav-link border-0 bg-transparent w-100 text-start"><i class="fas fa-sign-out-alt me-2"></i> Logout</button></form></li></ul>
     </div>
 
     <div class="main-content w-100">
