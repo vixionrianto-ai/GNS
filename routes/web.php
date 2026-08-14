@@ -83,10 +83,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/laporan/export/excel', [LaporanController::class, 'exportExcel'])
         ->name('laporan.export.excel');
 
-    /* BACKUP DATABASE - SUPER ADMIN */
+    /* BACKUP & RESTORE DATABASE - SUPER ADMIN */
     Route::middleware('role:Super Admin')->group(function () {
         Route::get('/backup', [BackupController::class, 'index'])
             ->name('backup.index');
+
+        Route::get('/restore', [BackupController::class, 'index'])
+            ->name('restore.index');
 
         Route::post('/backup/create', [BackupController::class, 'create'])
             ->name('backup.create');
