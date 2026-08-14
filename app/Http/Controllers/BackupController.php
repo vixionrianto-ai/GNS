@@ -75,8 +75,12 @@ class BackupController extends Controller
      */
     public function restore(Request $request)
     {
+        // File backup dibuat sendiri oleh aplikasi dengan ekstensi .sql.
+        // Rule mimes:sql dapat menolak file .sql karena MIME type yang
+        // dikirim browser/server tidak selalu terdeteksi sebagai "sql".
+        // extensions:sql memvalidasi ekstensi file secara langsung.
         $request->validate([
-            'backup_file' => 'required|file|mimes:sql',
+            'backup_file' => 'required|file|extensions:sql',
         ]);
 
         $this->backupService->restore(
