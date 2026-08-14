@@ -106,7 +106,7 @@ return [
 
         ['header' => 'SUPER ADMIN'],
         ['text' => 'Backup Database', 'route' => 'backup.index', 'icon' => 'fas fa-database'],
-        ['text' => 'Restore Database', 'route' => 'backup.index', 'icon' => 'fas fa-upload'],
+        ['text' => 'Restore Database', 'route' => 'restore.index', 'icon' => 'fas fa-upload'],
         ['text' => 'Reset Data', 'route' => 'superadmin.index', 'icon' => 'fas fa-trash-alt'],
 
         ['header' => 'ACCOUNT'],
