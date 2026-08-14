@@ -71,6 +71,12 @@ class SuperAdminController extends Controller
                     $pelangganIds = Pelanggan::query()->pluck('id');
                     $counts['pelanggan'] = $pelangganIds->count();
 
+                    if ($pelangganIds->isNotEmpty()) {
+                        WhatsAppLog::query()
+                            ->whereIn('pelanggan_id', $pelangganIds)
+                            ->delete();
+                    }
+
                     $tagihanIds = Tagihan::query()
                         ->whereIn('pelanggan_id', $pelangganIds)
                         ->pluck('id');
@@ -146,9 +152,7 @@ class SuperAdminController extends Controller
                                 ->delete();
                         }
 
-                        if ($pembayaranIds->isNotEmpty()) {
-                            $counts['pembayaran'] = $pembayaranIds->count();
-                        }
+                        $counts['pembayaran'] = $pembayaranIds->count();
 
                         Tagihan::query()
                             ->whereIn('id', $affectedTagihanIds)
