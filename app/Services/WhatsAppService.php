@@ -60,6 +60,22 @@ class WhatsAppService
         return number_format($nilai, 0, ',', '.');
     }
 
+    protected function namaBulanIndonesia($bulan): string
+    {
+        $namaBulan = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+
+        return $namaBulan[(int) $bulan] ?? (string) $bulan;
+    }
+
+    protected function periodeIndonesia(Tagihan $tagihan): string
+    {
+        return $this->namaBulanIndonesia($tagihan->bulan) . ' ' . $tagihan->tahun;
+    }
+
     protected function template(string $settingKey, array $replace): string
     {
         $template = Setting::value($settingKey);
@@ -72,21 +88,12 @@ class WhatsAppService
         return $template;
     }
 
-    /**
-     * Mengambil seluruh tagihan pelanggan dan hanya menampilkan yang masih memiliki sisa.
-     * Urutan periode mengikuti FIFO (tahun, bulan, id). Nilai sisa berasal dari model
-     * Tagihan sehingga tetap mengikuti AlokasiPembayaran/FIFO yang sudah berjalan.
-     */
     protected function tagihanPlaceholder(Tagihan $tagihan): array
     {
         $pelanggan = $tagihan->pelanggan;
-
         $tagihans = Tagihan::where('pelanggan_id', $pelanggan->id)
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
-            ->orderBy('tahun')
-            ->orderBy('bulan')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('tahun')->orderBy('bulan')->orderBy('id')->get();
 
         $rincian = [];
         $totalTagihan = 0;
@@ -98,11 +105,9 @@ class WhatsAppService
             $tagihanTotal = (float) $item->getTotalTagihan();
             $dibayar = (float) $item->getTotalDibayar();
             $sisa = (float) $item->getSisaTagihan();
-
             $totalTagihan += $tagihanTotal;
             $totalDibayar += $dibayar;
             $totalSisa += $sisa;
-
             if ($sisa <= 0) continue;
 
             $nomorRincian++;
@@ -114,7 +119,7 @@ class WhatsAppService
             };
 
             $rincian[] = $nomorRincian . ".\n" .
-                "📅 Periode : " . optional($item->tanggal_tagihan)->translatedFormat('F Y') . "\n" .
+                "📅 Periode : " . $this->periodeIndonesia($item) . "\n" .
                 "📄 Invoice : {$item->invoice_no}\n" .
                 "{$statusIcon} Status : {$item->status}\n" .
                 "❗ Sisa yang harus dibayar : Rp " . $this->rupiah($sisa);
@@ -123,7 +128,7 @@ class WhatsAppService
         return [
             'nama' => $pelanggan->nama,
             'invoice' => $tagihan->invoice_no,
-            'periode' => $tagihan->periode,
+            'periode' => $this->periodeIndonesia($tagihan),
             'bulan' => $tagihan->bulan,
             'tahun' => $tagihan->tahun,
             'nominal' => 'Rp ' . $this->rupiah($tagihan->nominal),
@@ -145,11 +150,10 @@ class WhatsAppService
         $tagihan = $pembayaran->tagihan;
         $pelanggan = $tagihan->pelanggan;
         $tagihanData = $this->tagihanPlaceholder($tagihan);
-
         return array_merge([
             'nama' => $pelanggan->nama,
             'invoice' => $tagihan->invoice_no,
-            'periode' => $tagihan->periode,
+            'periode' => $this->periodeIndonesia($tagihan),
             'bulan' => $tagihan->bulan,
             'tahun' => $tagihan->tahun,
             'nominal' => 'Rp ' . $this->rupiah($tagihan->nominal),
@@ -173,39 +177,23 @@ class WhatsAppService
         return ['nama' => $pelanggan->nama, 'isp' => config('app.name')];
     }
 
-    /**
-     * Tagihan baru selalu menggunakan rincian kewajiban berjalan.
-     * Template lama di Settings sengaja tidak dipakai agar pesan tidak kembali
-     * hanya menampilkan satu invoice/periode.
-     */
     public function pesanTagihanBaru(Tagihan $tagihan): string
     {
         $data = $this->tagihanPlaceholder($tagihan);
-
         return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
             "Berikut rincian tagihan internet yang masih harus dibayar:\n\n" .
-            "━━━━━━━━━━━━━━━━━━\n" .
-            "📄 RINCIAN TAGIHAN\n" .
-            "━━━━━━━━━━━━━━━━━━\n\n" .
-            $data['rincian_tagihan'] . "\n\n" .
-            "━━━━━━━━━━━━━━━━━━\n" .
-            "💰 TOTAL HARUS DIBAYAR\n" .
-            "{$data['total_harus_dibayar']}\n" .
-            "━━━━━━━━━━━━━━━━━━\n\n" .
-            "Mohon melakukan pembayaran untuk melunasi seluruh tagihan.\n\n" .
-            "Terima kasih.\n" .
+            "━━━━━━━━━━━━━━━━━━\n📄 RINCIAN TAGIHAN\n━━━━━━━━━━━━━━━━━━\n\n" .
+            $data['rincian_tagihan'] . "\n\n━━━━━━━━━━━━━━━━━━\n💰 TOTAL HARUS DIBAYAR\n" .
+            "{$data['total_harus_dibayar']}\n━━━━━━━━━━━━━━━━━━\n\n" .
+            "Mohon melakukan pembayaran untuk melunasi seluruh tagihan.\n\nTerima kasih.\n" .
             config('app.name');
     }
 
     public function pesanReminder3Hari(Tagihan $tagihan): string
     {
         $data = $this->tagihanPlaceholder($tagihan);
-        return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
-            "Ini adalah pengingat tagihan internet yang masih harus dibayar:\n\n" .
-            "━━━━━━━━━━━━━━━━━━\n" . $data['rincian_tagihan'] . "\n" .
-            "━━━━━━━━━━━━━━━━━━\n" .
-            "💰 Total harus dibayar: {$data['total_harus_dibayar']}\n\n" .
-            "Terima kasih.\n" . config('app.name');
+        return "Halo Bapak/Ibu, {$data['nama']},\n\nIni adalah pengingat tagihan internet yang masih harus dibayar:\n\n━━━━━━━━━━━━━━━━━━\n" .
+            $data['rincian_tagihan'] . "\n━━━━━━━━━━━━━━━━━━\n💰 Total harus dibayar: {$data['total_harus_dibayar']}\n\nTerima kasih.\n" . config('app.name');
     }
 
     public function pesanReminder7Hari(Tagihan $tagihan): string
@@ -225,18 +213,9 @@ class WhatsAppService
 
     public function sendReminder(Tagihan $tagihan, string $jenis): bool
     {
-        if ($this->sudahPernahKirim($tagihan, $jenis)) {
-            Log::info('Reminder sudah pernah dikirim.', ['tagihan_id' => $tagihan->id, 'jenis' => $jenis]);
-            return false;
-        }
-
-        $pesan = match ($jenis) {
-            'h3' => $this->pesanReminder3Hari($tagihan),
-            'h7' => $this->pesanReminder7Hari($tagihan),
-            default => null,
-        };
+        if ($this->sudahPernahKirim($tagihan, $jenis)) return false;
+        $pesan = match ($jenis) {'h3' => $this->pesanReminder3Hari($tagihan), 'h7' => $this->pesanReminder7Hari($tagihan), default => null};
         if ($pesan === null) return false;
-
         $berhasil = $this->kirim($tagihan->pelanggan->no_hp, $pesan);
         $this->simpanLog($tagihan->pelanggan, $tagihan, $jenis, $tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
         return $berhasil;
@@ -265,13 +244,9 @@ class WhatsAppService
 
     public function kirim(string $nomor, string $pesan): bool
     {
-        if (config('app.whatsapp_enabled', env('WHATSAPP_ENABLED', true)) === false) {
-            Log::info('Pengiriman WhatsApp dilewati karena WHATSAPP_ENABLED bernilai false.');
-            return false;
-        }
+        if (config('app.whatsapp_enabled', env('WHATSAPP_ENABLED', true)) === false) return false;
         $nomor = $this->formatNomor($nomor);
         if (!$nomor) return false;
-
         try {
             $start = microtime(true);
             $hasil = $this->provider->send($nomor, $pesan);
@@ -291,17 +266,7 @@ class WhatsAppService
 
     public function simpanLog(Pelanggan $pelanggan, ?Tagihan $tagihan, string $jenis, string $nomor, string $pesan, bool $berhasil, ?string $response = null): void
     {
-        WhatsAppLog::create([
-            'pelanggan_id' => $pelanggan->id,
-            'tagihan_id' => $tagihan?->id,
-            'jenis' => $jenis,
-            'provider' => setting('whatsapp.provider', 'fonnte'),
-            'nomor' => $nomor,
-            'pesan' => $pesan,
-            'status' => $berhasil ? 'success' : 'failed',
-            'response' => $response,
-            'sent_at' => now(),
-        ]);
+        WhatsAppLog::create(['pelanggan_id' => $pelanggan->id, 'tagihan_id' => $tagihan?->id, 'jenis' => $jenis, 'provider' => setting('whatsapp.provider', 'fonnte'), 'nomor' => $nomor, 'pesan' => $pesan, 'status' => $berhasil ? 'success' : 'failed', 'response' => $response, 'sent_at' => now()]);
     }
 
     public function sendInvoicePdf(Pembayaran $pembayaran, string $documentUrl): bool
