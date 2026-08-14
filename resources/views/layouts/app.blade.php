@@ -128,7 +128,7 @@
             <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size: 10px; letter-spacing: 0.8px;">
                 Laporan
             </div>
-            <ul class="nav flex-column">
+            <ul class="nav flex-column mb-3">
                 <li class="nav-item">
                     <a href="#" class="nav-link">
                         <i class="fas fa-chart-line me-2"></i> Dashboard Analitik
@@ -137,6 +137,32 @@
                 <li class="nav-item">
                     <a href="#" class="nav-link">
                         <i class="fas fa-chart-bar me-2"></i> Laporan
+                    </a>
+                </li>
+            </ul>
+
+            <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size: 10px; letter-spacing: 0.8px;">
+                System
+            </div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
+                        <i class="fas fa-users-cog me-2"></i> User Management
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('roles.index') }}" class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}">
+                        <i class="fas fa-user-shield me-2"></i> Role Management
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('audit.index') }}" class="nav-link {{ request()->routeIs('audit.*') ? 'active' : '' }}">
+                        <i class="fas fa-history me-2"></i> Audit Trail
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('profile.edit') }}" class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+                        <i class="fas fa-user me-2"></i> Profile
                     </a>
                 </li>
             </ul>
