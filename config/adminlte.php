@@ -82,7 +82,6 @@ return [
     'sidebar_collapse_auto_size' => false,
     'sidebar_collapse_remember' => false,
     'sidebar_collapse_remember_no_transition' => true,
-    'sidebar_collapse_remember_no_transition' => true,
     'sidebar_scrollbar_theme' => 'os-theme-light',
     'sidebar_scrollbar_auto_hide' => 'l',
     'sidebar_nav_accordion' => true,
@@ -112,11 +111,7 @@ return [
 
     'menu' => [
 
-        // =====================================================
-        // LAPORAN - ditempatkan paling atas sesuai prioritas
-        // =====================================================
         ['header' => 'LAPORAN'],
-
         [
             'text' => 'Dashboard Analitik',
             'route' => 'dashboard',
@@ -128,11 +123,7 @@ return [
             'icon' => 'fas fa-chart-bar',
         ],
 
-        // =====================================================
-        // MASTER DATA
-        // =====================================================
         ['header' => 'MASTER DATA'],
-
         [
             'text' => 'Router',
             'route' => 'router.index',
@@ -149,11 +140,7 @@ return [
             'icon' => 'fas fa-users',
         ],
 
-        // =====================================================
-        // TRANSAKSI
-        // =====================================================
         ['header' => 'TRANSAKSI'],
-
         [
             'text' => 'Tagihan',
             'route' => 'tagihan.index',
@@ -170,22 +157,14 @@ return [
             'icon' => 'fab fa-whatsapp',
         ],
 
-        // =====================================================
-        // MIKROTIK
-        // =====================================================
         ['header' => 'MIKROTIK'],
-
         [
             'text' => 'Monitoring MikroTik',
             'route' => 'mikrotik.monitor',
             'icon' => 'fas fa-network-wired',
         ],
 
-        // =====================================================
-        // SYSTEM
-        // =====================================================
         ['header' => 'SYSTEM'],
-
         [
             'text' => 'User Management',
             'route' => 'users.index',
@@ -213,11 +192,7 @@ return [
             'icon' => 'fas fa-user',
         ],
 
-        // =====================================================
-        // SUPER ADMIN
-        // =====================================================
         ['header' => 'SUPER ADMIN'],
-
         [
             'text' => 'Backup Database',
             'url' => '#',
@@ -244,11 +219,7 @@ return [
             'icon' => 'fas fa-info-circle',
         ],
 
-        // =====================================================
-        // ACCOUNT
-        // =====================================================
         ['header' => 'ACCOUNT'],
-
         [
             'text' => 'Logout',
             'url' => 'logout',
@@ -263,7 +234,7 @@ return [
         JeroenNoten\LaravelAdminLte\Menu\Filters\SearchFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ActiveFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ClassesFilter::class,
-        JeroenNoten\LaravelLte\Menu\Filters\LangFilter::class,
+        JeroenNoten\LaravelAdminLte\Menu\Filters\LangFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\DataFilter::class,
     ],
 
