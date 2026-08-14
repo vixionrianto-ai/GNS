@@ -15,9 +15,6 @@
 
 @section('content')
 
-<!-- Area untuk Notifikasi AJAX -->
-<div id="alert-container"></div>
-
 @if(session('success'))
 <div class="alert alert-success alert-dismissible fade show shadow-sm">
     <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
@@ -44,9 +41,7 @@
                 <p class="text-muted text-uppercase font-weight-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px;">TOTAL ROUTER</p>
                 <h3 class="font-weight-bold text-dark mb-0" style="font-size: 28px;">{{ $routers->count() }}</h3>
             </div>
-            <div class="icon-stat">
-                <i class="fas fa-server text-primary"></i>
-            </div>
+            <div class="icon-stat"><i class="fas fa-server text-primary"></i></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
@@ -55,9 +50,7 @@
                 <p class="text-muted text-uppercase font-weight-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px;">ROUTER AKTIF</p>
                 <h3 class="font-weight-bold text-success mb-0" style="font-size: 28px;">{{ $routers->where('status','Aktif')->count() }}</h3>
             </div>
-            <div class="icon-stat">
-                <i class="fas fa-check-circle text-success"></i>
-            </div>
+            <div class="icon-stat"><i class="fas fa-check-circle text-success"></i></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
@@ -66,9 +59,7 @@
                 <p class="text-muted text-uppercase font-weight-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px;">SSL ENABLED</p>
                 <h3 class="font-weight-bold text-warning mb-0" style="font-size: 28px;">{{ $routers->where('ssl',true)->count() }}</h3>
             </div>
-            <div class="icon-stat">
-                <i class="fas fa-lock text-warning"></i>
-            </div>
+            <div class="icon-stat"><i class="fas fa-lock text-warning"></i></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
@@ -77,14 +68,12 @@
                 <p class="text-muted text-uppercase font-weight-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px;">LOKASI ROUTER</p>
                 <h3 class="font-weight-bold text-info mb-0" style="font-size: 28px;">{{ $routers->pluck('lokasi')->unique()->count() }}</h3>
             </div>
-            <div class="icon-stat">
-                <i class="fas fa-map-marker-alt text-info"></i>
-            </div>
+            <div class="icon-stat"><i class="fas fa-map-marker-alt text-info"></i></div>
         </div>
     </div>
 </div>
 
-<!-- Tabel Data Router dengan Tombol Aksi di Atas -->
+<!-- Tabel Data Router -->
 <div class="card card-outline card-primary shadow-sm" style="border-radius: 8px;">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap">
         <div>
@@ -122,9 +111,7 @@
                 <tr>
                     <td class="align-middle">{{ $loop->iteration }}</td>
                     <td class="align-middle font-weight-bold text-dark">{{ $router->nama_router }}</td>
-                    <td class="align-middle">
-                        <span class="badge badge-light border px-2 py-1">{{ $router->ip_router }}</span>
-                    </td>
+                    <td class="align-middle"><span class="badge badge-light border px-2 py-1">{{ $router->ip_router }}</span></td>
                     <td class="align-middle">{{ $router->api_port }}</td>
                     <td class="align-middle">{{ $router->lokasi ?: '-' }}</td>
                     <td class="align-middle text-muted">{{ $router->versi_routeros ?: '-' }}</td>
@@ -137,39 +124,26 @@
                     </td>
                     <td class="align-middle">
                         @if($router->is_online)
-                            <span class="badge badge-success px-2 py-1">
-                                <i class="fas fa-circle mr-1" style="font-size: 8px;"></i> Online
-                            </span>
+                            <span class="badge badge-success px-2 py-1"><i class="fas fa-circle mr-1" style="font-size: 8px;"></i> Online</span>
                         @else
-                            <span class="badge badge-danger px-2 py-1">
-                                <i class="fas fa-circle mr-1" style="font-size: 8px;"></i> Offline
-                            </span>
+                            <span class="badge badge-danger px-2 py-1"><i class="fas fa-circle mr-1" style="font-size: 8px;"></i> Offline</span>
                         @endif
-
                         @if($router->last_checked_at)
-                            <br>
-                            <small class="text-muted" style="font-size: 11px;">
-                                {{ $router->last_checked_at->format('d/m/Y H:i') }}
-                            </small>
+                            <br><small class="text-muted" style="font-size: 11px;">{{ $router->last_checked_at->format('d/m/Y H:i') }}</small>
                         @endif
                     </td>
-                    <td class="align-middle">
-                        <span class="text-muted">-</span>
-                    </td>
+                    <td class="align-middle"><span class="text-muted">-</span></td>
                     <td class="align-middle text-center">
                         <div class="btn-group shadow-sm">
-                            <a href="{{ route('router.edit', $router->id) }}" class="btn btn-warning btn-sm" title="Edit">
-                                <i class="fas fa-edit text-white"></i>
-                            </a>
-                            <button type="button" onclick="testRouterConnection({{ $router->id }})" class="btn btn-success btn-sm" title="Test Koneksi">
+                            <a href="{{ route('router.edit', $router->id) }}" class="btn btn-warning btn-sm" title="Edit"><i class="fas fa-edit text-white"></i></a>
+
+                            {{-- Test Koneksi: gunakan route Laravel biasa karena RouterController@test mengembalikan redirect/session, bukan JSON --}}
+                            <a href="{{ route('router.test', $router->id) }}" class="btn btn-success btn-sm" title="Test Koneksi">
                                 <i class="fas fa-plug"></i>
-                            </button>
-                            <a href="{{ route('router.pppsecret', $router->id) }}" class="btn btn-primary btn-sm" title="PPP Secret">
-                                <i class="fas fa-user-lock"></i>
                             </a>
-                            <a href="{{ route('router.pppprofile', $router->id) }}" class="btn btn-info btn-sm" title="PPP Profile">
-                                <i class="fas fa-id-card"></i>
-                            </a>
+
+                            <a href="{{ route('router.pppsecret', $router->id) }}" class="btn btn-primary btn-sm" title="PPP Secret"><i class="fas fa-user-lock"></i></a>
+                            <a href="{{ route('router.pppprofile', $router->id) }}" class="btn btn-info btn-sm" title="PPP Profile"><i class="fas fa-id-card"></i></a>
                             <form action="{{ route('router.destroy', $router->id) }}" method="POST" class="d-inline">
                                 @csrf
                                 @method('DELETE')
@@ -193,14 +167,8 @@
     </div>
     <div class="card-footer bg-white py-3">
         <div class="row align-items-center">
-            <div class="col-md-6">
-                <span class="text-muted text-sm">
-                    Total Router : <strong class="text-dark">{{ $routers->count() }}</strong>
-                </span>
-            </div>
-            <div class="col-md-6 text-right">
-                <span class="text-muted text-sm">GNS Enterprise • Router Management</span>
-            </div>
+            <div class="col-md-6"><span class="text-muted text-sm">Total Router : <strong class="text-dark">{{ $routers->count() }}</strong></span></div>
+            <div class="col-md-6 text-right"><span class="text-muted text-sm">GNS Enterprise • Router Management</span></div>
         </div>
     </div>
 </div>
@@ -208,33 +176,11 @@
 
 @section('css')
 <style>
-/* Mengubah navbar atas menjadi putih bersih agar seragam */
-.main-header.navbar {
-    background-color: #ffffff !important;
-    border-bottom: 1px solid #dee2e6 !important;
-}
-.main-header.navbar .nav-link {
-    color: #343a40 !important;
-}
-
-.small-box { 
-    border-radius: 8px; 
-    transition: all 0.3s ease-in-out; 
-    position: relative; 
-    overflow: hidden; 
-}
-.small-box:hover { 
-    transform: translateY(-2px); 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08) !important; 
-}
-.icon-stat {
-    position: absolute;
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 32px;
-    opacity: 0.2;
-}
+.main-header.navbar { background-color: #ffffff !important; border-bottom: 1px solid #dee2e6 !important; }
+.main-header.navbar .nav-link { color: #343a40 !important; }
+.small-box { border-radius: 8px; transition: all 0.3s ease-in-out; position: relative; overflow: hidden; }
+.small-box:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.08) !important; }
+.icon-stat { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 32px; opacity: 0.2; }
 .table td { vertical-align: middle !important; }
 .btn-group .btn { border-radius: 0; }
 .btn-group .btn:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
@@ -247,53 +193,5 @@
 $(function(){
     $('[title]').tooltip();
 });
-
-function testRouterConnection(routerId) {
-    let alertContainer = $('#alert-container');
-    alertContainer.html(`
-        <div class="alert alert-info alert-dismissible fade show shadow-sm">
-            <i class="fas fa-spinner fa-spin mr-1"></i> Menghubungkan ke router...
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    `);
-
-    fetch('/router/' + routerId + '/test', {
-        method: 'GET',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        let alertClass = data.success ? 'alert-success' : 'alert-danger';
-        let iconClass = data.success ? 'fa-check-circle' : 'fa-times-circle';
-        
-        alertContainer.html(`
-            <div class="alert ${alertClass} alert-dismissible fade show shadow-sm">
-                <i class="fas ${iconClass} mr-1"></i> ${data.message || data.success}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-        `);
-        
-        if(data.success) {
-            setTimeout(() => { location.reload(); }, 2000);
-        }
-    })
-    .catch(error => {
-        alertContainer.html(`
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm">
-                <i class="fas fa-times-circle mr-1"></i> Gagal menghubungi server pengujian koneksi.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-        `);
-    });
-}
 </script>
 @stop
