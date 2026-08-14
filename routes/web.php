@@ -30,12 +30,6 @@ Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
     ]);
 });
 
-/*
-|--------------------------------------------------------------------------
-| PUBLIC
-|--------------------------------------------------------------------------
-*/
-
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('dashboard');
@@ -44,93 +38,76 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
-/*
-|--------------------------------------------------------------------------
-| PUBLIC INVOICE PDF
-|--------------------------------------------------------------------------
-*/
-
-Route::get(
-    '/public-invoice/{token}/pdf',
-    [PembayaranController::class, 'publicPdf']
-)->name('pembayaran.public.pdf');
-
-/*
-|--------------------------------------------------------------------------
-| AUTHENTICATED
-|--------------------------------------------------------------------------
-*/
+Route::get('/public-invoice/{token}/pdf', [PembayaranController::class, 'publicPdf'])
+    ->name('pembayaran.public.pdf');
 
 Route::middleware('auth')->group(function () {
-    Route::resource('roles', \App\Http\Controllers\RoleController::class);
 
+    /* ROLE MANAGEMENT */
+    Route::resource('roles', \App\Http\Controllers\RoleController::class)
+        ->middleware('permission:role.view');
+
+    /* DASHBOARD */
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
+    /* MIKROTIK MONITORING */
     Route::get('/monitoring-mikrotik', [DashboardController::class, 'monitoring'])
         ->name('mikrotik.monitor');
 
+    /* SETTINGS */
     Route::get('/settings', [SettingController::class, 'index'])
+        ->middleware('permission:setting.manage')
         ->name('settings.index');
 
     Route::post('/settings', [SettingController::class, 'update'])
+        ->middleware('permission:setting.manage')
         ->name('settings.update');
 
     /* SUPER ADMIN */
+    Route::get('/super-admin/reset', [SuperAdminController::class, 'index'])
+        ->middleware('role:Super Admin')
+        ->name('superadmin.index');
 
-    Route::get(
-        '/super-admin/reset',
-        [SuperAdminController::class, 'index']
-    )->name('superadmin.index');
-
-    Route::post(
-        '/super-admin/reset',
-        [SuperAdminController::class, 'reset']
-    )->name('superadmin.reset');
+    Route::post('/super-admin/reset', [SuperAdminController::class, 'reset'])
+        ->middleware('role:Super Admin')
+        ->name('superadmin.reset');
 
     /* LAPORAN */
+    Route::get('/laporan', [LaporanController::class, 'index'])
+        ->name('laporan.index');
 
-    Route::get(
-        '/laporan',
-        [LaporanController::class, 'index']
-    )->name('laporan.index');
+    Route::get('/laporan/export/pdf', [LaporanController::class, 'exportPdf'])
+        ->name('laporan.export.pdf');
 
-    Route::get(
-        '/laporan/export/pdf',
-        [LaporanController::class, 'exportPdf']
-    )->name('laporan.export.pdf');
+    Route::get('/laporan/export/excel', [LaporanController::class, 'exportExcel'])
+        ->name('laporan.export.excel');
 
-    Route::get(
-        '/laporan/export/excel',
-        [LaporanController::class, 'exportExcel']
-    )->name('laporan.export.excel');
+    /* BACKUP DATABASE - SUPER ADMIN */
+    Route::middleware('role:Super Admin')->group(function () {
+        Route::get('/backup', [BackupController::class, 'index'])
+            ->name('backup.index');
 
-    /* BACKUP DATABASE */
+        Route::post('/backup/create', [BackupController::class, 'create'])
+            ->name('backup.create');
 
-    Route::get('/backup', [BackupController::class, 'index'])
-        ->name('backup.index');
+        Route::post('/backup/restore', [BackupController::class, 'restore'])
+            ->name('backup.restore');
 
-    Route::post('/backup/create', [BackupController::class, 'create'])
-        ->name('backup.create');
+        Route::get('/backup/{file}/download', [BackupController::class, 'download'])
+            ->name('backup.download');
 
-    Route::post('/backup/restore', [BackupController::class, 'restore'])
-        ->name('backup.restore');
-
-    Route::get('/backup/{file}/download', [BackupController::class, 'download'])
-        ->name('backup.download');
-
-    Route::delete('/backup/{file}', [BackupController::class, 'destroy'])
-        ->name('backup.destroy');
+        Route::delete('/backup/{file}', [BackupController::class, 'destroy'])
+            ->name('backup.destroy');
+    });
 
     /* ROUTER & MIKROTIK */
-
     Route::resource('router', RouterController::class);
 
     Route::get('/router/{id}/test', [RouterController::class, 'test'])
         ->name('router.test');
 
     /* PPP SECRET */
-
     Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])
         ->name('router.pppsecret');
 
@@ -156,7 +133,6 @@ Route::middleware('auth')->group(function () {
         ->name('router.pppsecret.disable');
 
     /* PPP ACTIVE */
-
     Route::get('/router/{id}/ppp-active', [RouterController::class, 'pppActive'])
         ->name('router.pppactive');
 
@@ -164,7 +140,6 @@ Route::middleware('auth')->group(function () {
         ->name('router.pppactive.disconnect');
 
     /* PPP PROFILE */
-
     Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])
         ->name('router.pppprofile');
 
@@ -184,21 +159,18 @@ Route::middleware('auth')->group(function () {
         ->name('router.pppprofile.delete');
 
     /* PAKET */
-
     Route::resource('paket', PaketController::class);
 
     Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])
         ->name('paket.getProfiles');
 
     /* PELANGGAN */
-
     Route::resource('pelanggan', PelangganController::class);
 
     Route::post('/pelanggan/sync', [PelangganController::class, 'sync'])
         ->name('pelanggan.sync');
 
     /* TAGIHAN */
-
     Route::resource('tagihan', TagihanController::class)
         ->except(['create', 'store', 'edit', 'update']);
 
@@ -215,7 +187,6 @@ Route::middleware('auth')->group(function () {
         ->name('tagihan.whatsapp');
 
     /* PEMBAYARAN */
-
     Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create'])
         ->name('pembayaran.create');
 
@@ -229,7 +200,6 @@ Route::middleware('auth')->group(function () {
         ->name('pembayaran.pdf');
 
     /* RIWAYAT WHATSAPP */
-
     Route::get('whatsapp', [WhatsAppLogController::class, 'index'])
         ->name('whatsapp.index');
 
@@ -237,18 +207,15 @@ Route::middleware('auth')->group(function () {
         ->name('whatsapp.show');
 
     /* USER MANAGEMENT */
-
     Route::resource('users', UserController::class)
         ->middleware('permission:user.view');
 
     /* AUDIT TRAIL */
-
     Route::get('/audit', [AuditTrailController::class, 'index'])
         ->middleware('permission:audit.view')
         ->name('audit.index');
 
     /* PROFILE */
-
     Route::get('/profile', [ProfileController::class, 'edit'])
         ->name('profile.edit');
 
@@ -257,7 +224,6 @@ Route::middleware('auth')->group(function () {
 
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
-
 });
 
 require __DIR__.'/auth.php';
