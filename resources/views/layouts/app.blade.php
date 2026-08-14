@@ -29,39 +29,139 @@
         <!-- LAPORAN -->
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Laporan</div>
         <ul class="nav flex-column mb-3">
-            <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-line me-2"></i> Dashboard Analitik</a></li>
-            <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-bar me-2"></i> Laporan</a></li>
+            <li class="nav-item">
+                <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                    <i class="fas fa-chart-line me-2"></i> Dashboard Analitik
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('laporan.index') }}" class="nav-link {{ request()->routeIs('laporan.*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-bar me-2"></i> Laporan
+                </a>
+            </li>
         </ul>
 
         <!-- MASTER DATA -->
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Master Data</div>
         <ul class="nav flex-column mb-3">
-            <li class="nav-item"><a href="{{ route('router.index') }}" class="nav-link {{ request()->routeIs('router.*') ? 'active' : '' }}"><i class="fas fa-network-wired me-2"></i> Router</a></li>
-            <li class="nav-item"><a href="{{ route('paket.index') }}" class="nav-link {{ request()->routeIs('paket.*') ? 'active' : '' }}"><i class="fas fa-box me-2"></i> Paket Internet</a></li>
-            <li class="nav-item"><a href="{{ route('pelanggan.index') }}" class="nav-link {{ request()->routeIs('pelanggan.*') ? 'active' : '' }}"><i class="fas fa-users me-2"></i> Pelanggan</a></li>
+            <li class="nav-item">
+                <a href="{{ route('router.index') }}" class="nav-link {{ request()->routeIs('router.*') ? 'active' : '' }}">
+                    <i class="fas fa-network-wired me-2"></i> Router
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('paket.index') }}" class="nav-link {{ request()->routeIs('paket.*') ? 'active' : '' }}">
+                    <i class="fas fa-box me-2"></i> Paket Internet
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('pelanggan.index') }}" class="nav-link {{ request()->routeIs('pelanggan.*') ? 'active' : '' }}">
+                    <i class="fas fa-users me-2"></i> Pelanggan
+                </a>
+            </li>
         </ul>
 
         <!-- TRANSAKSI -->
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Transaksi</div>
         <ul class="nav flex-column mb-3">
-            <li class="nav-item"><a href="{{ route('tagihan.index') }}" class="nav-link {{ request()->routeIs('tagihan.*') ? 'active' : '' }}"><i class="fas fa-file-invoice-dollar me-2"></i> Tagihan</a></li>
-            <li class="nav-item"><a href="{{ route('pembayaran.index') }}" class="nav-link {{ request()->routeIs('pembayaran.*') ? 'active' : '' }}"><i class="fas fa-wallet me-2"></i> Pembayaran</a></li>
-            <li class="nav-item"><a href="#" class="nav-link"><i class="fab fa-whatsapp me-2"></i> Riwayat WhatsApp</a></li>
+            <li class="nav-item">
+                <a href="{{ route('tagihan.index') }}" class="nav-link {{ request()->routeIs('tagihan.*') ? 'active' : '' }}">
+                    <i class="fas fa-file-invoice-dollar me-2"></i> Tagihan
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('pembayaran.index') }}" class="nav-link {{ request()->routeIs('pembayaran.*') ? 'active' : '' }}">
+                    <i class="fas fa-wallet me-2"></i> Pembayaran
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ route('whatsapp.index') }}" class="nav-link {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                    <i class="fab fa-whatsapp me-2"></i> Riwayat WhatsApp
+                </a>
+            </li>
         </ul>
 
         <!-- MIKROTIK -->
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">MikroTik</div>
         <ul class="nav flex-column mb-3">
-            <li class="nav-item"><a href="{{ route('mikrotik.monitor') }}" class="nav-link {{ request()->routeIs('mikrotik.*') ? 'active' : '' }}"><i class="fas fa-network-wired me-2"></i> Monitoring MikroTik</a></li>
+            <li class="nav-item">
+                <a href="{{ route('mikrotik.monitor') }}" class="nav-link {{ request()->routeIs('mikrotik.*') ? 'active' : '' }}">
+                    <i class="fas fa-network-wired me-2"></i> Monitoring MikroTik
+                </a>
+            </li>
         </ul>
 
         <!-- SYSTEM -->
         <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">System</div>
         <ul class="nav flex-column mb-3">
-            <li class="nav-item"><a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}"><i class="fas fa-users-cog me-2"></i> User Management</a></li>
-            <li class="nav-item"><a href="{{ route('roles.index') }}" class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}"><i class="fas fa-user-shield me-2"></i> Role Management</a></li>
-            <li class="nav-item"><a href="{{ route('audit.index') }}" class="nav-link {{ request()->routeIs('audit.*') ? 'active' : '' }}"><i class="fas fa-history me-2"></i> Audit Trail</a></li>
-            <li class="nav-item"><a href="{{ route('profile.edit') }}" class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}"><i class="fas fa-user me-2"></i> Profile</a></li>
+            @can('user.view')
+                <li class="nav-item">
+                    <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
+                        <i class="fas fa-users-cog me-2"></i> User Management
+                    </a>
+                </li>
+            @endcan
+            @can('role.view')
+                <li class="nav-item">
+                    <a href="{{ route('roles.index') }}" class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}">
+                        <i class="fas fa-user-shield me-2"></i> Role Management
+                    </a>
+                </li>
+            @endcan
+            @can('audit.view')
+                <li class="nav-item">
+                    <a href="{{ route('audit.index') }}" class="nav-link {{ request()->routeIs('audit.*') ? 'active' : '' }}">
+                        <i class="fas fa-history me-2"></i> Audit Trail
+                    </a>
+                </li>
+            @endcan
+            @can('setting.manage')
+                <li class="nav-item">
+                    <a href="{{ route('settings.index') }}" class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}">
+                        <i class="fas fa-cogs me-2"></i> Pengaturan
+                    </a>
+                </li>
+            @endcan
+            <li class="nav-item">
+                <a href="{{ route('profile.edit') }}" class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+                    <i class="fas fa-user me-2"></i> Profile
+                </a>
+            </li>
+        </ul>
+
+        <!-- SUPER ADMIN -->
+        @role('Super Admin')
+            <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Super Admin</div>
+            <ul class="nav flex-column mb-3">
+                <li class="nav-item">
+                    <a href="{{ route('backup.index') }}" class="nav-link {{ request()->routeIs('backup.*') ? 'active' : '' }}">
+                        <i class="fas fa-database me-2"></i> Backup Database
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('backup.index') }}" class="nav-link {{ request()->routeIs('backup.*') ? 'active' : '' }}">
+                        <i class="fas fa-upload me-2"></i> Restore Database
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('superadmin.index') }}" class="nav-link {{ request()->routeIs('superadmin.*') ? 'active' : '' }}">
+                        <i class="fas fa-trash-alt me-2"></i> Reset Data
+                    </a>
+                </li>
+            </ul>
+        @endrole
+
+        <!-- ACCOUNT -->
+        <div class="text-secondary text-uppercase fw-bold px-2 mb-2" style="font-size:10px;letter-spacing:.8px;">Account</div>
+        <ul class="nav flex-column mb-3">
+            <li class="nav-item">
+                <form method="POST" action="{{ route('logout') }}" class="m-0">
+                    @csrf
+                    <button type="submit" class="nav-link border-0 bg-transparent w-100 text-start">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    </button>
+                </form>
+            </li>
         </ul>
     </div>
 
