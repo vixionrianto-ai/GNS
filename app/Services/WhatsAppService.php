@@ -52,10 +52,7 @@ class WhatsAppService
 
     public function pembayaran(Pembayaran $pembayaran): ?string
     {
-        return $this->url(
-            $pembayaran->tagihan->pelanggan->no_hp,
-            $this->pesanPembayaran($pembayaran)
-        );
+        return $this->url($pembayaran->tagihan->pelanggan->no_hp, $this->pesanPembayaran($pembayaran));
     }
 
     protected function rupiah($nilai): string
@@ -76,12 +73,9 @@ class WhatsAppService
     }
 
     /**
-     * Placeholder tagihan.
-     *
-     * Rincian WhatsApp hanya menampilkan kewajiban yang MASIH HARUS DIBAYAR.
-     * Tagihan lunas tidak ditampilkan. Urutan mengikuti FIFO: tahun lalu bulan.
-     * Nilai sisa berasal dari Tagihan::getSisaTagihan(), sehingga mengikuti
-     * AlokasiPembayaran/FIFO yang sudah berjalan di sistem.
+     * Mengambil seluruh tagihan pelanggan dan hanya menampilkan yang masih memiliki sisa.
+     * Urutan periode mengikuti FIFO (tahun, bulan, id). Nilai sisa berasal dari model
+     * Tagihan sehingga tetap mengikuti AlokasiPembayaran/FIFO yang sudah berjalan.
      */
     protected function tagihanPlaceholder(Tagihan $tagihan): array
     {
@@ -109,11 +103,9 @@ class WhatsAppService
             $totalDibayar += $dibayar;
             $totalSisa += $sisa;
 
-            // Jangan masukkan tagihan yang sudah lunas ke rincian kewajiban.
             if ($sisa <= 0) continue;
 
             $nomorRincian++;
-
             $statusIcon = match ($item->status) {
                 Tagihan::STATUS_SEBAGIAN => '🟡',
                 Tagihan::STATUS_JATUH_TEMPO => '⏰',
@@ -121,17 +113,12 @@ class WhatsAppService
                 default => '⚪',
             };
 
-            $rincian[] =
-                $nomorRincian . ".\n" .
+            $rincian[] = $nomorRincian . ".\n" .
                 "📅 Periode : " . optional($item->tanggal_tagihan)->translatedFormat('F Y') . "\n" .
                 "📄 Invoice : {$item->invoice_no}\n" .
                 "{$statusIcon} Status : {$item->status}\n" .
-                "❗ Sisa yang harus dibayar : Rp " . $this->rupiah($sisa) . "\n";
+                "❗ Sisa yang harus dibayar : Rp " . $this->rupiah($sisa);
         }
-
-        $rincianText = $rincian
-            ? implode("\n────────────────────\n", $rincian)
-            : 'Tidak ada tagihan yang masih harus dibayar.';
 
         return [
             'nama' => $pelanggan->nama,
@@ -144,7 +131,7 @@ class WhatsAppService
             'total' => 'Rp ' . $this->rupiah($tagihan->total),
             'jatuh_tempo' => optional($tagihan->tanggal_jatuh_tempo)->format('d-m-Y'),
             'isp' => config('app.name'),
-            'rincian_tagihan' => $rincianText,
+            'rincian_tagihan' => $rincian ? implode("\n────────────────────\n", $rincian) : 'Tidak ada tagihan yang masih harus dibayar.',
             'jumlah_tagihan' => $nomorRincian,
             'total_tagihan' => 'Rp ' . $this->rupiah($totalTagihan),
             'total_dibayar' => 'Rp ' . $this->rupiah($totalDibayar),
@@ -183,25 +170,47 @@ class WhatsAppService
 
     protected function pelangganPlaceholder(Pelanggan $pelanggan): array
     {
-        return [
-            'nama' => $pelanggan->nama,
-            'isp' => config('app.name'),
-        ];
+        return ['nama' => $pelanggan->nama, 'isp' => config('app.name')];
     }
 
+    /**
+     * Tagihan baru selalu menggunakan rincian kewajiban berjalan.
+     * Template lama di Settings sengaja tidak dipakai agar pesan tidak kembali
+     * hanya menampilkan satu invoice/periode.
+     */
     public function pesanTagihanBaru(Tagihan $tagihan): string
     {
-        return $this->template('whatsapp.template_invoice', $this->tagihanPlaceholder($tagihan));
+        $data = $this->tagihanPlaceholder($tagihan);
+
+        return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
+            "Berikut rincian tagihan internet yang masih harus dibayar:\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "📄 RINCIAN TAGIHAN\n" .
+            "━━━━━━━━━━━━━━━━━━\n\n" .
+            $data['rincian_tagihan'] . "\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "💰 TOTAL HARUS DIBAYAR\n" .
+            "{$data['total_harus_dibayar']}\n" .
+            "━━━━━━━━━━━━━━━━━━\n\n" .
+            "Mohon melakukan pembayaran untuk melunasi seluruh tagihan.\n\n" .
+            "Terima kasih.\n" .
+            config('app.name');
     }
 
     public function pesanReminder3Hari(Tagihan $tagihan): string
     {
-        return $this->template('whatsapp.template_h3', $this->tagihanPlaceholder($tagihan));
+        $data = $this->tagihanPlaceholder($tagihan);
+        return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
+            "Ini adalah pengingat tagihan internet yang masih harus dibayar:\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" . $data['rincian_tagihan'] . "\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "💰 Total harus dibayar: {$data['total_harus_dibayar']}\n\n" .
+            "Terima kasih.\n" . config('app.name');
     }
 
     public function pesanReminder7Hari(Tagihan $tagihan): string
     {
-        return $this->template('whatsapp.template_h7', $this->tagihanPlaceholder($tagihan));
+        return $this->pesanReminder3Hari($tagihan);
     }
 
     public function pesanPembayaran(Pembayaran $pembayaran): string
@@ -226,21 +235,10 @@ class WhatsAppService
             'h7' => $this->pesanReminder7Hari($tagihan),
             default => null,
         };
-
         if ($pesan === null) return false;
 
         $berhasil = $this->kirim($tagihan->pelanggan->no_hp, $pesan);
-
-        $this->simpanLog(
-            $tagihan->pelanggan,
-            $tagihan,
-            $jenis,
-            $tagihan->pelanggan->no_hp,
-            $pesan,
-            $berhasil,
-            $this->lastResponse
-        );
-
+        $this->simpanLog($tagihan->pelanggan, $tagihan, $jenis, $tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
         return $berhasil;
     }
 
@@ -248,7 +246,6 @@ class WhatsAppService
     {
         $pesan = $this->pesanTagihanBaru($tagihan);
         $berhasil = $this->kirim($tagihan->pelanggan->no_hp, $pesan);
-
         $this->simpanLog($tagihan->pelanggan, $tagihan, 'tagihan', $tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
         return $berhasil;
     }
@@ -257,17 +254,13 @@ class WhatsAppService
     {
         $pesan = $this->pesanPembayaran($pembayaran);
         $berhasil = $this->kirim($pembayaran->tagihan->pelanggan->no_hp, $pesan);
-
         $this->simpanLog($pembayaran->tagihan->pelanggan, $pembayaran->tagihan, 'pembayaran', $pembayaran->tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
         return $berhasil;
     }
 
     public function sudahPernahKirim(Tagihan $tagihan, string $jenis): bool
     {
-        return WhatsAppLog::where('tagihan_id', $tagihan->id)
-            ->where('jenis', $jenis)
-            ->where('status', 'success')
-            ->exists();
+        return WhatsAppLog::where('tagihan_id', $tagihan->id)->where('jenis', $jenis)->where('status', 'success')->exists();
     }
 
     public function kirim(string $nomor, string $pesan): bool
@@ -276,45 +269,22 @@ class WhatsAppService
             Log::info('Pengiriman WhatsApp dilewati karena WHATSAPP_ENABLED bernilai false.');
             return false;
         }
-
         $nomor = $this->formatNomor($nomor);
-        if (!$nomor) {
-            Log::warning('Nomor WhatsApp kosong.');
-            return false;
-        }
+        if (!$nomor) return false;
 
         try {
             $start = microtime(true);
             $hasil = $this->provider->send($nomor, $pesan);
             $response = null;
-
             if (method_exists($this->provider, 'lastResponse')) {
                 $last = $this->provider->lastResponse();
-                if ($last) {
-                    $response = json_encode($last, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-                }
+                if ($last) $response = json_encode($last, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             }
-
             $this->lastResponse = $response;
-            Log::info('WhatsApp Response Time', [
-                'provider' => get_class($this->provider),
-                'seconds' => round(microtime(true) - $start, 3),
-            ]);
-
-            if ($hasil) {
-                Log::info('WhatsApp berhasil dikirim.', ['nomor' => $nomor]);
-            } else {
-                Log::warning('WhatsApp gagal dikirim.', ['nomor' => $nomor]);
-            }
-
+            Log::info('WhatsApp Response Time', ['provider' => get_class($this->provider), 'seconds' => round(microtime(true) - $start, 3)]);
             return $hasil;
         } catch (\Throwable $e) {
-            Log::error('WhatsApp Exception', [
-                'nomor' => $nomor,
-                'provider' => get_class($this->provider),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            Log::error('WhatsApp Exception', ['nomor' => $nomor, 'provider' => get_class($this->provider), 'error' => $e->getMessage()]);
             return false;
         }
     }
@@ -336,35 +306,14 @@ class WhatsAppService
 
     public function sendInvoicePdf(Pembayaran $pembayaran, string $documentUrl): bool
     {
-        if (config('app.whatsapp_enabled', env('WHATSAPP_ENABLED', true)) === false) {
-            Log::info('Pengiriman Invoice PDF WhatsApp dilewati karena WHATSAPP_ENABLED bernilai false.');
-            return false;
-        }
-
+        if (config('app.whatsapp_enabled', env('WHATSAPP_ENABLED', true)) === false) return false;
         $pesan = $this->pesanPembayaran($pembayaran);
-        $berhasil = $this->provider->sendDocument(
-            $this->formatNomor($pembayaran->tagihan->pelanggan->no_hp),
-            $pesan,
-            $documentUrl
-        );
-
+        $berhasil = $this->provider->sendDocument($this->formatNomor($pembayaran->tagihan->pelanggan->no_hp), $pesan, $documentUrl);
         if (method_exists($this->provider, 'lastResponse')) {
             $last = $this->provider->lastResponse();
-            $this->lastResponse = $last
-                ? json_encode($last, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                : null;
+            $this->lastResponse = $last ? json_encode($last, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : null;
         }
-
-        $this->simpanLog(
-            $pembayaran->tagihan->pelanggan,
-            $pembayaran->tagihan,
-            'pembayaran',
-            $pembayaran->tagihan->pelanggan->no_hp,
-            $pesan,
-            $berhasil,
-            $this->lastResponse
-        );
-
+        $this->simpanLog($pembayaran->tagihan->pelanggan, $pembayaran->tagihan, 'pembayaran', $pembayaran->tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
         return $berhasil;
     }
 }
