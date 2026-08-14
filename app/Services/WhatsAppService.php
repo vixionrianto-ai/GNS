@@ -150,9 +150,16 @@ class WhatsAppService
         $tagihan = $pembayaran->tagihan;
         $pelanggan = $tagihan->pelanggan;
         $tagihanData = $this->tagihanPlaceholder($tagihan);
+        $pdfUrl = url('/public-invoice/' . $pembayaran->public_token . '/pdf');
+
         return array_merge([
             'nama' => $pelanggan->nama,
-            'invoice' => $tagihan->invoice_no,
+            // INVOICE PEMBAYARAN harus memakai nomor invoice pada tabel pembayarans,
+            // bukan invoice tagihan yang dibayar.
+            'invoice' => $pembayaran->invoice_no,
+            'invoice_tagihan' => $tagihan->invoice_no,
+            'public_token' => $pembayaran->public_token,
+            'pdf_url' => $pdfUrl,
             'periode' => $this->periodeIndonesia($tagihan),
             'bulan' => $tagihan->bulan,
             'tahun' => $tagihan->tahun,
@@ -203,7 +210,29 @@ class WhatsAppService
 
     public function pesanPembayaran(Pembayaran $pembayaran): string
     {
-        return $this->template('whatsapp.template_paid', $this->pembayaranPlaceholder($pembayaran));
+        $data = $this->pembayaranPlaceholder($pembayaran);
+        $sisaText = $data['total_sisa'] === 'Rp 0' ? 'Semua tagihan telah lunas.' : $data['total_harus_dibayar'];
+
+        return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
+            "Terima kasih, pembayaran Anda telah kami terima.\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "💳 PEMBAYARAN DITERIMA\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "📄 Invoice Pembayaran : {$data['invoice']}\n" .
+            "💰 Jumlah Dibayar : {$data['total']}\n" .
+            "📆 Tanggal Bayar : {$data['tanggal_bayar']}\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "📋 SISA TAGIHAN\n" .
+            "━━━━━━━━━━━━━━━━━━\n\n" .
+            $data['rincian_tagihan'] . "\n\n" .
+            "━━━━━━━━━━━━━━━━━━\n" .
+            "💰 TOTAL SISA\n" .
+            "{$sisaText}\n" .
+            "━━━━━━━━━━━━━━━━━━\n\n" .
+            "🧾 Invoice pembayaran dapat diunduh melalui:\n" .
+            $data['pdf_url'] . "\n\n" .
+            "Terima kasih.\n" .
+            config('app.name');
     }
 
     public function pesanIsolir(Pelanggan $pelanggan): string
