@@ -82,6 +82,7 @@ return [
     'sidebar_collapse_auto_size' => false,
     'sidebar_collapse_remember' => false,
     'sidebar_collapse_remember_no_transition' => true,
+    'sidebar_collapse_remember_no_transition' => true,
     'sidebar_scrollbar_theme' => 'os-theme-light',
     'sidebar_scrollbar_auto_hide' => 'l',
     'sidebar_nav_accordion' => true,
@@ -111,6 +112,25 @@ return [
 
     'menu' => [
 
+        // =====================================================
+        // LAPORAN - ditempatkan paling atas sesuai prioritas
+        // =====================================================
+        ['header' => 'LAPORAN'],
+
+        [
+            'text' => 'Dashboard Analitik',
+            'route' => 'dashboard',
+            'icon' => 'fas fa-chart-line',
+        ],
+        [
+            'text' => 'Laporan',
+            'route' => 'laporan.index',
+            'icon' => 'fas fa-chart-bar',
+        ],
+
+        // =====================================================
+        // MASTER DATA
+        // =====================================================
         ['header' => 'MASTER DATA'],
 
         [
@@ -129,6 +149,9 @@ return [
             'icon' => 'fas fa-users',
         ],
 
+        // =====================================================
+        // TRANSAKSI
+        // =====================================================
         ['header' => 'TRANSAKSI'],
 
         [
@@ -147,19 +170,9 @@ return [
             'icon' => 'fab fa-whatsapp',
         ],
 
-        ['header' => 'LAPORAN'],
-
-        [
-            'text' => 'Dashboard Analitik',
-            'route' => 'dashboard',
-            'icon' => 'fas fa-chart-line',
-        ],
-        [
-            'text' => 'Laporan',
-            'route' => 'laporan.index',
-            'icon' => 'fas fa-chart-bar',
-        ],
-
+        // =====================================================
+        // MIKROTIK
+        // =====================================================
         ['header' => 'MIKROTIK'],
 
         [
@@ -168,6 +181,9 @@ return [
             'icon' => 'fas fa-network-wired',
         ],
 
+        // =====================================================
+        // SYSTEM
+        // =====================================================
         ['header' => 'SYSTEM'],
 
         [
@@ -176,13 +192,11 @@ return [
             'icon' => 'fas fa-users-cog',
             'can' => 'user.view',
         ],
-
         [
             'text' => 'Role Management',
             'route' => 'roles.index',
             'icon' => 'fas fa-user-shield',
         ],
-
         [
             'text' => 'Audit Trail',
             'route' => 'audit.index',
@@ -199,6 +213,9 @@ return [
             'icon' => 'fas fa-user',
         ],
 
+        // =====================================================
+        // SUPER ADMIN
+        // =====================================================
         ['header' => 'SUPER ADMIN'],
 
         [
@@ -227,6 +244,9 @@ return [
             'icon' => 'fas fa-info-circle',
         ],
 
+        // =====================================================
+        // ACCOUNT
+        // =====================================================
         ['header' => 'ACCOUNT'],
 
         [
@@ -243,7 +263,7 @@ return [
         JeroenNoten\LaravelAdminLte\Menu\Filters\SearchFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ActiveFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ClassesFilter::class,
-        JeroenNoten\LaravelAdminLte\Menu\Filters\LangFilter::class,
+        JeroenNoten\LaravelLte\Menu\Filters\LangFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\DataFilter::class,
     ],
 
