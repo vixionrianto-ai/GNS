@@ -139,7 +139,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="{{ route('backup.index') }}" class="nav-link {{ request()->routeIs('backup.*') ? 'active' : '' }}">
+                    <a href="{{ route('restore.index') }}" class="nav-link {{ request()->routeIs('restore.*') ? 'active' : '' }}">
                         <i class="fas fa-upload me-2"></i> Restore Database
                     </a>
                 </li>
