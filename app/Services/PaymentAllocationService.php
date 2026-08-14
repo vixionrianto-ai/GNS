@@ -38,15 +38,18 @@ class PaymentAllocationService
             $saldo = SaldoPelanggan::milik($pelanggan->id);
             $saldo = SaldoPelanggan::where('id', $saldo->id)->lockForUpdate()->first();
 
+            // FIFO murni: selalu mulai dari tagihan paling lama yang masih memiliki sisa.
+            // Tagihan awal tidak boleh diprioritaskan, karena pembayaran harus melunasi
+            // kewajiban tertua terlebih dahulu meskipun user membuka invoice yang lebih baru.
             $tagihans = Tagihan::where('pelanggan_id', $pelanggan->id)
                 ->whereIn('status', [
                     Tagihan::STATUS_BELUM_BAYAR,
                     Tagihan::STATUS_SEBAGIAN,
                     Tagihan::STATUS_JATUH_TEMPO,
                 ])
-                ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$tagihanAwal->id])
                 ->orderBy('tahun')
                 ->orderBy('bulan')
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
@@ -55,9 +58,16 @@ class PaymentAllocationService
 
             foreach ($tagihans as $tagihan) {
                 if ($sisaUang <= 0) break;
-                if ($tagihan->sisa <= 0) continue;
 
-                $nominalDialokasikan = min($tagihan->sisa, $sisaUang);
+                // Jangan bergantung pada kolom sisa yang mungkin belum tersinkron.
+                // Hitung dari alokasi/pembayaran aktual agar FIFO konsisten.
+                $sisaTagihan = (float) $tagihan->getSisaTagihan();
+                if ($sisaTagihan <= 0) {
+                    $tagihan->refreshStatus();
+                    continue;
+                }
+
+                $nominalDialokasikan = min($sisaTagihan, $sisaUang);
 
                 AlokasiPembayaran::create([
                     'pembayaran_id' => $pembayaran->id,
