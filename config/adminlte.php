@@ -181,7 +181,6 @@ return [
             'text' => 'Role Management',
             'route' => 'roles.index',
             'icon' => 'fas fa-user-shield',
-            'can' => 'role.view',
         ],
 
         [
