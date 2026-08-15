@@ -2,7 +2,6 @@
 
 @section('content')
 <div class="container-fluid px-3 py-2">
-    <!-- Header Page Compact & Senada -->
     <div class="card border-0 shadow-sm rounded-3 mb-2 text-white overflow-hidden" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
         <div class="card-body px-3 py-2">
             <div class="row align-items-center g-2">
@@ -31,11 +30,8 @@
         </div>
     </div>
 
-    <!-- Layout Utama 2 Kolom (Pas 1 Halaman) -->
     <div class="row g-2 mb-2">
-        <!-- Kolom Kiri: Informasi Pelanggan & Rincian Keuangan -->
         <div class="col-lg-8">
-            <!-- Informasi Pelanggan -->
             <div class="card border-0 shadow-sm rounded-3 mb-2 overflow-hidden">
                 <div class="card-header bg-white py-2 px-3 border-0 d-flex align-items-center">
                     <div class="bg-primary bg-opacity-10 text-primary p-1.5 rounded-2 me-2">
@@ -73,7 +69,6 @@
                 </div>
             </div>
 
-            <!-- Rincian Keuangan -->
             <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="card-header bg-white py-2 px-3 border-0 d-flex align-items-center">
                     <div class="bg-success bg-opacity-10 text-success p-1.5 rounded-2 me-2">
@@ -108,10 +103,8 @@
             </div>
         </div>
 
-        <!-- Kolom Kanan: Total & Ringkasan -->
         <div class="col-lg-4">
             <div class="d-flex flex-column gap-2 h-100">
-                <!-- Card Total Pembayaran -->
                 <div class="p-3 rounded-3 text-white shadow-sm d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #198754 0%, #157347 100%);">
                     <div>
                         <span class="text-white-50 fw-bold text-uppercase small" style="font-size: 10px;">Total Pembayaran</span>
@@ -123,7 +116,6 @@
                     </div>
                 </div>
 
-                <!-- Card Ringkasan -->
                 <div class="card border-0 shadow-sm rounded-3 flex-grow-1 overflow-hidden">
                     <div class="card-header bg-white py-2 px-3 border-0">
                         <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-file-invoice text-success me-2"></i> Ringkasan</h6>
@@ -159,7 +151,6 @@
         </div>
     </div>
 
-    <!-- Tombol Aksi Bawah -->
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <a href="{{ route('pembayaran.index') }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm">
@@ -179,6 +170,16 @@
                     <a href="{{ $waUrl }}" target="_blank" class="btn btn-success btn-sm px-3 rounded-pill fw-bold shadow-sm">
                         <i class="fab fa-whatsapp me-1"></i> WhatsApp
                     </a>
+                @endif
+
+                @if($pembayaran->status === \App\Models\Pembayaran::STATUS_BERHASIL)
+                    <form action="{{ route('pembayaran.destroy', $pembayaran) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin membatalkan pembayaran ini? Seluruh alokasi FIFO dan penggunaan saldo akan dikembalikan.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-outline-danger btn-sm px-3 rounded-pill fw-bold shadow-sm">
+                            <i class="fas fa-undo me-1"></i> Batalkan Pembayaran
+                        </button>
+                    </form>
                 @endif
             </div>
         </div>
