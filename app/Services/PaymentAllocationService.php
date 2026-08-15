@@ -30,6 +30,49 @@ class PaymentAllocationService
         return $prefix . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Hitung sisa tagihan untuk proses FIFO tanpa menghitung pembayaran
+     * yang sedang dialokasikan sebagai pembayaran legacy.
+     *
+     * Pembayaran baru biasanya sudah memiliki tagihan_id dari invoice yang
+     * dipilih user. Jika langsung memakai getSisaTagihan(), pembayaran baru
+     * tersebut terlihat sebagai pembayaran penuh pada tagihan awal sebelum
+     * alokasi FIFO dibuat. Itu dapat membuat tagihan tertua terlewati.
+     */
+    protected function getSisaUntukAlokasi(Tagihan $tagihan, int $pembayaranId): float
+    {
+        $total = (float) $tagihan->getTotalTagihan();
+
+        $alokasi = $tagihan->alokasi()
+            ->whereHas('pembayaran', function ($q) {
+                $q->where('status', Pembayaran::STATUS_BERHASIL);
+            })
+            ->where('pembayaran_id', '!=', $pembayaranId)
+            ->sum('nominal');
+
+        $legacyPayments = Pembayaran::where('tagihan_id', $tagihan->id)
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->where('id', '!=', $pembayaranId)
+            ->get();
+
+        $legacyTotal = 0.0;
+
+        foreach ($legacyPayments as $legacyPayment) {
+            if ($legacyPayment->alokasi()->exists()) {
+                continue;
+            }
+
+            $legacyTotal += (float) (
+                $legacyPayment->dibayar
+                ?: $legacyPayment->nominal
+                ?: $legacyPayment->total_bayar
+                ?: 0
+            );
+        }
+
+        return max(0, $total - (float) $alokasi - $legacyTotal);
+    }
+
     public function allocate(Pembayaran $pembayaran, Tagihan $tagihanAwal, float $nominalBayar): array
     {
         return DB::transaction(function () use ($pembayaran, $tagihanAwal, $nominalBayar) {
@@ -59,9 +102,12 @@ class PaymentAllocationService
             foreach ($tagihans as $tagihan) {
                 if ($sisaUang <= 0) break;
 
-                // Jangan bergantung pada kolom sisa yang mungkin belum tersinkron.
-                // Hitung dari alokasi/pembayaran aktual agar FIFO konsisten.
-                $sisaTagihan = (float) $tagihan->getSisaTagihan();
+                // Penting: pembayaran yang sedang diproses dikecualikan dari
+                // perhitungan sisa. Record Pembayaran sudah dibuat lebih dulu
+                // oleh controller dan dapat menunjuk ke invoice yang dipilih,
+                // tetapi uangnya belum boleh dianggap terbayar sampai FIFO selesai.
+                $sisaTagihan = $this->getSisaUntukAlokasi($tagihan, $pembayaran->id);
+
                 if ($sisaTagihan <= 0) {
                     $tagihan->refreshStatus();
                     continue;
