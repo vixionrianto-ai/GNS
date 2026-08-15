@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AlokasiPembayaran;
 use App\Models\Tagihan;
 use App\Models\Pelanggan;
+use App\Models\Pembayaran;
 use App\Services\TagihanService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -51,6 +53,25 @@ class TagihanController extends Controller
         }
 
         return $query;
+    }
+
+    /**
+     * Cari pembayaran berhasil yang benar-benar mengalokasikan dana ke tagihan.
+     * Penting untuk FIFO karena relasi Tagihan->pembayaran hanya mewakili
+     * pembayaran lama/asal dan tidak selalu merupakan pembayaran yang melunasi
+     * tagihan tersebut.
+     */
+    private function pembayaranUntukTagihan(Tagihan $tagihan): ?Pembayaran
+    {
+        $alokasi = AlokasiPembayaran::with('pembayaran')
+            ->where('tagihan_id', $tagihan->id)
+            ->whereHas('pembayaran', function ($query) {
+                $query->where('status', Pembayaran::STATUS_BERHASIL);
+            })
+            ->latest('id')
+            ->first();
+
+        return $alokasi?->pembayaran;
     }
 
     public function index(Request $request)
@@ -125,8 +146,11 @@ class TagihanController extends Controller
     {
         $tagihan->load(['pelanggan', 'pelanggan.paket', 'pelanggan.router', 'pembayaran']);
 
-        if ($tagihan->status === Tagihan::STATUS_LUNAS && $tagihan->pembayaran) {
-            $waUrl = $whatsapp->pembayaran($tagihan->pembayaran);
+        if ($tagihan->status === Tagihan::STATUS_LUNAS) {
+            $pembayaran = $this->pembayaranUntukTagihan($tagihan);
+            $waUrl = $pembayaran
+                ? $whatsapp->pembayaran($pembayaran)
+                : $whatsapp->tagihan($tagihan);
         } else {
             $waUrl = $whatsapp->tagihan($tagihan);
         }
@@ -137,10 +161,17 @@ class TagihanController extends Controller
     public function sendWhatsapp(Tagihan $tagihan, WhatsAppService $whatsapp)
     {
         try {
-            if ($tagihan->status === Tagihan::STATUS_LUNAS && $tagihan->pembayaran) {
-                $waUrl = $whatsapp->pembayaran($tagihan->pembayaran);
+            if ($tagihan->status === Tagihan::STATUS_LUNAS) {
+                $pembayaran = $this->pembayaranUntukTagihan($tagihan);
+                $waUrl = $pembayaran
+                    ? $whatsapp->pembayaran($pembayaran)
+                    : $whatsapp->tagihan($tagihan);
             } else {
                 $waUrl = $whatsapp->tagihan($tagihan);
+            }
+
+            if (! $waUrl) {
+                return redirect()->route('tagihan.index')->with('error', 'Nomor WhatsApp pelanggan tidak tersedia.');
             }
 
             return redirect()->away($waUrl);
