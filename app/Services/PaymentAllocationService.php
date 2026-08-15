@@ -149,28 +149,56 @@ class PaymentAllocationService
 
             if ($saldo->saldo <= 0) return 0;
 
-            $tagihan->refresh();
+            // Saldo juga wajib mengikuti FIFO. Jangan langsung membayar
+            // tagihan yang baru dibuat apabila masih ada tagihan lama yang memiliki sisa.
+            $tagihans = Tagihan::where('pelanggan_id', $tagihan->pelanggan_id)
+                ->whereIn('status', [
+                    Tagihan::STATUS_BELUM_BAYAR,
+                    Tagihan::STATUS_SEBAGIAN,
+                    Tagihan::STATUS_JATUH_TEMPO,
+                ])
+                ->orderBy('tahun')
+                ->orderBy('bulan')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
 
-            if (! in_array($tagihan->status, [
-                Tagihan::STATUS_BELUM_BAYAR,
-                Tagihan::STATUS_SEBAGIAN,
-                Tagihan::STATUS_JATUH_TEMPO,
-            ])) return 0;
+            $saldoTersedia = (float) $saldo->saldo;
+            $totalDipakai = 0.0;
 
-            $dipakai = $this->applyToSingleTagihan($tagihan, (float) $saldo->saldo);
-            if ($dipakai <= 0) return 0;
+            foreach ($tagihans as $tagihanItem) {
+                if ($saldoTersedia <= 0) break;
 
-            $saldo->kurangi($dipakai, 'Pembayaran tagihan ' . $tagihan->invoice_no);
+                $tagihanItem->refresh();
 
-            SaldoUsage::create([
-                'saldo_pelanggan_id' => $saldo->id,
-                'tagihan_id' => $tagihan->id,
-                'jumlah' => $dipakai,
-                'tipe' => 'auto',
-                'keterangan' => 'Pembayaran tagihan menggunakan saldo pelanggan',
-            ]);
+                if (! in_array($tagihanItem->status, [
+                    Tagihan::STATUS_BELUM_BAYAR,
+                    Tagihan::STATUS_SEBAGIAN,
+                    Tagihan::STATUS_JATUH_TEMPO,
+                ])) {
+                    continue;
+                }
 
-            return $dipakai;
+                $dipakai = $this->applyToSingleTagihan($tagihanItem, $saldoTersedia);
+                if ($dipakai <= 0) continue;
+
+                $saldoTersedia -= $dipakai;
+                $totalDipakai += $dipakai;
+
+                SaldoUsage::create([
+                    'saldo_pelanggan_id' => $saldo->id,
+                    'tagihan_id' => $tagihanItem->id,
+                    'jumlah' => $dipakai,
+                    'tipe' => 'auto',
+                    'keterangan' => 'Pembayaran tagihan menggunakan saldo pelanggan secara FIFO',
+                ]);
+            }
+
+            if ($totalDipakai > 0) {
+                $saldo->kurangi($totalDipakai, 'Pembayaran otomatis tagihan secara FIFO');
+            }
+
+            return $totalDipakai;
         });
     }
 }
