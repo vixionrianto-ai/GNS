@@ -88,13 +88,16 @@ class PaymentAllocationService
             }
 
             if ($sisaUang > 0) {
-                $saldo->tambah($sisaUang, 'Kelebihan pembayaran');
+                $saldo->tambah(
+                    $sisaUang,
+                    'Kelebihan pembayaran ' . $pembayaran->invoice_no
+                );
 
                 AlokasiPembayaran::create([
                     'pembayaran_id' => $pembayaran->id,
                     'tagihan_id' => null,
                     'nominal' => $sisaUang,
-                    'keterangan' => 'Masuk saldo pelanggan',
+                    'keterangan' => 'Masuk saldo pelanggan dari ' . $pembayaran->invoice_no,
                 ]);
             }
 
@@ -132,7 +135,7 @@ class PaymentAllocationService
             'pembayaran_id' => $pembayaran->id,
             'tagihan_id' => $tagihan->id,
             'nominal' => $dipakai,
-            'keterangan' => 'Pemakaian saldo pelanggan',
+            'keterangan' => 'Pemakaian saldo pelanggan untuk ' . $tagihan->invoice_no,
         ]);
 
         $tagihan->refresh();
@@ -165,6 +168,7 @@ class PaymentAllocationService
 
             $saldoTersedia = (float) $saldo->saldo;
             $totalDipakai = 0.0;
+            $invoiceTerakhir = null;
 
             foreach ($tagihans as $tagihanItem) {
                 if ($saldoTersedia <= 0) break;
@@ -184,18 +188,22 @@ class PaymentAllocationService
 
                 $saldoTersedia -= $dipakai;
                 $totalDipakai += $dipakai;
+                $invoiceTerakhir = $tagihanItem->invoice_no;
 
                 SaldoUsage::create([
                     'saldo_pelanggan_id' => $saldo->id,
                     'tagihan_id' => $tagihanItem->id,
                     'jumlah' => $dipakai,
                     'tipe' => 'auto',
-                    'keterangan' => 'Pembayaran tagihan menggunakan saldo pelanggan secara FIFO',
+                    'keterangan' => 'Pemakaian saldo untuk ' . $tagihanItem->invoice_no . ' secara FIFO',
                 ]);
             }
 
             if ($totalDipakai > 0) {
-                $saldo->kurangi($totalDipakai, 'Pembayaran otomatis tagihan secara FIFO');
+                $saldo->kurangi(
+                    $totalDipakai,
+                    'Pemakaian saldo untuk ' . $invoiceTerakhir . ' secara FIFO'
+                );
             }
 
             return $totalDipakai;
