@@ -196,6 +196,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('pembayaran', PembayaranController::class)
         ->only(['index', 'show', 'store']);
 
+    Route::delete('/pembayaran/{pembayaran}', [PembayaranController::class, 'destroy'])
+        ->name('pembayaran.destroy');
+
     Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice'])
         ->name('pembayaran.invoice');
 
