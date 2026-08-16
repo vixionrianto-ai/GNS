@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Setting;
 use App\Models\Tagihan;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ReminderService
 {
@@ -61,6 +62,7 @@ class ReminderService
                 }
 
                 $berhasil = $this->whatsAppService->kirim($nomor, $pesan);
+                $response = $this->whatsAppService->lastResponse();
 
                 $this->whatsAppService->simpanLog(
                     $tagihan->pelanggan,
@@ -69,14 +71,19 @@ class ReminderService
                     $nomor,
                     $pesan,
                     $berhasil,
-                    null
+                    $response
                 );
 
                 if ($berhasil) {
                     $jumlah++;
                 }
             } catch (\Throwable $e) {
-                report($e);
+                Log::error('WhatsApp Reminder Error', [
+                    'jenis' => $jenis,
+                    'tagihan_id' => $tagihan->id ?? null,
+                    'pelanggan_id' => $tagihan->pelanggan_id ?? null,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
