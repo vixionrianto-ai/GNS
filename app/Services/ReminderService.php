@@ -15,25 +15,13 @@ class ReminderService
 
     public function reminderConfigured(): array
     {
-        $firstDays = max(0, (int) Setting::value('whatsapp.reminder_h3', 3));
-        $secondDays = max(0, (int) Setting::value('whatsapp.reminder_h7', 7));
+        $firstDays = max(0, (int) Setting::value('whatsapp.reminder_first_days', 5));
+        $secondDays = max(0, (int) Setting::value('whatsapp.reminder_second_days', 14));
 
         return [
-            'reminder_1' => $this->sendConfiguredReminder('reminder_1', $firstDays, 'whatsapp.template_h3'),
-            'reminder_2' => $this->sendConfiguredReminder('reminder_2', $secondDays, 'whatsapp.template_h7'),
+            'reminder_first' => $this->sendConfiguredReminder('reminder_first', $firstDays, 'whatsapp.template_reminder_first'),
+            'reminder_second' => $this->sendConfiguredReminder('reminder_second', $secondDays, 'whatsapp.template_reminder_second'),
         ];
-    }
-
-    public function reminderH3(): int
-    {
-        $days = max(0, (int) Setting::value('whatsapp.reminder_h3', 3));
-        return $this->sendConfiguredReminder('reminder_1', $days, 'whatsapp.template_h3');
-    }
-
-    public function reminderH7(): int
-    {
-        $days = max(0, (int) Setting::value('whatsapp.reminder_h7', 7));
-        return $this->sendConfiguredReminder('reminder_2', $days, 'whatsapp.template_h7');
     }
 
     protected function sendConfiguredReminder(string $jenis, int $days, string $templateKey): int
