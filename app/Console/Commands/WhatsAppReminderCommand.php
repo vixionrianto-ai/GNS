@@ -6,14 +6,12 @@ use App\Services\ReminderService;
 use Illuminate\Console\Command;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Attributes\Description;
+use App\Models\Setting;
 
 #[Signature('wa:reminder')]
-#[Description('Mengirim reminder WhatsApp otomatis')]
+#[Description('Mengirim reminder WhatsApp otomatis berdasarkan pengaturan')]
 class WhatsAppReminderCommand extends Command
 {
-    /**
-     * Execute the console command.
-     */
     public function handle(ReminderService $reminderService): int
     {
         $this->info('========================================');
@@ -21,14 +19,15 @@ class WhatsAppReminderCommand extends Command
         $this->info('========================================');
         $this->newLine();
 
-        $hasil3 = $reminderService->reminderH3();
-        $hasil7 = $reminderService->reminderH7();
+        $firstDays = (int) Setting::value('whatsapp.reminder_h3', 3);
+        $secondDays = (int) Setting::value('whatsapp.reminder_h7', 7);
+        $hasil = $reminderService->reminderConfigured();
 
         $this->table(
-            ['Reminder', 'Jumlah'],
+            ['Reminder', 'Hari Setelah Jatuh Tempo', 'Jumlah'],
             [
-                ['H+3', $hasil3],
-                ['H+7', $hasil7],
+                ['Pertama', 'H+' . $firstDays, $hasil['reminder_1']],
+                ['Kedua', 'H+' . $secondDays, $hasil['reminder_2']],
             ]
         );
 
