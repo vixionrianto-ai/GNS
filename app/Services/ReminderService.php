@@ -13,10 +13,6 @@ class ReminderService
     ) {
     }
 
-    /**
-     * Kirim reminder berdasarkan konfigurasi Settings.
-     * Reminder pertama dan kedua tidak lagi terikat pada H+3/H+7.
-     */
     public function reminderConfigured(): array
     {
         $firstDays = max(0, (int) Setting::value('whatsapp.reminder_h3', 3));
@@ -28,18 +24,12 @@ class ReminderService
         ];
     }
 
-    /**
-     * Compatibility method untuk pemanggilan lama.
-     */
     public function reminderH3(): int
     {
         $days = max(0, (int) Setting::value('whatsapp.reminder_h3', 3));
         return $this->sendConfiguredReminder('reminder_1', $days, 'whatsapp.template_h3');
     }
 
-    /**
-     * Compatibility method untuk pemanggilan lama.
-     */
     public function reminderH7(): int
     {
         $days = max(0, (int) Setting::value('whatsapp.reminder_h7', 7));
@@ -58,6 +48,12 @@ class ReminderService
                 Tagihan::STATUS_SEBAGIAN,
             ])
             ->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
+            ->whereHas('pelanggan', function ($query) {
+                $query->whereNotNull('no_hp')
+                    ->where('no_hp', '!=', '')
+                    ->where('no_hp', '!=', '-')
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(no_hp, ' ', ''), '-', ''), '+', ''), '(', '') REGEXP '[0-9]{8,}'");
+            })
             ->get();
 
         foreach ($tagihans as $tagihan) {
@@ -72,7 +68,7 @@ class ReminderService
                 }
 
                 $nomor = $tagihan->pelanggan?->no_hp;
-                if (!$nomor) {
+                if (!$this->validNomor($nomor)) {
                     continue;
                 }
 
@@ -97,6 +93,40 @@ class ReminderService
         }
 
         return $jumlah;
+    }
+
+    public function countConfiguredCandidates(int $days): int
+    {
+        $tanggalBatas = Carbon::today()->subDays(max(0, $days));
+
+        return Tagihan::query()
+            ->whereIn('status', [
+                Tagihan::STATUS_BELUM_BAYAR,
+                Tagihan::STATUS_JATUH_TEMPO,
+                Tagihan::STATUS_SEBAGIAN,
+            ])
+            ->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
+            ->whereHas('pelanggan', function ($query) {
+                $query->whereNotNull('no_hp')
+                    ->where('no_hp', '!=', '')
+                    ->where('no_hp', '!=', '-')
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(no_hp, ' ', ''), '-', ''), '+', ''), '(', '') REGEXP '[0-9]{8,}'");
+            })
+            ->count();
+    }
+
+    protected function validNomor(?string $nomor): bool
+    {
+        if ($nomor === null) {
+            return false;
+        }
+
+        $nomor = trim($nomor);
+        if ($nomor === '' || $nomor === '-') {
+            return false;
+        }
+
+        return preg_match('/[0-9]{8,}/', preg_replace('/[^0-9]/', '', $nomor)) === 1;
     }
 
     protected function renderTemplate(string $templateKey, Tagihan $tagihan): string
