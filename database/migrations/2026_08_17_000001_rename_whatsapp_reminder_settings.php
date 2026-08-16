@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -37,10 +36,22 @@ return new class extends Migration
                 ]);
             }
         }
+
+        if (Schema::hasTable('whatsapp_logs')) {
+            DB::table('whatsapp_logs')->where('jenis', 'reminder_1')->update(['jenis' => 'reminder_first']);
+            DB::table('whatsapp_logs')->where('jenis', 'reminder_2')->update(['jenis' => 'reminder_second']);
+            DB::table('whatsapp_logs')->where('jenis', 'h3')->update(['jenis' => 'reminder_first']);
+            DB::table('whatsapp_logs')->where('jenis', 'h7')->update(['jenis' => 'reminder_second']);
+        }
     }
 
     public function down(): void
     {
+        if (Schema::hasTable('whatsapp_logs')) {
+            DB::table('whatsapp_logs')->where('jenis', 'reminder_first')->update(['jenis' => 'reminder_1']);
+            DB::table('whatsapp_logs')->where('jenis', 'reminder_second')->update(['jenis' => 'reminder_2']);
+        }
+
         if (!Schema::hasTable('settings')) {
             return;
         }
