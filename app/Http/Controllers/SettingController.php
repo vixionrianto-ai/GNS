@@ -3,14 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Services\BillingConfigurationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\BillingConfigurationService;
 
 class SettingController extends Controller
 {
+    protected BillingConfigurationService $billingConfiguration;
+
+    public function __construct(BillingConfigurationService $billingConfiguration)
+    {
+        $this->billingConfiguration = $billingConfiguration;
+    }
+
     /**
-     * Halaman Pengaturan
+     * Halaman Pengaturan.
      */
     public function index()
     {
@@ -22,41 +29,25 @@ class SettingController extends Controller
         return view('settings.index', compact('settings'));
     }
 
-        /**
-         * Simpan Pengaturan
-         */
-        public function update(Request $request)
-        {
-            $request->validate([
-                'settings' => ['array'],
-            ]);
-            DB::transaction(function () use ($request) {
+    /**
+     * Simpan pengaturan dan sinkronkan konfigurasi billing sekali saja.
+     */
+    public function update(Request $request)
+    {
+        $request->validate([
+            'settings' => ['array'],
+        ]);
 
+        DB::transaction(function () use ($request) {
             foreach ($request->input('settings', []) as $id => $value) {
-
-                Setting::where('id', $id)
-                    ->update([
-                        'value' => $value,
-                    ]);
-
+                Setting::where('id', $id)->update([
+                    'value' => $value,
+                ]);
             }
 
             $this->billingConfiguration->sync();
-
         });
 
-            $this->billingConfiguration->sync();
-
-            return back()->with(
-                'success',
-                'Pengaturan berhasil disimpan.'
-            );
-        }
-    protected BillingConfigurationService $billingConfiguration;
-
-    public function __construct(
-        BillingConfigurationService $billingConfiguration
-    ) {
-        $this->billingConfiguration = $billingConfiguration;
+        return back()->with('success', 'Pengaturan berhasil disimpan.');
     }
 }
