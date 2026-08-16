@@ -144,8 +144,6 @@ class WhatsAppService
 
         return array_merge([
             'nama' => $pelanggan->nama,
-            // INVOICE PEMBAYARAN harus memakai nomor invoice pada tabel pembayarans,
-            // bukan invoice tagihan yang dibayar.
             'invoice' => $pembayaran->invoice_no,
             'invoice_tagihan' => $tagihan->invoice_no,
             'public_token' => $pembayaran->public_token,
@@ -241,6 +239,8 @@ class WhatsAppService
 
     public function kirim(string $nomor, string $pesan): bool
     {
+        $this->lastResponse = null;
+
         if (config('app.whatsapp_enabled', env('WHATSAPP_ENABLED', true)) === false) return false;
         $nomor = $this->formatNomor($nomor);
         if (!$nomor) return false;
@@ -259,6 +259,11 @@ class WhatsAppService
             Log::error('WhatsApp Exception', ['nomor' => $nomor, 'provider' => get_class($this->provider), 'error' => $e->getMessage()]);
             return false;
         }
+    }
+
+    public function lastResponse(): ?string
+    {
+        return $this->lastResponse;
     }
 
     public function simpanLog(Pelanggan $pelanggan, ?Tagihan $tagihan, string $jenis, string $nomor, string $pesan, bool $berhasil, ?string $response = null): void
