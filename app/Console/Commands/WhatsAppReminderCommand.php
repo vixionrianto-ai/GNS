@@ -3,9 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Setting;
-use App\Models\Tagihan;
 use App\Services\ReminderService;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Attributes\Description;
@@ -25,8 +23,8 @@ class WhatsAppReminderCommand extends Command
         $secondDays = max(0, (int) Setting::value('whatsapp.reminder_h7', 7));
 
         if ($this->option('dry-run')) {
-            $firstCount = $this->countCandidates($firstDays);
-            $secondCount = $this->countCandidates($secondDays);
+            $firstCount = $reminderService->countConfiguredCandidates($firstDays);
+            $secondCount = $reminderService->countConfiguredCandidates($secondDays);
 
             $this->table(
                 ['Reminder', 'Hari Setelah Jatuh Tempo', 'Kandidat'],
@@ -56,23 +54,5 @@ class WhatsAppReminderCommand extends Command
         $this->info('Reminder selesai.');
 
         return self::SUCCESS;
-    }
-
-    protected function countCandidates(int $days): int
-    {
-        $tanggalBatas = Carbon::today()->subDays($days);
-
-        return Tagihan::query()
-            ->whereIn('status', [
-                Tagihan::STATUS_BELUM_BAYAR,
-                Tagihan::STATUS_JATUH_TEMPO,
-                Tagihan::STATUS_SEBAGIAN,
-            ])
-            ->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
-            ->whereHas('pelanggan', function ($query) {
-                $query->whereNotNull('no_hp')
-                    ->where('no_hp', '!=', '');
-            })
-            ->count();
     }
 }
