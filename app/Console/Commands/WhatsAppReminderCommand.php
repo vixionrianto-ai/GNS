@@ -19,8 +19,8 @@ class WhatsAppReminderCommand extends Command
         $this->info('========================================');
         $this->newLine();
 
-        $firstDays = max(0, (int) Setting::value('whatsapp.reminder_h3', 3));
-        $secondDays = max(0, (int) Setting::value('whatsapp.reminder_h7', 7));
+        $firstDays = max(0, (int) Setting::value('whatsapp.reminder_first_days', 5));
+        $secondDays = max(0, (int) Setting::value('whatsapp.reminder_second_days', 14));
 
         if ($this->option('dry-run')) {
             $firstCount = $reminderService->countConfiguredCandidates($firstDays);
@@ -45,8 +45,8 @@ class WhatsAppReminderCommand extends Command
         $this->table(
             ['Reminder', 'Hari Setelah Jatuh Tempo', 'Jumlah'],
             [
-                ['Pertama', 'H+' . $firstDays, $hasil['reminder_1']],
-                ['Kedua', 'H+' . $secondDays, $hasil['reminder_2']],
+                ['Pertama', 'H+' . $firstDays, $hasil['reminder_first']],
+                ['Kedua', 'H+' . $secondDays, $hasil['reminder_second']],
             ]
         );
 
