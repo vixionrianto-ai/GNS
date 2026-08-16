@@ -40,16 +40,6 @@ class WhatsAppService
         return $this->url($tagihan->pelanggan->no_hp, $this->pesanTagihanBaru($tagihan));
     }
 
-    public function reminder3(Tagihan $tagihan): ?string
-    {
-        return $this->url($tagihan->pelanggan->no_hp, $this->pesanReminder3Hari($tagihan));
-    }
-
-    public function reminder7(Tagihan $tagihan): ?string
-    {
-        return $this->url($tagihan->pelanggan->no_hp, $this->pesanReminder7Hari($tagihan));
-    }
-
     public function pembayaran(Pembayaran $pembayaran): ?string
     {
         return $this->url($pembayaran->tagihan->pelanggan->no_hp, $this->pesanPembayaran($pembayaran));
@@ -196,18 +186,6 @@ class WhatsAppService
             config('app.name');
     }
 
-    public function pesanReminder3Hari(Tagihan $tagihan): string
-    {
-        $data = $this->tagihanPlaceholder($tagihan);
-        return "Halo Bapak/Ibu, {$data['nama']},\n\nIni adalah pengingat tagihan internet yang masih harus dibayar:\n\n━━━━━━━━━━━━━━━━━━\n" .
-            $data['rincian_tagihan'] . "\n━━━━━━━━━━━━━━━━━━\n💰 Total harus dibayar: {$data['total_harus_dibayar']}\n\nTerima kasih.\n" . config('app.name');
-    }
-
-    public function pesanReminder7Hari(Tagihan $tagihan): string
-    {
-        return $this->pesanReminder3Hari($tagihan);
-    }
-
     public function pesanPembayaran(Pembayaran $pembayaran): string
     {
         $data = $this->pembayaranPlaceholder($pembayaran);
@@ -238,16 +216,6 @@ class WhatsAppService
     public function pesanIsolir(Pelanggan $pelanggan): string
     {
         return $this->template('whatsapp.template_isolir', $this->pelangganPlaceholder($pelanggan));
-    }
-
-    public function sendReminder(Tagihan $tagihan, string $jenis): bool
-    {
-        if ($this->sudahPernahKirim($tagihan, $jenis)) return false;
-        $pesan = match ($jenis) {'h3' => $this->pesanReminder3Hari($tagihan), 'h7' => $this->pesanReminder7Hari($tagihan), default => null};
-        if ($pesan === null) return false;
-        $berhasil = $this->kirim($tagihan->pelanggan->no_hp, $pesan);
-        $this->simpanLog($tagihan->pelanggan, $tagihan, $jenis, $tagihan->pelanggan->no_hp, $pesan, $berhasil, $this->lastResponse);
-        return $berhasil;
     }
 
     public function sendTagihan(Tagihan $tagihan): bool
