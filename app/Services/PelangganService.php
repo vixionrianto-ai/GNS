@@ -125,7 +125,8 @@ class PelangganService
     public function update(int $id, array $data): Pelanggan
     {
         $pelanggan = Pelanggan::findOrFail($id);
-        $oldUsername = $pelanggan->username_pppoe;
+        $oldUsername = trim((string) $pelanggan->username_pppoe);
+        $oldRouterId = $pelanggan->router_id;
 
         $pelanggan->update($data);
 
@@ -135,23 +136,40 @@ class PelangganService
                 $paket = Paket::find($data['paket_id']);
 
                 if ($router && $paket) {
-                    if (!empty($oldUsername)) {
-                        $this->mikrotik->updateSecretById(
-                            $router,
-                            $oldUsername,
-                            $data['username_pppoe'],
-                            $data['password_pppoe'],
-                            $paket->nama_paket,
-                            'pppoe'
-                        );
-                    } else {
-                        $this->mikrotik->createSecret(
-                            $router,
-                            $data['username_pppoe'],
-                            $data['password_pppoe'],
-                            $paket->nama_paket,
-                            'pppoe'
-                        );
+                    $profile = trim((string) $paket->profile_mikrotik);
+
+                    if ($profile !== '') {
+                        if ($oldUsername !== '') {
+                            $oldRouter = Router::find($oldRouterId) ?: $router;
+                            $secret = $this->mikrotik->getSecretByName($oldRouter, $oldUsername);
+
+                            if ($secret && !empty($secret['.id'])) {
+                                $this->mikrotik->updateSecretById(
+                                    $router,
+                                    $secret['.id'],
+                                    $data['username_pppoe'],
+                                    $data['password_pppoe'],
+                                    $profile,
+                                    'pppoe'
+                                );
+                            } else {
+                                $this->mikrotik->createSecret(
+                                    $router,
+                                    $data['username_pppoe'],
+                                    $data['password_pppoe'],
+                                    $profile,
+                                    'pppoe'
+                                );
+                            }
+                        } else {
+                            $this->mikrotik->createSecret(
+                                $router,
+                                $data['username_pppoe'],
+                                $data['password_pppoe'],
+                                $profile,
+                                'pppoe'
+                            );
+                        }
                     }
                 }
             } catch (\Exception $e) {
