@@ -178,6 +178,11 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::get(
+        '/tagihan/{tagihan}/whatsapp',
+        [TagihanController::class, 'whatsapp']
+    );
+
+    Route::get(
         '/tagihan/{id}',
         [TagihanController::class, 'show']
     );
