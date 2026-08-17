@@ -32,11 +32,21 @@ class WhatsAppService
     {
         $nomor = $this->formatNomor($nomor);
         if (!$nomor) return null;
-
-        // Satu sumber URL WhatsApp untuk website dan Android.
-        // wa.me akan diarahkan ke aplikasi WhatsApp bila tersedia di perangkat,
-        // dan tetap menyediakan fallback web bila aplikasi tidak tersedia.
         return "https://wa.me/{$nomor}?text=" . urlencode($pesan);
+    }
+
+    /**
+     * Link percakapan WhatsApp yang dipakai tombol WA pelanggan.
+     * Tidak membuat pesan baru; hanya membuka chat ke nomor pelanggan.
+     */
+    public function appUrl(?string $nomor, string $pesan = ''): ?string
+    {
+        $nomor = $this->formatNomor($nomor);
+        if (!$nomor) return null;
+
+        return $pesan === ''
+            ? "https://wa.me/{$nomor}"
+            : "https://wa.me/{$nomor}?text=" . urlencode($pesan);
     }
 
     public function tagihan(Tagihan $tagihan): ?string
