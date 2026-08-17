@@ -172,18 +172,29 @@ class MikroTikService
         if ($this->getSecretByName($router, $username)) {
             throw new Exception("PPP Secret {$username} sudah ada.");
         }
+
         $query = new Query('/ppp/secret/add');
         $query->equal('name', $username);
         $query->equal('password', $password);
         $query->equal('profile', $profile);
         $query->equal('service', $service);
-        $client->query($query)->read();
 
+        $result = $client->query($query)->read();
+        $secretId = $result[0]['ret'] ?? $result[0]['.id'] ?? null;
+
+        if ($secretId) {
+            return (string) $secretId;
+        }
+
+        // Fallback untuk RouterOS/API yang tidak mengembalikan ID pada response add.
         for ($i = 0; $i < 5; $i++) {
             usleep(200000);
             $secret = $this->getSecretByName($router, $username);
-            if ($secret) return $secret['.id'];
+            if ($secret && !empty($secret['.id'])) {
+                return (string) $secret['.id'];
+            }
         }
+
         throw new Exception('PPP Secret berhasil dibuat tetapi ID MikroTik tidak ditemukan.');
     }
 
