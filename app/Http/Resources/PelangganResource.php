@@ -13,10 +13,7 @@ class PelangganResource extends JsonResource
         $whatsappUrl = null;
 
         if (!empty($this->no_hp)) {
-            $whatsappUrl = app(WhatsAppService::class)->url(
-                $this->no_hp,
-                ''
-            );
+            $whatsappUrl = app(WhatsAppService::class)->appUrl($this->no_hp, '');
         }
 
         return [
