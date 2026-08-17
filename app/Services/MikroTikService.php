@@ -84,7 +84,7 @@ class MikroTikService
     private function readSecretByName(Router $router, string $username): ?array
     {
         $query = new Query('/ppp/secret/print');
-        $query->equal('name', $username);
+        $query->where('name', $username);
         $query->equal('.proplist', '.id,name,service,profile,disabled');
 
         $result = $this->connect($router)->query($query)->read();
