@@ -5,17 +5,20 @@ namespace App\Services;
 use App\Models\Pelanggan;
 use App\Models\Router;
 use App\Models\Paket;
-use App\Models\Tagihan;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 
 class PelangganService
 {
     protected MikroTikService $mikrotik;
+    protected TagihanService $tagihanService;
 
-    public function __construct(MikroTikService $mikrotik)
-    {
+    public function __construct(
+        MikroTikService $mikrotik,
+        TagihanService $tagihanService
+    ) {
         $this->mikrotik = $mikrotik;
+        $this->tagihanService = $tagihanService;
     }
 
     public function getList(array $filters = []): LengthAwarePaginator
@@ -60,7 +63,7 @@ class PelangganService
 
     public function getTagihan(int $pelangganId)
     {
-        return Tagihan::where('pelanggan_id', $pelangganId)
+        return \App\Models\Tagihan::where('pelanggan_id', $pelangganId)
             ->orderByDesc('tahun')
             ->orderByDesc('bulan')
             ->get();
@@ -113,19 +116,19 @@ class PelangganService
 
         $pelanggan = Pelanggan::create($data);
 
+        // Gunakan TagihanService sebagai satu-satunya sumber logika pembuatan tagihan.
+        // Ini menyamakan API Android dengan alur website: invoice, periode,
+        // tanggal tagihan/jatuh tempo, nominal/total/sisa, saldo otomatis,
+        // audit trail, dan integrasi notifikasi mengikuti aturan yang sama.
         try {
-            if ($paket) {
-                Tagihan::create([
-                    'pelanggan_id' => $pelanggan->id,
-                    'paket_id'     => $pelanggan->paket_id,
-                    'bulan'        => date('m'),
-                    'tahun'        => date('Y'),
-                    'jumlah'       => $paket->harga ?? 0,
-                    'status'       => 'Belum Bayar',
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error("Gagal membuat tagihan otomatis untuk Pelanggan ID {$pelanggan->id}: " . $e->getMessage());
+            $pelanggan->load('paket');
+            $this->tagihanService->generate($pelanggan);
+        } catch (\Throwable $e) {
+            Log::error("Gagal membuat tagihan awal untuk Pelanggan ID {$pelanggan->id}: " . $e->getMessage(), [
+                'pelanggan_id' => $pelanggan->id,
+                'exception' => $e,
+            ]);
+            throw $e;
         }
 
         return $pelanggan->fresh([
