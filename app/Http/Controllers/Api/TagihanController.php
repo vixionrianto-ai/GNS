@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\Concerns\ApiResponse;
 use App\Http\Resources\TagihanResource;
 use App\Services\TagihanService;
+use App\Services\WhatsAppTagihanService;
 use Illuminate\Http\JsonResponse;
 use App\Models\Pelanggan;
 use App\Models\Tagihan;
@@ -51,6 +52,25 @@ class TagihanController extends Controller
                 $service->getDetail($id)
             ),
             'Detail tagihan berhasil diambil.'
+        );
+    }
+
+    public function whatsapp(
+        Tagihan $tagihan,
+        WhatsAppTagihanService $whatsapp
+    ): JsonResponse {
+        $data = $whatsapp->forTagihan($tagihan);
+
+        if (empty($data['url'])) {
+            return $this->error(
+                'Nomor WhatsApp pelanggan tidak tersedia.',
+                422
+            );
+        }
+
+        return $this->success(
+            $data,
+            'Aksi WhatsApp tagihan berhasil disiapkan.'
         );
     }
 
