@@ -81,6 +81,16 @@ class MikroTikService
         return $this->connect($router)->query($query)->read();
     }
 
+    private function readSecretByName(Router $router, string $username): ?array
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->equal('name', $username);
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
+
+        $result = $this->connect($router)->query($query)->read();
+        return $result[0] ?? null;
+    }
+
     public function getSecrets(Router $router): array
     {
         $secrets = $this->readSecrets($router);
@@ -145,10 +155,7 @@ class MikroTikService
 
     public function getSecretByName(Router $router, string $username): ?array
     {
-        foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['name'] ?? '') === $username) return $secret;
-        }
-        return null;
+        return $this->readSecretByName($router, $username);
     }
 
     public function getSecretById(Router $router, string $id): ?array
