@@ -96,7 +96,7 @@ class PelangganService
                     $router,
                     $data['username_pppoe'],
                     $data['password_pppoe'],
-                    $paket->nama_paket,
+                    $paket->profile_mikrotik,
                     'pppoe'
                 );
             }
