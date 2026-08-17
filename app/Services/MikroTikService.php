@@ -126,12 +126,8 @@ class MikroTikService
                 $created = null;
                 for ($i = 0; $i < 5; $i++) {
                     usleep(200000);
-                    foreach ($this->readSecrets($router) as $secret) {
-                        if (($secret['name'] ?? '') === $username) {
-                            $created = $secret;
-                            break 2;
-                        }
-                    }
+                    $created = $this->readSecretByName($router, $username);
+                    if ($created) break;
                 }
 
                 if ($created) {
@@ -186,10 +182,9 @@ class MikroTikService
             return (string) $secretId;
         }
 
-        // Fallback untuk RouterOS/API yang tidak mengembalikan ID pada response add.
         for ($i = 0; $i < 5; $i++) {
             usleep(200000);
-            $secret = $this->getSecretByName($router, $username);
+            $secret = $this->readSecretByName($router, $username);
             if ($secret && !empty($secret['.id'])) {
                 return (string) $secret['.id'];
             }
