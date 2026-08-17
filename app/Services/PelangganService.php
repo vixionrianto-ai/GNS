@@ -83,25 +83,21 @@ class PelangganService
 
     public function create(array $data): Pelanggan
     {
-        // Gunakan format kode pelanggan yang sama dengan website:
-        // GNS + nomor urut 5 digit. Android tidak membuat kode sendiri.
-        $kodePelanggan = trim((string) ($data['kode_pelanggan'] ?? ''));
+        // API/Android tidak boleh menentukan kode pelanggan sendiri.
+        // Gunakan format yang sama dengan website: GNS + 5 digit.
+        $last = Pelanggan::where('kode_pelanggan', 'like', 'GNS%')
+            ->orderByDesc('id')
+            ->first();
 
-        if ($kodePelanggan === '') {
-            $last = Pelanggan::orderByDesc('id')->first();
-            $nomor = 1;
-
-            if ($last && !empty($last->kode_pelanggan)) {
-                $kodeLama = (string) $last->kode_pelanggan;
-                if (str_starts_with($kodeLama, 'GNS')) {
-                    $nomor = (int) substr($kodeLama, 3) + 1;
-                }
+        $nomor = 1;
+        if ($last && !empty($last->kode_pelanggan)) {
+            $suffix = substr((string) $last->kode_pelanggan, 3);
+            if (ctype_digit($suffix)) {
+                $nomor = (int) $suffix + 1;
             }
-
-            $kodePelanggan = 'GNS' . str_pad((string) $nomor, 5, '0', STR_PAD_LEFT);
         }
 
-        $data['kode_pelanggan'] = $kodePelanggan;
+        $data['kode_pelanggan'] = 'GNS' . str_pad((string) $nomor, 5, '0', STR_PAD_LEFT);
 
         // 1. Simpan data pelanggan ke database MySQL
         $pelanggan = Pelanggan::create($data);
