@@ -46,9 +46,7 @@ class PelangganService
 
         $query->orderBy('nama');
 
-        return $query->paginate(
-            $filters['per_page'] ?? 15
-        );
+        return $query->paginate($filters['per_page'] ?? 15);
     }
 
     public function getDetail(int $id)
@@ -62,7 +60,7 @@ class PelangganService
 
     public function getTagihan(int $pelangganId)
     {
-        return \App\Models\Tagihan::where('pelanggan_id', $pelangganId)
+        return Tagihan::where('pelanggan_id', $pelangganId)
             ->orderByDesc('tahun')
             ->orderByDesc('bulan')
             ->get();
@@ -71,9 +69,9 @@ class PelangganService
     public function getPembayaran(int $pelangganId)
     {
         return \App\Models\Pembayaran::with([
-                'tagihan',
-                'user',
-            ])
+            'tagihan',
+            'user',
+        ])
             ->whereHas('tagihan', function ($query) use ($pelangganId) {
                 $query->where('pelanggan_id', $pelangganId);
             })
@@ -81,46 +79,41 @@ class PelangganService
             ->get();
     }
 
-    public function create(array $data): Pelanggan
+    private function generateKodePelanggan(): string
     {
-        // API/Android tidak boleh menentukan kode pelanggan sendiri.
-        // Gunakan format yang sama dengan website: GNS + 5 digit.
-        $last = Pelanggan::where('kode_pelanggan', 'like', 'GNS%')
+        $lastKode = Pelanggan::where('kode_pelanggan', 'like', 'GNS%')
             ->orderByDesc('id')
-            ->first();
+            ->value('kode_pelanggan');
 
         $nomor = 1;
-        if ($last && !empty($last->kode_pelanggan)) {
-            $suffix = substr((string) $last->kode_pelanggan, 3);
-            if (ctype_digit($suffix)) {
-                $nomor = (int) $suffix + 1;
-            }
+        if ($lastKode && preg_match('/^GNS(\d+)$/', (string) $lastKode, $match)) {
+            $nomor = ((int) $match[1]) + 1;
         }
 
-        $data['kode_pelanggan'] = 'GNS' . str_pad((string) $nomor, 5, '0', STR_PAD_LEFT);
+        return 'GNS' . str_pad((string) $nomor, 5, '0', STR_PAD_LEFT);
+    }
 
-        // 1. Simpan data pelanggan ke database MySQL
+    public function create(array $data): Pelanggan
+    {
+        // Client tidak boleh menentukan identitas kode pelanggan.
+        $data['kode_pelanggan'] = $this->generateKodePelanggan();
+
+        $router = !empty($data['router_id']) ? Router::find($data['router_id']) : null;
+        $paket = !empty($data['paket_id']) ? Paket::find($data['paket_id']) : null;
+
+        if (!empty($data['username_pppoe']) && !empty($data['password_pppoe']) && $router && $paket) {
+            $this->mikrotik->createSecret(
+                $router,
+                $data['username_pppoe'],
+                $data['password_pppoe'],
+                $paket->profile_mikrotik,
+                'pppoe'
+            );
+        }
+
         $pelanggan = Pelanggan::create($data);
 
-        // 2. Otomatis buat secret di MikroTik
-        if (!empty($data['username_pppoe']) && !empty($data['password_pppoe']) && !empty($data['router_id'])) {
-            $router = Router::find($data['router_id']);
-            $paket = Paket::find($data['paket_id']);
-
-            if ($router && $paket) {
-                $this->mikrotik->createSecret(
-                    $router,
-                    $data['username_pppoe'],
-                    $data['password_pppoe'],
-                    $paket->profile_mikrotik,
-                    'pppoe'
-                );
-            }
-        }
-
-        // 3. OTOMATIS BUAT TAGIHAN PERTAMA (LANGSUNG KE DATABASE)
         try {
-            $paket = Paket::find($pelanggan->paket_id);
             if ($paket) {
                 Tagihan::create([
                     'pelanggan_id' => $pelanggan->id,
@@ -135,7 +128,11 @@ class PelangganService
             Log::error("Gagal membuat tagihan otomatis untuk Pelanggan ID {$pelanggan->id}: " . $e->getMessage());
         }
 
-        return $pelanggan;
+        return $pelanggan->fresh([
+            'paket',
+            'router',
+            'saldo',
+        ]);
     }
 
     public function update(int $id, array $data): Pelanggan
@@ -144,56 +141,52 @@ class PelangganService
         $oldUsername = trim((string) $pelanggan->username_pppoe);
         $oldRouterId = $pelanggan->router_id;
 
-        $pelanggan->update($data);
+        // Kode pelanggan adalah identitas server dan tidak boleh diubah oleh client.
+        unset($data['kode_pelanggan']);
 
-        if (!empty($data['username_pppoe']) && !empty($data['password_pppoe']) && !empty($data['router_id'])) {
+        $router = !empty($data['router_id']) ? Router::find($data['router_id']) : null;
+        $paket = !empty($data['paket_id']) ? Paket::find($data['paket_id']) : null;
+
+        if (!empty($data['username_pppoe']) && !empty($data['password_pppoe']) && $router && $paket) {
             try {
-                $router = Router::find($data['router_id']);
-                $paket = Paket::find($data['paket_id']);
+                $profile = trim((string) $paket->profile_mikrotik);
 
-                if ($router && $paket) {
-                    $profile = trim((string) $paket->profile_mikrotik);
+                if ($profile !== '' && $oldUsername !== '') {
+                    $oldRouter = Router::find($oldRouterId) ?: $router;
+                    $secret = $this->mikrotik->getSecretByName($oldRouter, $oldUsername);
 
-                    if ($profile !== '') {
-                        if ($oldUsername !== '') {
-                            $oldRouter = Router::find($oldRouterId) ?: $router;
-                            $secret = $this->mikrotik->getSecretByName($oldRouter, $oldUsername);
-
-                            if ($secret && !empty($secret['.id'])) {
-                                $this->mikrotik->updateSecretById(
-                                    $router,
-                                    $secret['.id'],
-                                    $data['username_pppoe'],
-                                    $data['password_pppoe'],
-                                    $profile,
-                                    'pppoe'
-                                );
-                            } else {
-                                $this->mikrotik->createSecret(
-                                    $router,
-                                    $data['username_pppoe'],
-                                    $data['password_pppoe'],
-                                    $profile,
-                                    'pppoe'
-                                );
-                            }
-                        } else {
-                            $this->mikrotik->createSecret(
-                                $router,
-                                $data['username_pppoe'],
-                                $data['password_pppoe'],
-                                $profile,
-                                'pppoe'
-                            );
-                        }
+                    if ($secret && !empty($secret['.id'])) {
+                        $this->mikrotik->updateSecretById(
+                            $router,
+                            $secret['.id'],
+                            $data['username_pppoe'],
+                            $data['password_pppoe'],
+                            $profile,
+                            'pppoe'
+                        );
+                    } else {
+                        $this->mikrotik->createSecret(
+                            $router,
+                            $data['username_pppoe'],
+                            $data['password_pppoe'],
+                            $profile,
+                            'pppoe'
+                        );
                     }
                 }
             } catch (\Exception $e) {
                 Log::error("Gagal update PPP Secret di MikroTik untuk Pelanggan ID {$pelanggan->id}: " . $e->getMessage());
+                throw $e;
             }
         }
 
-        return $pelanggan->fresh();
+        $pelanggan->update($data);
+
+        return $pelanggan->fresh([
+            'paket',
+            'router',
+            'saldo',
+        ]);
     }
 
     public function delete(int $id): bool
@@ -204,7 +197,11 @@ class PelangganService
             try {
                 $router = Router::find($pelanggan->router_id);
                 if ($router) {
-                    $this->mikrotik->deleteSecretById($router, $pelanggan->username_pppoe);
+                    $secret = $this->mikrotik->getSecretByName($router, $pelanggan->username_pppoe);
+
+                    if ($secret && !empty($secret['.id'])) {
+                        $this->mikrotik->deleteSecretById($router, $secret['.id']);
+                    }
                 }
             } catch (\Exception $e) {
                 Log::error("Gagal menghapus PPP Secret di MikroTik untuk Pelanggan ID {$id}: " . $e->getMessage());
