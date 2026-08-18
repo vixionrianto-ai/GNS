@@ -78,13 +78,16 @@ class TagihanService
         };
     }
 
-    public function generate(Pelanggan $pelanggan): Tagihan
+    public function generate(Pelanggan $pelanggan, bool $sendWhatsApp = true): Tagihan
     {
-        return $this->generateUntukPeriode($pelanggan, Carbon::today());
+        return $this->generateUntukPeriode($pelanggan, Carbon::today(), $sendWhatsApp);
     }
 
-    public function generateUntukPeriode(Pelanggan $pelanggan, Carbon $tanggal): Tagihan
-    {
+    public function generateUntukPeriode(
+        Pelanggan $pelanggan,
+        Carbon $tanggal,
+        bool $sendWhatsApp = true
+    ): Tagihan {
         if (empty($pelanggan->tanggal_aktif)) {
             throw new \Exception("Pelanggan {$pelanggan->nama} belum memiliki tanggal aktif.");
         }
@@ -111,7 +114,14 @@ class TagihanService
         $tanggalJatuhTempo = $this->hitungJatuhTempo($tanggalTagihan);
         $nominal = $this->getNominal($pelanggan);
 
-        return DB::transaction(function () use ($pelanggan, $periode, $tanggalTagihan, $tanggalJatuhTempo, $nominal) {
+        return DB::transaction(function () use (
+            $pelanggan,
+            $periode,
+            $tanggalTagihan,
+            $tanggalJatuhTempo,
+            $nominal,
+            $sendWhatsApp
+        ) {
             $tagihan = Tagihan::create([
                 'pelanggan_id'        => $pelanggan->id,
                 'invoice_no'          => $this->generateInvoiceNumber($tanggalTagihan),
@@ -146,14 +156,16 @@ class TagihanService
                 $tagihan->refresh();
             }
 
-            try {
-                $this->whatsAppService->sendTagihan($tagihan);
-            } catch (\Throwable $e) {
-                Log::error('Gagal mengirim WhatsApp invoice.', [
-                    'invoice' => $tagihan->invoice_no,
-                    'pelanggan_id' => $pelanggan->id,
-                    'error' => $e->getMessage(),
-                ]);
+            if ($sendWhatsApp) {
+                try {
+                    $this->whatsAppService->sendTagihan($tagihan);
+                } catch (\Throwable $e) {
+                    Log::error('Gagal mengirim WhatsApp invoice.', [
+                        'invoice' => $tagihan->invoice_no,
+                        'pelanggan_id' => $pelanggan->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
             return $tagihan;
@@ -178,7 +190,7 @@ class TagihanService
 
         foreach ($pelanggans as $pelanggan) {
             try {
-                $this->generateUntukPeriode($pelanggan, $periode ?? Carbon::today());
+                $this->generateUntukPeriode($pelanggan, $periode ?? Carbon::today(), true);
                 $berhasil++;
             } catch (\Throwable $e) {
                 if (str_contains(strtolower($e->getMessage()), 'sudah ada')) {
@@ -226,7 +238,7 @@ class TagihanService
             $pelanggan = $tagihan->pelanggan()->with('paket')->first();
             $invoiceLama = $tagihan->invoice_no;
             $tagihan->delete();
-            $baru = $this->generate($pelanggan);
+            $baru = $this->generate($pelanggan, true);
 
             $this->auditTrail->tagihan('regenerate', 'Regenerate invoice ' . $invoiceLama, [
                 'invoice_lama' => $invoiceLama,
@@ -238,12 +250,6 @@ class TagihanService
         });
     }
 
-    /**
-     * Update status tagihan otomatis.
-     *
-     * Hanya tagihan yang belum dibayar sama sekali yang berubah menjadi Jatuh Tempo.
-     * Tagihan yang sudah dibayar sebagian tetap Sebagian meskipun melewati jatuh tempo.
-     */
     public function updateStatusOtomatis(): int
     {
         $tagihans = Tagihan::where('status', Tagihan::STATUS_BELUM_BAYAR)
@@ -266,12 +272,6 @@ class TagihanService
         return $jumlah;
     }
 
-    /**
-     * Update denda otomatis.
-     *
-     * Denda menambah total tagihan dan otomatis menambah sisa yang belum dibayar.
-     * Status Jatuh Tempo dipertahankan untuk tagihan yang masih memiliki sisa.
-     */
     public function updateDenda(): int
     {
         $jumlah = 0;
