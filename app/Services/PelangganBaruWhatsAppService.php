@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Pelanggan;
 use App\Models\Setting;
+use Carbon\Carbon;
 
 class PelangganBaruWhatsAppService
 {
@@ -16,6 +17,18 @@ class PelangganBaruWhatsAppService
     {
         $pelanggan->loadMissing(['paket', 'router']);
 
+        $formatTanggal = static function ($tanggal): string {
+            if (empty($tanggal)) {
+                return '-';
+            }
+
+            try {
+                return Carbon::parse($tanggal)->format('d-m-Y');
+            } catch (\Throwable) {
+                return (string) $tanggal;
+            }
+        };
+
         $data = [
             'nama' => $pelanggan->nama,
             'kode_pelanggan' => $pelanggan->kode_pelanggan,
@@ -23,12 +36,8 @@ class PelangganBaruWhatsAppService
             'username_pppoe' => $pelanggan->username_pppoe ?? '-',
             'router' => $pelanggan->router?->nama_router ?? ($pelanggan->router?->nama ?? '-'),
             'ip_address' => $pelanggan->ip_address ?: '-',
-            'tanggal_pasang' => $pelanggan->tanggal_pasang
-                ? optional($pelanggan->tanggal_pasang)->format('d-m-Y')
-                : '-',
-            'tanggal_aktif' => $pelanggan->tanggal_aktif
-                ? optional($pelanggan->tanggal_aktif)->format('d-m-Y')
-                : '-',
+            'tanggal_pasang' => $formatTanggal($pelanggan->tanggal_pasang),
+            'tanggal_aktif' => $formatTanggal($pelanggan->tanggal_aktif),
             'status' => $pelanggan->status,
             'isp' => config('app.name'),
         ];
