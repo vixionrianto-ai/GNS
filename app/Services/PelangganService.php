@@ -117,12 +117,11 @@ class PelangganService
         $pelanggan = Pelanggan::create($data);
 
         // Gunakan TagihanService sebagai satu-satunya sumber logika pembuatan tagihan.
-        // Ini menyamakan API Android dengan alur website: invoice, periode,
-        // tanggal tagihan/jatuh tempo, nominal/total/sisa, saldo otomatis,
-        // audit trail, dan integrasi notifikasi mengikuti aturan yang sama.
+        // Tagihan pertama dibuat tanpa mengirim template "Tagihan Baru" karena
+        // notifikasi pada momen pendaftaran pelanggan memakai template "Pelanggan Baru".
         try {
             $pelanggan->load('paket');
-            $this->tagihanService->generate($pelanggan);
+            $this->tagihanService->generate($pelanggan, false);
         } catch (\Throwable $e) {
             Log::error("Gagal membuat tagihan awal untuk Pelanggan ID {$pelanggan->id}: " . $e->getMessage(), [
                 'pelanggan_id' => $pelanggan->id,
