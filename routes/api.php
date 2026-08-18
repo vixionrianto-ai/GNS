@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\TagihanController;
 use App\Http\Controllers\Api\RouterController;
 use App\Http\Controllers\Api\PaketController;
+use App\Http\Controllers\Api\WhatsAppLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -98,154 +99,56 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Authentication
-    |--------------------------------------------------------------------------
-    */
-
+    /* Authentication */
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
-
+    /* Dashboard */
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pelanggan
-    |--------------------------------------------------------------------------
-    */
-
+    /* Pelanggan */
     Route::get('/pelanggan', [PelangganController::class, 'index']);
     Route::get('/pelanggan/{id}', [PelangganController::class, 'show']);
     Route::get('/pelanggan/{id}/tagihan', [PelangganController::class, 'tagihan']);
     Route::get('/pelanggan/{id}/pembayaran', [PelangganController::class, 'pembayaran']);
-
     Route::post('/pelanggan', [PelangganController::class, 'store']);
     Route::put('/pelanggan/{id}', [PelangganController::class, 'update']);
     Route::delete('/pelanggan/{id}', [PelangganController::class, 'destroy']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pembayaran (DIBENAHI: Rute statis ditaruh di atas {id})
-    |--------------------------------------------------------------------------
-    */
-
+    /* Pembayaran */
     Route::get('/pembayaran', [PembayaranController::class, 'index']);
     Route::get('/pembayaran/summary', [PembayaranController::class, 'summary']);
     Route::get('/pembayaran/history', [PembayaranController::class, 'history']);
     Route::get('/pembayaran/{id}', [PembayaranController::class, 'show']);
     Route::post('/pembayaran', [PembayaranController::class, 'store']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Tagihan
-    |--------------------------------------------------------------------------
-    */
-    Route::get(
-        '/tagihan',
-        [TagihanController::class, 'index']
-    );
+    /* Tagihan */
+    Route::get('/tagihan', [TagihanController::class, 'index']);
+    Route::post('/tagihan/generate-semua', [TagihanController::class, 'generateSemua']);
+    Route::post('/tagihan/generate-periode', [TagihanController::class, 'generatePeriode']);
+    Route::post('/tagihan/generate/{pelanggan}', [TagihanController::class, 'generate']);
+    Route::post('/tagihan/maintenance', [TagihanController::class, 'maintenance']);
+    Route::post('/tagihan/{tagihan}/regenerate', [TagihanController::class, 'regenerate']);
+    Route::get('/tagihan/{tagihan}/whatsapp', [TagihanController::class, 'whatsapp']);
+    Route::get('/tagihan/{id}', [TagihanController::class, 'show']);
 
-    Route::post(
-        '/tagihan/generate-semua',
-        [TagihanController::class, 'generateSemua']
-    );
+    /* Paket */
+    Route::get('/paket', [PaketController::class, 'index']);
+    Route::get('/paket/{id}', [PaketController::class, 'show']);
+    Route::post('/paket', [PaketController::class, 'store']);
+    Route::put('/paket/{id}', [PaketController::class, 'update']);
+    Route::delete('/paket/{id}', [PaketController::class, 'destroy']);
 
-    Route::post(
-        '/tagihan/generate-periode',
-        [TagihanController::class, 'generatePeriode']
-    );
+    /* Riwayat WhatsApp */
+    Route::get('/whatsapp', [WhatsAppLogController::class, 'index']);
+    Route::get('/whatsapp/{id}', [WhatsAppLogController::class, 'show']);
 
-    Route::post(
-        '/tagihan/generate/{pelanggan}',
-        [TagihanController::class, 'generate']
-    );
-
-    Route::post(
-        '/tagihan/maintenance',
-        [TagihanController::class, 'maintenance']
-    );
-
-    Route::post(
-        '/tagihan/{tagihan}/regenerate',
-        [TagihanController::class, 'regenerate']
-    );
-
-    Route::get(
-        '/tagihan/{tagihan}/whatsapp',
-        [TagihanController::class, 'whatsapp']
-    );
-
-    Route::get(
-        '/tagihan/{id}',
-        [TagihanController::class, 'show']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Paket
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/paket',
-        [PaketController::class, 'index']
-    );
-
-    Route::get(
-        '/paket/{id}',
-        [PaketController::class, 'show']
-    );
-
-    Route::post(
-        '/paket',
-        [PaketController::class, 'store']
-    );
-
-    Route::put(
-        '/paket/{id}',
-        [PaketController::class, 'update']
-    );
-
-    Route::delete(
-        '/paket/{id}',
-        [PaketController::class, 'destroy']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Operator
-    |--------------------------------------------------------------------------
-    */
-
+    /* Operator */
     Route::get('/operator/home', [OperatorController::class, 'home']);
-    Route::get(
-        '/operator/profile',
-        [OperatorController::class, 'profile']
-    );
+    Route::get('/operator/profile', [OperatorController::class, 'profile']);
+    Route::put('/operator/profile', [OperatorController::class, 'updateProfile']);
+    Route::put('/operator/password', [OperatorController::class, 'changePassword']);
 
-    Route::put(
-        '/operator/profile',
-        [OperatorController::class, 'updateProfile']
-    );
-
-    Route::put(
-        '/operator/password',
-        [OperatorController::class, 'changePassword']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Search
-    |--------------------------------------------------------------------------
-    */
-
+    /* Search */
     Route::get('/search', [SearchController::class, 'index']);
-
 });
