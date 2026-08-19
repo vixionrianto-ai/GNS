@@ -27,7 +27,7 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return response()->json([
+        $data = [
             'totalPelanggan' => Pelanggan::count(),
             'pelangganAktif' => Pelanggan::where('status', 'Aktif')->count(),
             'pelangganNonaktif' => Pelanggan::where('status', 'Nonaktif')->count(),
@@ -45,6 +45,20 @@ class DashboardController extends Controller
             'pembayaranTerakhir' => $pembayaranTerakhir,
             'tagihanJatuhTempo' => $tagihanJatuhTempo,
             'serverTime' => now()->toIso8601String(),
+            'routerOffline' => Router::where('status', '!=', 'Aktif')->count(),
+            'tagihanBelumLunas' => Tagihan::where('status', '!=', Tagihan::STATUS_LUNAS)->count(),
+            'tagihanSebagian' => Tagihan::where('status', Tagihan::STATUS_SEBAGIAN)->count(),
+            'tagihanJatuhTempoCount' => Tagihan::where('status', Tagihan::STATUS_JATUH_TEMPO)->count(),
+            'tagihanHariIni' => Tagihan::whereDate('tanggal_tagihan', today())->count(),
+            'totalPembayaran' => Pembayaran::count(),
+            'pembayaranHariIni' => Pembayaran::whereDate('tanggal_bayar', today())->count(),
+            'totalPendapatan' => (float) Pembayaran::where('status', Pembayaran::STATUS_BERHASIL)->sum('total_bayar'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dashboard berhasil dimuat.',
+            'data' => $data,
         ]);
     }
 }
