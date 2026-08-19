@@ -20,15 +20,29 @@ class TagihanController extends Controller
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
             $query->where(function ($q) use ($search) {
-                $q->where('invoice', 'like', "%{$search}%")
+                $q->where('invoice_no', 'like', "%{$search}%")
                     ->orWhereHas('pelanggan', fn ($p) => $p->where('nama', 'like', "%{$search}%"));
             });
         }
 
+        if ($request->filled('pelanggan_id')) {
+            $query->where('pelanggan_id', $request->integer('pelanggan_id'));
+        }
+
+        $paginator = $query->latest()->paginate($request->integer('per_page', 20));
+
         return response()->json([
             'success' => true,
             'message' => 'Tagihan berhasil dimuat.',
-            'data' => $query->latest()->paginate($request->integer('per_page', 20)),
+            'data' => $paginator->items(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
         ]);
     }
 
