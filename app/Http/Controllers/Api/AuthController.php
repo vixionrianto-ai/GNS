@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApiToken;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -25,14 +27,21 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->tokens()->delete();
-        $token = $user->createToken('gns-android')->plainTextToken;
+        ApiToken::where('user_id', $user->id)->where('name', 'gns-android')->delete();
+
+        $plainToken = Str::random(80);
+        ApiToken::create([
+            'user_id' => $user->id,
+            'name' => 'gns-android',
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => now()->addDays(30),
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil.',
             'data' => [
-                'token' => $token,
+                'token' => $plainToken,
                 'user' => $user,
             ],
         ]);
@@ -50,7 +59,8 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()?->delete();
+        $plainToken = trim(substr($request->header('Authorization', ''), 7));
+        ApiToken::where('token_hash', hash('sha256', $plainToken))->delete();
 
         return response()->json([
             'success' => true,
