@@ -20,7 +20,17 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('router', RouterController::class);
         Route::get('/router/{router}/test', [RouterController::class, 'test']);
         Route::get('/router/{router}/ppp-secret', [RouterController::class, 'pppSecret']);
+        Route::post('/router/{router}/ppp-secret', [RouterController::class, 'storeSecret']);
+        Route::get('/router/{router}/ppp-secret/{username}/edit', [RouterController::class, 'editSecret']);
+        Route::put('/router/{router}/ppp-secret/{secret}', [RouterController::class, 'updateSecret']);
+        Route::delete('/router/{router}/ppp-secret/{secret}', [RouterController::class, 'deleteSecret']);
+        Route::put('/router/{router}/ppp-secret/{secret}/enable', [RouterController::class, 'enableSecret']);
+        Route::put('/router/{router}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret']);
         Route::get('/router/{router}/ppp-profile', [RouterController::class, 'pppProfile']);
+        Route::post('/router/{router}/ppp-profile', [RouterController::class, 'storeProfile']);
+        Route::get('/router/{router}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile']);
+        Route::put('/router/{router}/ppp-profile/{profile}', [RouterController::class, 'updateProfile']);
+        Route::delete('/router/{router}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile']);
 
         Route::apiResource('paket', PaketController::class);
         Route::get('/router/{router}/profiles', [PaketController::class, 'profiles']);
