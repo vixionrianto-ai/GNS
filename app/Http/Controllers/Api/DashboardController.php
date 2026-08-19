@@ -47,7 +47,7 @@ class DashboardController extends Controller
             'serverTime' => now()->toIso8601String(),
             'routerOffline' => Router::where('status', '!=', 'Aktif')->count(),
             'tagihanBelumLunas' => Tagihan::where('status', '!=', Tagihan::STATUS_LUNAS)->count(),
-            'tagihanSebagian' => Tagihan::where('status', Tagihan::STATUS_SEBAGIAN)->count(),
+            'tagihanSebagian' => Tagihan::where('status', 'Sebagian')->count(),
             'tagihanJatuhTempoCount' => Tagihan::where('status', Tagihan::STATUS_JATUH_TEMPO)->count(),
             'tagihanHariIni' => Tagihan::whereDate('tanggal_tagihan', today())->count(),
             'totalPembayaran' => Pembayaran::count(),
