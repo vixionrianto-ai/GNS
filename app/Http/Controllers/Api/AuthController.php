@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -16,7 +17,7 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = \App\Models\User::where('email', $credentials['email'])->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -28,16 +29,22 @@ class AuthController extends Controller
         $token = $user->createToken('gns-android')->plainTextToken;
 
         return response()->json([
+            'success' => true,
             'message' => 'Login berhasil.',
-            'token' => $token,
-            'user' => $user,
+            'data' => [
+                'token' => $token,
+                'user' => $user,
+            ],
         ]);
     }
 
     public function me(Request $request)
     {
         return response()->json([
-            'user' => $request->user(),
+            'success' => true,
+            'data' => [
+                'user' => $request->user(),
+            ],
         ]);
     }
 
@@ -46,6 +53,7 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json([
+            'success' => true,
             'message' => 'Logout berhasil.',
         ]);
     }
