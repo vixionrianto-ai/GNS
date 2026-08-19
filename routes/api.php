@@ -3,7 +3,10 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PaketController;
+use App\Http\Controllers\Api\PelangganController;
+use App\Http\Controllers\Api\PembayaranController;
 use App\Http\Controllers\Api\RouterController;
+use App\Http\Controllers\Api\TagihanController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -16,8 +19,21 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('router', RouterController::class);
         Route::get('/router/{router}/test', [RouterController::class, 'test']);
+        Route::get('/router/{router}/ppp-secret', [RouterController::class, 'pppSecret']);
+        Route::get('/router/{router}/ppp-profile', [RouterController::class, 'pppProfile']);
 
         Route::apiResource('paket', PaketController::class);
         Route::get('/router/{router}/profiles', [PaketController::class, 'profiles']);
+
+        Route::apiResource('pelanggan', PelangganController::class);
+        Route::post('/pelanggan/sync', [PelangganController::class, 'sync']);
+
+        Route::apiResource('tagihan', TagihanController::class)->only(['index', 'show', 'destroy']);
+        Route::post('/tagihan/generate-harian', [TagihanController::class, 'generate']);
+
+        Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create']);
+        Route::apiResource('pembayaran', PembayaranController::class)->only(['index', 'show', 'store']);
+        Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice']);
+        Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf']);
     });
 });
