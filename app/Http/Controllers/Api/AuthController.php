@@ -51,9 +51,8 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => [
-                'user' => $request->user(),
-            ],
+            'message' => 'Profil berhasil dimuat.',
+            'data' => $request->user(),
         ]);
     }
 
