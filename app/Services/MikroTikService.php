@@ -81,6 +81,26 @@ class MikroTikService
         return $this->connect($router)->query($query)->read();
     }
 
+    /**
+     * Lightweight list used only by the synchronization process.
+     * It deliberately does not request PPP passwords for every secret.
+     */
+    private function readSecretsForSync(Router $router): array
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
+        return $this->connect($router)->query($query)->read();
+    }
+
+    private function readSecretPasswordByName(Router $router, string $username): ?string
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->where('name', $username);
+        $query->equal('.proplist', '.id,name,password');
+        $result = $this->connect($router)->query($query)->read();
+        return isset($result[0]['password']) ? (string) $result[0]['password'] : null;
+    }
+
     private function readSecretByName(Router $router, string $username): ?array
     {
         $query = new Query('/ppp/secret/print');
@@ -93,6 +113,7 @@ class MikroTikService
 
     public function getSecrets(Router $router): array
     {
+        // Keep the existing behaviour for callers outside sync.
         $secrets = $this->readSecrets($router);
         $byName = [];
         foreach ($secrets as $secret) {
