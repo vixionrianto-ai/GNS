@@ -74,20 +74,49 @@ class MikroTikService
         }
     }
 
+    /**
+     * Lightweight PPP secret listing used by dashboard/sync operations.
+     * Do not request passwords here: it makes large /ppp/secret/print calls
+     * unnecessarily expensive and can trigger RouterOS API timeouts.
+     */
     private function readSecrets(Router $router): array
     {
         $query = new Query('/ppp/secret/print');
-        $query->equal('.proplist', '.id,name,password,service,profile,disabled');
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
         return $this->connect($router)->query($query)->read();
+    }
+
+    /**
+     * Read a single PPP secret password only when it is actually needed.
+     */
+    private function readSecretPasswordByName(Router $router, string $username): ?string
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->equal('name', $username);
+        $query->equal('.proplist', '.id,name,password');
+        $result = $this->connect($router)->query($query)->read();
+        return isset($result[0]['password']) ? (string) $result[0]['password'] : null;
     }
 
     public function getSecrets(Router $router): array
     {
+        // One lightweight full scan only.
         $secrets = $this->readSecrets($router);
+
         $byName = [];
         foreach ($secrets as $secret) {
-            if (!empty($secret['name'])) $byName[$secret['name']] = $secret;
+            if (!empty($secret['name'])) {
+                $byName[$secret['name']] = $secret;
+            }
         }
+
+        // Keep the existing database password for already-known customers so
+        // sync does not need to read passwords from MikroTik for every row.
+        $dbPasswords = Pelanggan::where('router_id', $router->id)
+            ->whereNotNull('username_pppoe')
+            ->where('username_pppoe', '!=', '')
+            ->pluck('password_pppoe', 'username_pppoe')
+            ->toArray();
 
         // DATABASE MENJADI SUMBER PEMULIHAN SETELAH RESTORE.
         // Jika pelanggan masih ada di database tetapi PPP Secret hilang di MikroTik,
@@ -119,18 +148,15 @@ class MikroTikService
                 $created = null;
                 for ($i = 0; $i < 5; $i++) {
                     usleep(200000);
-                    foreach ($this->readSecrets($router) as $secret) {
-                        if (($secret['name'] ?? '') === $username) {
-                            $created = $secret;
-                            break 2;
-                        }
-                    }
+                    $created = $this->getSecretByName($router, $username);
+                    if ($created) break;
                 }
 
                 if ($created) {
                     $pelanggan->mikrotik_secret_id = $created['.id'] ?? null;
                     $pelanggan->save();
                     $byName[$username] = $created;
+                    $secrets[] = $created;
 
                     if (($pelanggan->status ?? '') === 'Aktif') {
                         $this->enableSecretById($router, $created['.id']);
@@ -143,23 +169,40 @@ class MikroTikService
             }
         }
 
-        return $this->readSecrets($router);
+        // Add password only when the controller actually needs it:
+        // existing customers use their DB password; newly imported customers
+        // perform one filtered password lookup.
+        foreach ($secrets as &$secret) {
+            $username = trim((string) ($secret['name'] ?? ''));
+            if ($username === '') continue;
+
+            if (array_key_exists($username, $dbPasswords)) {
+                $secret['password'] = (string) ($dbPasswords[$username] ?? '');
+            } elseif (!array_key_exists('password', $secret)) {
+                $secret['password'] = $this->readSecretPasswordByName($router, $username) ?? '';
+            }
+        }
+        unset($secret);
+
+        return $secrets;
     }
 
     public function getSecretByName(Router $router, string $username): ?array
     {
-        foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['name'] ?? '') === $username) return $secret;
-        }
-        return null;
+        $query = new Query('/ppp/secret/print');
+        $query->equal('name', $username);
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
+        $result = $this->connect($router)->query($query)->read();
+        return $result[0] ?? null;
     }
 
     public function getSecretById(Router $router, string $id): ?array
     {
-        foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['.id'] ?? '') === $id) return $secret;
-        }
-        return null;
+        $query = new Query('/ppp/secret/print');
+        $query->equal('.id', $id);
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
+        $result = $this->connect($router)->query($query)->read();
+        return $result[0] ?? null;
     }
 
     public function createSecret(Router $router, string $username, string $password, string $profile, string $service = 'pppoe'): string
