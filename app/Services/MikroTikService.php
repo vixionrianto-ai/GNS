@@ -82,8 +82,8 @@ class MikroTikService
     }
 
     /**
-     * Lightweight list used only by the synchronization process.
-     * It deliberately does not request PPP passwords for every secret.
+     * Lightweight list used by synchronization.
+     * Passwords are deliberately excluded from the full scan.
      */
     private function readSecretsForSync(Router $router): array
     {
@@ -106,20 +106,31 @@ class MikroTikService
         $query = new Query('/ppp/secret/print');
         $query->where('name', $username);
         $query->equal('.proplist', '.id,name,service,profile,disabled');
-
         $result = $this->connect($router)->query($query)->read();
         return $result[0] ?? null;
     }
 
     public function getSecrets(Router $router): array
     {
-        // Keep the existing behaviour for callers outside sync.
-        $secrets = $this->readSecrets($router);
+        // Use the lightweight scan so synchronization does not request every password.
+        $secrets = $this->readSecretsForSync($router);
+
         $byName = [];
         foreach ($secrets as $secret) {
-            if (!empty($secret['name'])) $byName[$secret['name']] = $secret;
+            if (!empty($secret['name'])) {
+                $byName[$secret['name']] = $secret;
+            }
         }
 
+        // Existing customers keep their database password; this avoids one
+        // password lookup per existing PPP secret during synchronization.
+        $dbPasswords = Pelanggan::where('router_id', $router->id)
+            ->whereNotNull('username_pppoe')
+            ->where('username_pppoe', '!=', '')
+            ->pluck('password_pppoe', 'username_pppoe')
+            ->toArray();
+
+        // Existing database customers whose PPP Secret is missing are still restored.
         $pelanggans = Pelanggan::where('router_id', $router->id)
             ->whereNotNull('username_pppoe')
             ->where('username_pppoe', '!=', '')
@@ -155,6 +166,7 @@ class MikroTikService
                     $pelanggan->mikrotik_secret_id = $created['.id'] ?? null;
                     $pelanggan->save();
                     $byName[$username] = $created;
+                    $secrets[] = $created;
 
                     if (($pelanggan->status ?? '') === 'Aktif') {
                         $this->enableSecretById($router, $created['.id']);
@@ -167,7 +179,20 @@ class MikroTikService
             }
         }
 
-        return $this->readSecrets($router);
+        // Preserve the password field expected by the existing sync/import code.
+        foreach ($secrets as &$secret) {
+            $username = trim((string) ($secret['name'] ?? ''));
+            if ($username === '') continue;
+
+            if (array_key_exists($username, $dbPasswords) && $dbPasswords[$username] !== null) {
+                $secret['password'] = (string) $dbPasswords[$username];
+            } elseif (!array_key_exists('password', $secret)) {
+                $secret['password'] = $this->readSecretPasswordByName($router, $username) ?? '';
+            }
+        }
+        unset($secret);
+
+        return $secrets;
     }
 
     public function getSecretByName(Router $router, string $username): ?array
@@ -177,10 +202,11 @@ class MikroTikService
 
     public function getSecretById(Router $router, string $id): ?array
     {
-        foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['.id'] ?? '') === $id) return $secret;
-        }
-        return null;
+        $query = new Query('/ppp/secret/print');
+        $query->equal('.id', $id);
+        $query->equal('.proplist', '.id,name,password,service,profile,disabled');
+        $result = $this->connect($router)->query($query)->read();
+        return $result[0] ?? null;
     }
 
     public function createSecret(Router $router, string $username, string $password, string $profile, string $service = 'pppoe'): string
