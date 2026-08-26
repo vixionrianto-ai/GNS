@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\RouterController as WebRouterController;
 use App\Models\Router;
 use Illuminate\Http\Request;
+use RouterOS\Client;
+use RouterOS\Config;
+use RouterOS\Query;
 
 class RouterController extends Controller
 {
@@ -36,7 +39,32 @@ class RouterController extends Controller
 
     public function test($router)
     {
-        return $this->normalize(app(WebRouterController::class)->test($router));
+        $routerRecord = Router::findOrFail($router);
+
+        try {
+            $client = new Client(new Config([
+                'host' => $routerRecord->ip_router,
+                'user' => $routerRecord->username,
+                'pass' => $routerRecord->password,
+                'port' => $routerRecord->api_port,
+            ]));
+
+            $result = $client->query(new Query('/system/resource/print'))->read();
+            $resource = $result[0] ?? [];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Berhasil terhubung : ' .
+                    ($resource['board-name'] ?? 'Router MikroTik') .
+                    ' | RouterOS ' .
+                    ($resource['version'] ?? '-'),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Koneksi MikroTik gagal: ' . $e->getMessage(),
+            ], 422);
+        }
     }
 
     public function pppSecret($router)
