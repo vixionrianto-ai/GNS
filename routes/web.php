@@ -9,17 +9,6 @@ use App\Http\Controllers\PelangganController;
 use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\DashboardController;
-use App\Models\Router;
-use App\Services\MikroTikService;
-
-Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
-    $router = Router::first();
-
-    dd([
-        'identity' => $mikrotik->getIdentity($router),
-        'version' => $mikrotik->getRouterVersion($router),
-    ]);
-})->middleware('auth');
 
 Route::get('/', function () {
     if (Auth::check()) {
