@@ -1,7 +1,8 @@
 <?php
 
 return [
-    'enabled' => (bool) env('WHATSAPP_ENABLED', true),
+    // Otomatis WhatsApp sengaja OFF sampai diaktifkan oleh admin.
+    'enabled' => (bool) env('WHATSAPP_ENABLED', false),
     'provider' => env('WHATSAPP_PROVIDER', 'fonnte'),
     'fonnte' => [
         'token' => env('WHATSAPP_FONNTE_TOKEN'),
