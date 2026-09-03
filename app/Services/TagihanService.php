@@ -6,11 +6,12 @@ use App\Models\Pelanggan;
 use App\Models\Tagihan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TagihanService
 {
     /**
-     * Generate nomor invoice
+     * Generate nomor invoice.
      * Contoh: INV-202607-00001
      */
     public function generateInvoiceNumber(): string
@@ -41,15 +42,19 @@ class TagihanService
     public function generate(Pelanggan $pelanggan): Tagihan
     {
         if (empty($pelanggan->tanggal_aktif)) {
-            throw new \Exception(
+            throw new \InvalidArgumentException(
                 "Pelanggan {$pelanggan->nama} belum memiliki tanggal aktif."
             );
         }
 
-        $tanggalAktif = Carbon::parse($pelanggan->tanggal_aktif);
-        $hariTagihan = $tanggalAktif->day;
-        $hariIni = Carbon::today();
+        if (!$pelanggan->paket) {
+            throw new \InvalidArgumentException(
+                "Pelanggan {$pelanggan->nama} belum memiliki paket."
+            );
+        }
 
+        $tanggalAktif = Carbon::parse($pelanggan->tanggal_aktif);
+        $hariIni = Carbon::today();
         $periode = $hariIni->format('Y-m');
 
         $exists = Tagihan::where('pelanggan_id', $pelanggan->id)
@@ -57,7 +62,7 @@ class TagihanService
             ->exists();
 
         if ($exists) {
-            throw new \Exception(
+            throw new \RuntimeException(
                 "Tagihan periode {$periode} sudah ada."
             );
         }
@@ -68,7 +73,7 @@ class TagihanService
             1
         )->daysInMonth;
 
-        $hariTagihan = min($hariTagihan, $jumlahHariBulanIni);
+        $hariTagihan = min($tanggalAktif->day, $jumlahHariBulanIni);
 
         $tanggalTagihan = Carbon::create(
             $hariIni->year,
@@ -76,11 +81,8 @@ class TagihanService
             $hariTagihan
         );
 
-        $tanggalJatuhTempo = $tanggalTagihan
-            ->copy()
-            ->addDays(10);
-
-        $nominal = $pelanggan->paket->harga;
+        $tanggalJatuhTempo = $tanggalTagihan->copy()->addDays(10);
+        $nominal = (float) $pelanggan->paket->harga;
 
         return DB::transaction(function () use (
             $pelanggan,
@@ -89,6 +91,19 @@ class TagihanService
             $tanggalJatuhTempo,
             $nominal
         ) {
+            // Re-check inside the transaction so a concurrent manual/cron
+            // generation cannot create the same customer's period twice.
+            $exists = Tagihan::where('pelanggan_id', $pelanggan->id)
+                ->where('periode', $periode)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($exists) {
+                throw new \RuntimeException(
+                    "Tagihan periode {$periode} sudah ada."
+                );
+            }
+
             return Tagihan::create([
                 'pelanggan_id' => $pelanggan->id,
                 'invoice_no' => $this->generateInvoiceNumber(),
@@ -126,15 +141,28 @@ class TagihanService
                 continue;
             }
 
-            if (Carbon::parse($pelanggan->tanggal_aktif)->day != $hariIni) {
+            if (Carbon::parse($pelanggan->tanggal_aktif)->day !== $hariIni) {
                 continue;
             }
 
             try {
                 $this->generate($pelanggan);
                 $jumlah++;
-            } catch (\Exception $e) {
-                continue;
+            } catch (\RuntimeException $e) {
+                // Duplicate generation is expected when cron and a manual
+                // trigger overlap. Other runtime errors are logged below.
+                if (!str_contains($e->getMessage(), 'sudah ada')) {
+                    Log::error('Generate tagihan gagal', [
+                        'pelanggan_id' => $pelanggan->id,
+                        'message' => $e->getMessage(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Generate tagihan gagal', [
+                    'pelanggan_id' => $pelanggan->id,
+                    'message' => $e->getMessage(),
+                    'exception' => $e::class,
+                ]);
             }
         }
 
