@@ -5,10 +5,10 @@ use App\Models\Pelanggan;
 use App\Models\Router;
 use App\Models\Tagihan;
 use App\Models\User;
+use App\Services\InvoiceService;
 use App\Services\MikroTikService;
 use App\Services\PembayaranService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
 use Exception;
 
 uses(RefreshDatabase::class);
@@ -64,6 +64,8 @@ it('still saves payment when MikroTik update fails', function () {
         'nominal' => 10000,
         'denda' => 1000,
         'total' => 11000,
+        'dibayar' => 0,
+        'sisa' => 11000,
         'status' => Tagihan::STATUS_BELUM_BAYAR,
     ]);
 
@@ -81,7 +83,7 @@ it('still saves payment when MikroTik update fails', function () {
         }
     };
 
-    $service = new PembayaranService($mikrotik);
+    $service = new PembayaranService($mikrotik, new InvoiceService());
 
     $pembayaran = $service->bayar([
         'tagihan_id' => $tagihan->id,
@@ -94,5 +96,7 @@ it('still saves payment when MikroTik update fails', function () {
     expect($pembayaran->exists)->toBeTrue();
     $tagihan->refresh();
     expect($tagihan->status)->toBe(Tagihan::STATUS_LUNAS);
+    expect((float) $tagihan->dibayar)->toBe(11500.0);
+    expect((float) $tagihan->sisa)->toBe(0.0);
     expect((float) $pembayaran->total_bayar)->toBe(11500.0);
 });
