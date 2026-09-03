@@ -57,45 +57,21 @@ class TagihanService
         $hariIni = Carbon::today();
         $periode = $hariIni->format('Y-m');
 
-        $exists = Tagihan::where('pelanggan_id', $pelanggan->id)
-            ->where('periode', $periode)
-            ->exists();
-
-        if ($exists) {
-            throw new \RuntimeException(
-                "Tagihan periode {$periode} sudah ada."
-            );
-        }
-
-        $jumlahHariBulanIni = Carbon::create(
-            $hariIni->year,
-            $hariIni->month,
-            1
-        )->daysInMonth;
-
-        $hariTagihan = min($tanggalAktif->day, $jumlahHariBulanIni);
-
-        $tanggalTagihan = Carbon::create(
-            $hariIni->year,
-            $hariIni->month,
-            $hariTagihan
-        );
-
-        $tanggalJatuhTempo = $tanggalTagihan->copy()->addDays(10);
-        $nominal = (float) $pelanggan->paket->harga;
-
         return DB::transaction(function () use (
             $pelanggan,
             $periode,
-            $tanggalTagihan,
-            $tanggalJatuhTempo,
-            $nominal
+            $tanggalAktif,
+            $hariIni
         ) {
-            // Re-check inside the transaction so a concurrent manual/cron
-            // generation cannot create the same customer's period twice.
-            $exists = Tagihan::where('pelanggan_id', $pelanggan->id)
-                ->where('periode', $periode)
+            // Lock the customer row so cron/manual generation for the same
+            // customer cannot pass the duplicate check concurrently.
+            $pelangganTerkunci = Pelanggan::query()
+                ->whereKey($pelanggan->id)
                 ->lockForUpdate()
+                ->firstOrFail();
+
+            $exists = Tagihan::where('pelanggan_id', $pelangganTerkunci->id)
+                ->where('periode', $periode)
                 ->exists();
 
             if ($exists) {
@@ -104,8 +80,32 @@ class TagihanService
                 );
             }
 
+            $paket = $pelangganTerkunci->paket;
+            if (!$paket) {
+                throw new \InvalidArgumentException(
+                    "Pelanggan {$pelangganTerkunci->nama} belum memiliki paket."
+                );
+            }
+
+            $jumlahHariBulanIni = Carbon::create(
+                $hariIni->year,
+                $hariIni->month,
+                1
+            )->daysInMonth;
+
+            $hariTagihan = min($tanggalAktif->day, $jumlahHariBulanIni);
+
+            $tanggalTagihan = Carbon::create(
+                $hariIni->year,
+                $hariIni->month,
+                $hariTagihan
+            );
+
+            $tanggalJatuhTempo = $tanggalTagihan->copy()->addDays(10);
+            $nominal = (float) $paket->harga;
+
             return Tagihan::create([
-                'pelanggan_id' => $pelanggan->id,
+                'pelanggan_id' => $pelangganTerkunci->id,
                 'invoice_no' => $this->generateInvoiceNumber(),
                 'periode' => $periode,
                 'bulan' => $tanggalTagihan->month,
