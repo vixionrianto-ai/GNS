@@ -14,10 +14,8 @@ class PembayaranService
     protected MikroTikService $mikrotik;
     protected InvoiceService $invoiceService;
 
-    public function __construct(
-        MikroTikService $mikrotik,
-        InvoiceService $invoiceService
-    ) {
+    public function __construct(MikroTikService $mikrotik, InvoiceService $invoiceService)
+    {
         $this->mikrotik = $mikrotik;
         $this->invoiceService = $invoiceService;
     }
@@ -25,23 +23,25 @@ class PembayaranService
     public function bayar(array $data): Pembayaran
     {
         return DB::transaction(function () use ($data) {
-            $tagihan = Tagihan::with(['pelanggan.router'])->findOrFail($data['tagihan_id']);
+            $tagihan = Tagihan::query()->with(['pelanggan.router'])->whereKey($data['tagihan_id'])->lockForUpdate()->firstOrFail();
+            $tagihan->refreshStatus();
+            $tagihan = $tagihan->fresh(['pelanggan.router']);
 
             if ($tagihan->status === Tagihan::STATUS_LUNAS) {
                 throw new Exception('Tagihan sudah lunas.');
             }
 
             $biayaAdmin = (float) ($data['biaya_admin'] ?? 0);
-            $total = (float) $tagihan->nominal + (float) $tagihan->denda + $biayaAdmin;
+            $nominalTagihan = (float) $tagihan->getTotalTagihan();
+            $total = $nominalTagihan + $biayaAdmin;
+            $dibayar = (float) $data['dibayar'];
 
-            if ((float) $data['dibayar'] < $total) {
+            if ($dibayar < $total) {
                 throw new Exception('Nominal pembayaran kurang.');
             }
 
-            $invoiceNo = $this->invoiceService->generate();
-
             $pembayaran = Pembayaran::create([
-                'invoice_no' => $invoiceNo,
+                'invoice_no' => $this->invoiceService->generate(),
                 'invoice_date' => now(),
                 'invoice_pdf' => null,
                 'public_token' => Str::random(64),
@@ -49,11 +49,11 @@ class PembayaranService
                 'user_id' => Auth::id(),
                 'tanggal_bayar' => now(),
                 'metode' => $data['metode'],
-                'nominal' => $tagihan->nominal,
+                'nominal' => $nominalTagihan,
                 'biaya_admin' => $biayaAdmin,
                 'total_bayar' => $total,
-                'dibayar' => $data['dibayar'],
-                'kembalian' => (float) $data['dibayar'] - $total,
+                'dibayar' => $dibayar,
+                'kembalian' => $dibayar - $total,
                 'status' => Pembayaran::STATUS_BERHASIL,
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
@@ -61,23 +61,15 @@ class PembayaranService
             $tagihan->update([
                 'status' => Tagihan::STATUS_LUNAS,
                 'tanggal_bayar' => now(),
-                'dibayar' => $total,
+                'dibayar' => $nominalTagihan,
                 'sisa' => 0,
             ]);
 
             $pelanggan = $tagihan->pelanggan;
-
             if ($pelanggan && $pelanggan->mikrotik_secret_id) {
                 try {
-                    $this->mikrotik->enableSecretById(
-                        $pelanggan->router,
-                        $pelanggan->mikrotik_secret_id
-                    );
-
-                    $this->mikrotik->disconnectActiveSessionBySecretId(
-                        $pelanggan->router,
-                        $pelanggan->mikrotik_secret_id
-                    );
+                    $this->mikrotik->enableSecretById($pelanggan->router, $pelanggan->mikrotik_secret_id);
+                    $this->mikrotik->disconnectActiveSessionBySecretId($pelanggan->router, $pelanggan->mikrotik_secret_id);
                 } catch (\Throwable $e) {
                     \Log::warning('Gagal memperbarui status PPP secret saat pembayaran', [
                         'tagihan_id' => $tagihan->id,
