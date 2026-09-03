@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
-use App\Services\InvoiceService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Exception;
 
 class PembayaranService
@@ -22,24 +22,19 @@ class PembayaranService
         $this->invoiceService = $invoiceService;
     }
 
-    /**
-     * Proses pembayaran tagihan.
-     */
     public function bayar(array $data): Pembayaran
     {
         return DB::transaction(function () use ($data) {
-            $tagihan = Tagihan::with([
-                'pelanggan.router'
-            ])->findOrFail($data['tagihan_id']);
+            $tagihan = Tagihan::with(['pelanggan.router'])->findOrFail($data['tagihan_id']);
 
             if ($tagihan->status === Tagihan::STATUS_LUNAS) {
                 throw new Exception('Tagihan sudah lunas.');
             }
 
             $biayaAdmin = (float) ($data['biaya_admin'] ?? 0);
-            $total = $tagihan->nominal + $tagihan->denda + $biayaAdmin;
+            $total = (float) $tagihan->nominal + (float) $tagihan->denda + $biayaAdmin;
 
-            if ($data['dibayar'] < $total) {
+            if ((float) $data['dibayar'] < $total) {
                 throw new Exception('Nominal pembayaran kurang.');
             }
 
@@ -49,6 +44,7 @@ class PembayaranService
                 'invoice_no' => $invoiceNo,
                 'invoice_date' => now(),
                 'invoice_pdf' => null,
+                'public_token' => Str::random(64),
                 'tagihan_id' => $tagihan->id,
                 'user_id' => Auth::id(),
                 'tanggal_bayar' => now(),
@@ -57,19 +53,11 @@ class PembayaranService
                 'biaya_admin' => $biayaAdmin,
                 'total_bayar' => $total,
                 'dibayar' => $data['dibayar'],
-                'kembalian' => $data['dibayar'] - $total,
+                'kembalian' => (float) $data['dibayar'] - $total,
                 'status' => Pembayaran::STATUS_BERHASIL,
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | UPDATE TAGIHAN
-            |--------------------------------------------------------------------------
-            | Pembayaran pada flow lama memang harus lunas. Nilai dibayar pada
-            | Tagihan dicatat sebesar kewajiban yang tertutup, bukan uang kembalian.
-            |--------------------------------------------------------------------------
-            */
             $tagihan->update([
                 'status' => Tagihan::STATUS_LUNAS,
                 'tanggal_bayar' => now(),
@@ -77,17 +65,9 @@ class PembayaranService
                 'sisa' => 0,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | AKTIFKAN SECRET MIKROTIK
-            |--------------------------------------------------------------------------
-            */
             $pelanggan = $tagihan->pelanggan;
 
-            if (
-                $pelanggan &&
-                $pelanggan->mikrotik_secret_id
-            ) {
+            if ($pelanggan && $pelanggan->mikrotik_secret_id) {
                 try {
                     $this->mikrotik->enableSecretById(
                         $pelanggan->router,
