@@ -11,20 +11,17 @@ use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\DashboardController;
 
-
-
 use App\Models\Router;
 use App\Services\MikroTikService;
 
 Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
-
     $router = Router::first();
 
     dd([
         'identity' => $mikrotik->getIdentity($router),
         'version' => $mikrotik->getRouterVersion($router),
     ]);
-});
+})->middleware('auth');
 
 /*
 |--------------------------------------------------------------------------
@@ -51,7 +48,6 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 */
 
 Route::middleware('auth')->group(function () {
-
     /*
     |--------------------------------------------------------------------------
     | ROUTER
@@ -60,9 +56,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('router', RouterController::class);
 
-    // Test koneksi
-    Route::get('/router/{id}/test',
-        [RouterController::class, 'test'])
+    Route::get('/router/{id}/test', [RouterController::class, 'test'])
         ->name('router.test');
 
     /*
@@ -71,36 +65,28 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/router/{id}/ppp-secret',
-        [RouterController::class, 'pppSecret'])
+    Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])
         ->name('router.pppsecret');
 
-    Route::get('/router/{id}/ppp-secret/create',
-        [RouterController::class, 'createSecret'])
+    Route::get('/router/{id}/ppp-secret/create', [RouterController::class, 'createSecret'])
         ->name('router.pppsecret.create');
 
-    Route::post('/router/{id}/ppp-secret/store',
-        [RouterController::class, 'storeSecret'])
+    Route::post('/router/{id}/ppp-secret/store', [RouterController::class, 'storeSecret'])
         ->name('router.pppsecret.store');
 
-    Route::get('/router/{id}/ppp-secret/{username}/edit',
-        [RouterController::class, 'editSecret'])
+    Route::get('/router/{id}/ppp-secret/{username}/edit', [RouterController::class, 'editSecret'])
         ->name('router.pppsecret.edit');
 
-    Route::put('/router/{id}/ppp-secret/{secret}',
-        [RouterController::class, 'updateSecret'])
+    Route::put('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'updateSecret'])
         ->name('router.pppsecret.update');
 
-    Route::delete('/router/{id}/ppp-secret/{secret}',
-        [RouterController::class, 'deleteSecret'])
+    Route::delete('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'deleteSecret'])
         ->name('router.pppsecret.delete');
 
-    Route::put('/router/{id}/ppp-secret/{secret}/enable',
-        [RouterController::class, 'enableSecret'])
+    Route::put('/router/{id}/ppp-secret/{secret}/enable', [RouterController::class, 'enableSecret'])
         ->name('router.pppsecret.enable');
 
-    Route::put('/router/{id}/ppp-secret/{secret}/disable',
-        [RouterController::class, 'disableSecret'])
+    Route::put('/router/{id}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret'])
         ->name('router.pppsecret.disable');
 
     /*
@@ -109,28 +95,22 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/router/{id}/ppp-profile',
-        [RouterController::class, 'pppProfile'])
+    Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])
         ->name('router.pppprofile');
 
-    Route::get('/router/{id}/ppp-profile/create',
-        [RouterController::class, 'createProfile'])
+    Route::get('/router/{id}/ppp-profile/create', [RouterController::class, 'createProfile'])
         ->name('router.pppprofile.create');
 
-    Route::post('/router/{id}/ppp-profile/store',
-        [RouterController::class, 'storeProfile'])
+    Route::post('/router/{id}/ppp-profile/store', [RouterController::class, 'storeProfile'])
         ->name('router.pppprofile.store');
 
-    Route::get('/router/{id}/ppp-profile/{profile}/edit',
-        [RouterController::class, 'editProfile'])
+    Route::get('/router/{id}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile'])
         ->name('router.pppprofile.edit');
 
-    Route::put('/router/{id}/ppp-profile/{profile}',
-        [RouterController::class, 'updateProfile'])
+    Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])
         ->name('router.pppprofile.update');
 
-    Route::delete('/router/{id}/ppp-profile/{profile}',
-        [RouterController::class, 'deleteProfile'])
+    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])
         ->name('router.pppprofile.delete');
 
     /*
@@ -141,8 +121,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('paket', PaketController::class);
 
-    Route::get('/router/{router}/profiles',
-        [PaketController::class, 'getProfiles'])
+    Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])
         ->name('paket.getProfiles');
 
     /*
@@ -153,8 +132,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('pelanggan', PelangganController::class);
 
-    Route::post('/pelanggan/sync',
-        [PelangganController::class, 'sync'])
+    Route::post('/pelanggan/sync', [PelangganController::class, 'sync'])
         ->name('pelanggan.sync');
 
     /*
@@ -164,15 +142,9 @@ Route::middleware('auth')->group(function () {
     */
 
     Route::resource('tagihan', TagihanController::class)
-        ->except([
-            'create',
-            'store',
-            'edit',
-            'update'
-        ]);
+        ->except(['create', 'store', 'edit', 'update']);
 
-    Route::post('/tagihan/generate-harian',
-        [TagihanController::class, 'generate'])
+    Route::post('/tagihan/generate-harian', [TagihanController::class, 'generate'])
         ->name('tagihan.generate');
 
     /*
@@ -180,45 +152,33 @@ Route::middleware('auth')->group(function () {
     | PEMBAYARAN
     |--------------------------------------------------------------------------
     */
-    Route::get(
-        '/tagihan/{tagihan}/bayar',
-        [PembayaranController::class, 'create']
-    )->name('pembayaran.create');
+
+    Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create'])
+        ->name('pembayaran.create');
 
     Route::resource('pembayaran', PembayaranController::class)
-        ->only([
-            'index',
-            'show',
-            'store',
-        ]);
-        Route::get(
-            '/pembayaran/{pembayaran}/invoice',
-            [PembayaranController::class, 'invoice']
-        )->name('pembayaran.invoice');
+        ->only(['index', 'show', 'store']);
 
-        Route::get(
-            '/pembayaran/{pembayaran}/pdf',
-            [PembayaranController::class, 'pdf']
-        )->name('pembayaran.pdf');
-        
+    Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice'])
+        ->name('pembayaran.invoice');
+
+    Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf'])
+        ->name('pembayaran.pdf');
+
     /*
     |--------------------------------------------------------------------------
     | PROFILE
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/profile',
-        [ProfileController::class, 'edit'])
+    Route::get('/profile', [ProfileController::class, 'edit'])
         ->name('profile.edit');
 
-    Route::patch('/profile',
-        [ProfileController::class, 'update'])
+    Route::patch('/profile', [ProfileController::class, 'update'])
         ->name('profile.update');
 
-    Route::delete('/profile',
-        [ProfileController::class, 'destroy'])
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
-
 });
 
 /*
