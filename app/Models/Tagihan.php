@@ -52,25 +52,25 @@ class Tagihan extends Model
     public function getTotalTagihan(): float
     {
         $total = (float) ($this->total ?? 0);
-        return $total > 0 ? $total : (float) ($this->nominal ?? 0) + (float) ($this->denda ?? 0);
+
+        return $total > 0
+            ? $total
+            : (float) ($this->nominal ?? 0) + (float) ($this->denda ?? 0);
     }
 
     public function getTotalDibayar(): float
     {
-        $allocated = $this->relationLoaded('alokasi')
-            ? (float) $this->alokasi->sum('nominal')
-            : (float) $this->alokasi()->sum('nominal');
+        // Allocation is only considered paid when its parent payment succeeded.
+        // This prevents a failed/cancelled payment allocation from making an
+        // invoice appear partially or fully paid.
+        $allocated = (float) $this->alokasi()
+            ->whereHas('pembayaran', function ($query) {
+                $query->where('status', Pembayaran::STATUS_BERHASIL);
+            })
+            ->sum('nominal');
 
         if ($allocated > 0) {
             return $allocated;
-        }
-
-        if ($this->relationLoaded('pembayaran')) {
-            return (float) $this->pembayaran
-                ->where('status', Pembayaran::STATUS_BERHASIL)
-                ->sum(fn ($pembayaran) =>
-                    (float) ($pembayaran->dibayar ?: $pembayaran->nominal ?: $pembayaran->total_bayar ?: 0)
-                );
         }
 
         return (float) $this->pembayaran()
@@ -93,7 +93,11 @@ class Tagihan extends Model
         $sisa = max(0, $total - $dibayar);
 
         if ($this->status === self::STATUS_DIBATALKAN) {
-            $this->update(['dibayar' => $dibayar, 'sisa' => $sisa]);
+            $this->update([
+                'dibayar' => $dibayar,
+                'sisa' => $sisa,
+            ]);
+
             return $this->fresh();
         }
 
