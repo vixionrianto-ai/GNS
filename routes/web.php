@@ -14,9 +14,8 @@ use App\Services\MikroTikService;
 
 Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
     $router = Router::first();
-    abort_unless($router, 404, 'Router belum tersedia.');
 
-    return response()->json([
+    dd([
         'identity' => $mikrotik->getIdentity($router),
         'version' => $mikrotik->getRouterVersion($router),
     ]);
@@ -44,7 +43,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/router/{id}/test', [RouterController::class, 'test'])
         ->name('router.test');
-
     Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])
         ->name('router.pppsecret');
     Route::get('/router/{id}/ppp-secret/create', [RouterController::class, 'createSecret'])
@@ -97,12 +95,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf'])
         ->name('pembayaran.pdf');
 
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 require __DIR__.'/auth.php';
