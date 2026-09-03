@@ -8,59 +8,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pembayaran extends Model
 {
-    /*
-    |--------------------------------------------------------------------------
-    | STATUS PEMBAYARAN
-    |--------------------------------------------------------------------------
-    */
-
     public const STATUS_BERHASIL = 'Berhasil';
     public const STATUS_PENDING = 'Pending';
     public const STATUS_DIBATALKAN = 'Dibatalkan';
 
-    /*
-    |--------------------------------------------------------------------------
-    | MASS ASSIGNMENT
-    |--------------------------------------------------------------------------
-    */
-
     protected $fillable = [
-        'invoice_no',
-        'invoice_date',
-        'invoice_pdf',
-        'tagihan_id',
-        'user_id',
-        'tanggal_bayar',
-        'metode',
-        'nominal',
-        'biaya_admin',
-        'total_bayar',
-        'dibayar',
-        'kembalian',
-        'status',
-        'keterangan',
+        'invoice_no', 'invoice_date', 'invoice_pdf', 'public_token',
+        'tagihan_id', 'user_id', 'tanggal_bayar', 'metode', 'nominal',
+        'biaya_admin', 'total_bayar', 'dibayar', 'kembalian', 'status', 'keterangan',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | CAST
-    |--------------------------------------------------------------------------
-    */
 
     protected $casts = [
         'tanggal_bayar' => 'date',
+        'invoice_date' => 'date',
         'nominal' => 'decimal:2',
         'biaya_admin' => 'decimal:2',
         'total_bayar' => 'decimal:2',
         'dibayar' => 'decimal:2',
         'kembalian' => 'decimal:2',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | RELATION
-    |--------------------------------------------------------------------------
-    */
 
     public function tagihan(): BelongsTo
     {
@@ -76,12 +42,6 @@ class Pembayaran extends Model
     {
         return $this->hasMany(AlokasiPembayaran::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | HELPER
-    |--------------------------------------------------------------------------
-    */
 
     public function isBerhasil(): bool
     {
