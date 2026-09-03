@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pembayaran extends Model
 {
@@ -14,9 +15,7 @@ class Pembayaran extends Model
     */
 
     public const STATUS_BERHASIL = 'Berhasil';
-
     public const STATUS_PENDING = 'Pending';
-
     public const STATUS_DIBATALKAN = 'Dibatalkan';
 
     /*
@@ -26,11 +25,9 @@ class Pembayaran extends Model
     */
 
     protected $fillable = [
-
         'invoice_no',
         'invoice_date',
         'invoice_pdf',
-
         'tagihan_id',
         'user_id',
         'tanggal_bayar',
@@ -42,7 +39,6 @@ class Pembayaran extends Model
         'kembalian',
         'status',
         'keterangan',
-
     ];
 
     /*
@@ -52,19 +48,12 @@ class Pembayaran extends Model
     */
 
     protected $casts = [
-
         'tanggal_bayar' => 'date',
-
         'nominal' => 'decimal:2',
-
         'biaya_admin' => 'decimal:2',
-
         'total_bayar' => 'decimal:2',
-
         'dibayar' => 'decimal:2',
-
         'kembalian' => 'decimal:2',
-
     ];
 
     /*
@@ -81,6 +70,11 @@ class Pembayaran extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function alokasi(): HasMany
+    {
+        return $this->hasMany(AlokasiPembayaran::class);
     }
 
     /*
