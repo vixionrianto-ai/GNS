@@ -10,27 +10,16 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PembayaranController extends Controller
 {
-    /**
-     * Riwayat pembayaran
-     */
     public function index()
     {
         $pembayarans = Pembayaran::with([
             'tagihan.pelanggan',
             'user',
-        ])
-        ->latest()
-        ->paginate(15);
+        ])->latest()->paginate(15);
 
-        return view(
-            'pembayaran.index',
-            compact('pembayarans')
-        );
+        return view('pembayaran.index', compact('pembayarans'));
     }
 
-    /**
-     * Detail pembayaran
-     */
     public function show(Pembayaran $pembayaran)
     {
         $pembayaran->load([
@@ -39,14 +28,9 @@ class PembayaranController extends Controller
             'user',
         ]);
 
-        return view(
-            'pembayaran.show',
-            compact('pembayaran')
-        );
+        return view('pembayaran.show', compact('pembayaran'));
     }
-    /**
-     * Halaman Invoice
-     */
+
     public function invoice(Pembayaran $pembayaran)
     {
         $pembayaran->load([
@@ -55,68 +39,62 @@ class PembayaranController extends Controller
             'user',
         ]);
 
-        return view(
-            'pembayaran.invoice',
-            compact('pembayaran')
-        );
+        return view('pembayaran.invoice', compact('pembayaran'));
     }
 
-/**
- * Download PDF
- */
-public function pdf(Pembayaran $pembayaran)
-{
-    $pembayaran->load([
-        'tagihan.pelanggan.paket',
-        'tagihan.pelanggan.router',
-        'user',
-    ]);
+    public function pdf(Pembayaran $pembayaran)
+    {
+        $pembayaran->load([
+            'tagihan.pelanggan.paket',
+            'tagihan.pelanggan.router',
+            'user',
+        ]);
 
-    $pdf = Pdf::loadView(
-        'pembayaran.pdf',
-        compact('pembayaran')
-    );
+        $pdf = Pdf::loadView('pembayaran.pdf', compact('pembayaran'));
+        $pdf->setPaper('A4', 'portrait');
 
-    $pdf->setPaper('A4', 'portrait');
+        return $pdf->download('Invoice-' . $pembayaran->invoice_no . '.pdf');
+    }
 
-    return $pdf->download(
-        'Invoice-'.$pembayaran->invoice_no.'.pdf'
-    );
-}
     /**
-     * Form pembayaran
+     * PDF invoice publik menggunakan token acak.
+     * Tidak memakai middleware auth agar link WhatsApp dapat dibuka pelanggan.
      */
+    public function publicPdf(string $token)
+    {
+        $pembayaran = Pembayaran::where('public_token', $token)
+            ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->firstOrFail();
+
+        $pembayaran->load([
+            'tagihan.pelanggan.paket',
+            'tagihan.pelanggan.router',
+            'user',
+        ]);
+
+        $pdf = Pdf::loadView('pembayaran.pdf', compact('pembayaran'));
+        $pdf->setPaper('A4', 'portrait');
+
+        return $pdf->download('Invoice-' . $pembayaran->invoice_no . '.pdf');
+    }
+
     public function create(Tagihan $tagihan)
     {
-        return view(
-            'pembayaran.create',
-            compact('tagihan')
-        );
+        return view('pembayaran.create', compact('tagihan'));
     }
 
-    /**
-     * Simpan pembayaran
-     */
     public function store(
-    PembayaranRequest $request,
-    PembayaranService $service
+        PembayaranRequest $request,
+        PembayaranService $service
     ) {
         try {
+            $pembayaran = $service->bayar($request->validated());
 
-            $pembayaran = $service->bayar(
-                $request->validated()
-            );
-
-            return redirect()->route(
-                'pembayaran.invoice',
-                $pembayaran
-            );
+            return redirect()->route('pembayaran.invoice', $pembayaran);
         } catch (\Throwable $e) {
             return back()
                 ->withInput()
-                ->withErrors([
-                    'message' => $e->getMessage(),
-                ]);
+                ->withErrors(['message' => $e->getMessage()]);
         }
     }
 }
