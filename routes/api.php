@@ -43,6 +43,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create']);
         Route::apiResource('pembayaran', PembayaranController::class)->only(['index', 'show', 'store']);
+        Route::post('/pembayaran/{pembayaran}/cancel', [PembayaranController::class, 'cancel']);
         Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice']);
         Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf']);
     });
