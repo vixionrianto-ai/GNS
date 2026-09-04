@@ -27,96 +27,40 @@ class TagihanController extends Controller
             'pelanggan.paket'
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Filter Status
-        |--------------------------------------------------------------------------
-        */
-
         if ($request->filled('status')) {
-
-            $query->where(
-                'status',
-                $request->status
-            );
-
+            $query->where('status', $request->status);
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Filter Periode
-        |--------------------------------------------------------------------------
-        */
 
         if ($request->filled('periode')) {
-
-            $query->where(
-                'periode',
-                $request->periode
-            );
-
+            $query->where('periode', $request->periode);
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Search
-        |--------------------------------------------------------------------------
-        */
 
         if ($request->filled('search')) {
-
-            $query->whereHas(
-                'pelanggan',
-                function ($q) use ($request) {
-
-                    $q->where(
-                        'nama',
-                        'like',
-                        '%' .
-                        $request->search .
-                        '%'
-                    );
-
-                }
-            );
-
+            $query->whereHas('pelanggan', function ($q) use ($request) {
+                $q->where('nama', 'like', '%' . $request->search . '%');
+            });
         }
 
-        $tagihans = $query
-            ->latest()
-            ->paginate(20);
+        $tagihans = $query->latest()->paginate(20);
 
-        return view(
-            'tagihan.index',
-            compact('tagihans')
-        );
+        return view('tagihan.index', compact('tagihans'));
     }
+
     /**
      * Generate tagihan harian
      */
     public function generate()
     {
         try {
-
-            $jumlah = $this->tagihanService
-                ->generateHarian();
+            $jumlah = $this->tagihanService->generateHarian();
 
             return redirect()
                 ->route('tagihan.index')
-                ->with(
-                    'success',
-                    "{$jumlah} tagihan berhasil dibuat."
-                );
-
+                ->with('success', "{$jumlah} tagihan berhasil dibuat.");
         } catch (\Exception $e) {
-
             return redirect()
                 ->route('tagihan.index')
-                ->with(
-                    'error',
-                    $e->getMessage()
-                );
-
+                ->with('error', $e->getMessage());
         }
     }
 
@@ -131,37 +75,34 @@ class TagihanController extends Controller
             'pelanggan.router',
         ]);
 
-        return view(
-            'tagihan.show',
-            compact('tagihan')
-        );
+        return view('tagihan.show', compact('tagihan'));
     }
 
     /**
      * Hapus Tagihan
+     *
+     * Invoice yang sudah memiliki riwayat pembayaran tidak boleh dihapus.
+     * Menghapusnya akan menghilangkan jejak finansial dan, karena FK alokasi
+     * menggunakan cascade, juga dapat menghapus data alokasi pembayaran.
      */
     public function destroy(Tagihan $tagihan)
     {
         try {
+            if ($tagihan->pembayaran()->exists()) {
+                return redirect()
+                    ->route('tagihan.index')
+                    ->with('error', 'Tagihan tidak dapat dihapus karena sudah memiliki riwayat pembayaran.');
+            }
 
             $tagihan->delete();
 
             return redirect()
                 ->route('tagihan.index')
-                ->with(
-                    'success',
-                    'Tagihan berhasil dihapus.'
-                );
-
+                ->with('success', 'Tagihan berhasil dihapus.');
         } catch (\Exception $e) {
-
             return redirect()
                 ->route('tagihan.index')
-                ->with(
-                    'error',
-                    $e->getMessage()
-                );
-
+                ->with('error', $e->getMessage());
         }
     }
 }
