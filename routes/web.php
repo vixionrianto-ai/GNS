@@ -79,6 +79,8 @@ Route::middleware('auth')->group(function () {
         ->name('pembayaran.create');
     Route::resource('pembayaran', PembayaranController::class)
         ->only(['index', 'show', 'store']);
+    Route::post('/pembayaran/{pembayaran}/cancel', [PembayaranController::class, 'cancel'])
+        ->name('pembayaran.cancel');
     Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice'])
         ->name('pembayaran.invoice');
     Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf'])
