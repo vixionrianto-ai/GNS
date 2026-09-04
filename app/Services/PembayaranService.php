@@ -59,8 +59,6 @@ class PembayaranService
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
 
-            // Keep the payment ledger and tagihan allocation in sync.
-            // Admin fee is not applied to the customer's invoice balance.
             AlokasiPembayaran::create([
                 'pembayaran_id' => $pembayaran->id,
                 'tagihan_id' => $tagihan->id,
@@ -87,6 +85,37 @@ class PembayaranService
             }
 
             return $pembayaran;
+        });
+    }
+
+    public function batalkan(Pembayaran $pembayaran): Pembayaran
+    {
+        return DB::transaction(function () use ($pembayaran) {
+            $pembayaran = Pembayaran::query()
+                ->with('tagihan')
+                ->whereKey($pembayaran->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($pembayaran->status === Pembayaran::STATUS_DIBATALKAN) {
+                throw new Exception('Pembayaran sudah dibatalkan.');
+            }
+
+            $tagihan = Tagihan::query()
+                ->whereKey($pembayaran->tagihan_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $pembayaran->update([
+                'status' => Pembayaran::STATUS_DIBATALKAN,
+            ]);
+
+            // Remove only allocations belonging to this payment. The tagihan
+            // balance is then recalculated from remaining successful payments.
+            AlokasiPembayaran::where('pembayaran_id', $pembayaran->id)->delete();
+            $tagihan->refreshStatus();
+
+            return $pembayaran->fresh(['tagihan']);
         });
     }
 }
