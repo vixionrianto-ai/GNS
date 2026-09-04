@@ -97,4 +97,19 @@ class PembayaranController extends Controller
                 ->withErrors(['message' => $e->getMessage()]);
         }
     }
+
+    public function cancel(
+        Pembayaran $pembayaran,
+        PembayaranService $service
+    ) {
+        try {
+            $service->batalkan($pembayaran);
+
+            return redirect()
+                ->route('pembayaran.show', $pembayaran)
+                ->with('success', 'Pembayaran berhasil dibatalkan dan status tagihan dihitung ulang.');
+        } catch (\Throwable $e) {
+            return back()->withErrors(['message' => $e->getMessage()]);
+        }
+    }
 }
