@@ -38,14 +38,27 @@ class PembayaranController extends Controller
     public function store(PembayaranRequest $request, PembayaranService $service)
     {
         try {
-            // Exactly the same service used by the website performs payment,
-            // allocation, tagihan status and all other business rules.
             $pembayaran = $service->bayar($request->validated());
             return response()->json([
                 'success' => true,
                 'message' => 'Pembayaran berhasil.',
                 'data' => $pembayaran->load(['tagihan.pelanggan', 'user']),
             ], 201);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function cancel(Pembayaran $pembayaran, PembayaranService $service)
+    {
+        try {
+            $pembayaran = $service->batalkan($pembayaran);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pembayaran berhasil dibatalkan dan status tagihan dihitung ulang.',
+                'data' => $pembayaran->load(['tagihan.pelanggan', 'user']),
+            ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
