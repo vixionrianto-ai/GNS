@@ -51,7 +51,7 @@ class TagihanController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Detail tagihan berhasil dimuat.',
-            'data' => $tagihan->load(['pelanggan', 'alokasiPembayarans']),
+            'data' => $tagihan->load(['pelanggan', 'alokasi']),
         ]);
     }
 
@@ -74,8 +74,8 @@ class TagihanController extends Controller
         }
 
         return response()->json([
-            'success' => true,
-            'message' => 'Operasi tagihan berhasil.',
-        ]);
+            'success' => false,
+            'message' => 'Operasi tagihan harus dilakukan melalui endpoint API yang sesuai.',
+        ], 405);
     }
 }
