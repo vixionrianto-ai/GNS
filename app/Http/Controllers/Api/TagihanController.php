@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\TagihanController as WebTagihanController;
 use App\Models\Tagihan;
+use App\Services\TagihanService;
 use Illuminate\Http\Request;
 
 class TagihanController extends Controller
@@ -57,25 +57,43 @@ class TagihanController extends Controller
 
     public function destroy(Tagihan $tagihan)
     {
-        $response = app(WebTagihanController::class)->destroy($tagihan);
-        return $this->normalizeResponse($response);
-    }
-
-    public function generate(Request $request)
-    {
-        $response = app(WebTagihanController::class)->generate($request);
-        return $this->normalizeResponse($response);
-    }
-
-    private function normalizeResponse($response)
-    {
-        if ($response instanceof \Illuminate\Http\JsonResponse) {
-            return $response;
+        if ($tagihan->pembayaran()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tagihan tidak dapat dihapus karena sudah memiliki riwayat pembayaran.',
+            ], 422);
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Operasi tagihan harus dilakukan melalui endpoint API yang sesuai.',
-        ], 405);
+        try {
+            $tagihan->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tagihan berhasil dihapus.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function generate(Request $request, TagihanService $tagihanService)
+    {
+        try {
+            $jumlah = $tagihanService->generateHarian();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$jumlah} tagihan berhasil dibuat.",
+                'data' => ['jumlah' => $jumlah],
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }
