@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AlokasiPembayaran;
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
 use Illuminate\Support\Facades\Auth;
@@ -58,12 +59,17 @@ class PembayaranService
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
 
-            $tagihan->update([
-                'status' => Tagihan::STATUS_LUNAS,
-                'tanggal_bayar' => now(),
-                'dibayar' => $nominalTagihan,
-                'sisa' => 0,
+            // Keep the payment ledger and tagihan allocation in sync.
+            // Admin fee is not applied to the customer's invoice balance.
+            AlokasiPembayaran::create([
+                'pembayaran_id' => $pembayaran->id,
+                'tagihan_id' => $tagihan->id,
+                'nominal' => $nominalTagihan,
+                'keterangan' => 'Alokasi pembayaran tagihan',
             ]);
+
+            $tagihan->refreshStatus();
+            $tagihan = $tagihan->fresh(['pelanggan.router']);
 
             $pelanggan = $tagihan->pelanggan;
             if ($pelanggan && $pelanggan->mikrotik_secret_id) {
