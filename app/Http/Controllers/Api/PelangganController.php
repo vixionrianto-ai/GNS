@@ -52,48 +52,21 @@ class PelangganController extends Controller
 
     public function store(Request $request)
     {
-        app(WebPelangganController::class)->store($request);
-        $pelanggan = Pelanggan::with(['paket', 'router'])
-            ->where('username_pppoe', $request->username_pppoe)
-            ->latest('id')
-            ->firstOrFail();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data pelanggan berhasil ditambahkan.',
-            'data' => $pelanggan,
-        ], 201);
+        return app(WebPelangganController::class)->store($request);
     }
 
     public function update(Request $request, Pelanggan $pelanggan)
     {
-        app(WebPelangganController::class)->update($request, $pelanggan);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data pelanggan berhasil diperbarui.',
-            'data' => $pelanggan->refresh()->load(['paket', 'router']),
-        ]);
+        return app(WebPelangganController::class)->update($request, (string) $pelanggan->id);
     }
 
     public function destroy(Pelanggan $pelanggan)
     {
-        $id = $pelanggan->id;
-        app(WebPelangganController::class)->destroy($pelanggan);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Pelanggan #{$id} berhasil dihapus.",
-        ]);
+        return app(WebPelangganController::class)->destroy((string) $pelanggan->id);
     }
 
-    public function sync()
+    public function sync(Request $request)
     {
-        app(WebPelangganController::class)->sync();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Sinkronisasi pelanggan berhasil.',
-        ]);
+        return app(WebPelangganController::class)->sync();
     }
 }
