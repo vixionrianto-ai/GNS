@@ -77,7 +77,10 @@ class PembayaranService
             $tagihan = $tagihan->fresh(['pelanggan.router']);
 
             if ($tagihan->pelanggan) {
-                $this->syncCustomerAccess($tagihan->pelanggan);
+                $pelanggan = $tagihan->pelanggan;
+                DB::afterCommit(function () use ($pelanggan): void {
+                    $this->syncCustomerAccess($pelanggan);
+                });
             }
 
             return $pembayaran;
@@ -111,25 +114,23 @@ class PembayaranService
             $tagihan = $tagihan->fresh(['pelanggan.router']);
 
             if ($tagihan->pelanggan) {
-                $this->syncCustomerAccess($tagihan->pelanggan);
+                $pelanggan = $tagihan->pelanggan;
+                DB::afterCommit(function () use ($pelanggan): void {
+                    $this->syncCustomerAccess($pelanggan);
+                });
             }
 
             return $pembayaran->fresh(['tagihan']);
         });
     }
 
-    /**
-     * Sinkronkan akses PPP pelanggan berdasarkan seluruh tagihan aktifnya.
-     * Satu pembayaran yang lunas tidak cukup untuk membuka akses jika masih
-     * ada tagihan lain yang sudah jatuh tempo dan belum lunas.
-     */
     protected function syncCustomerAccess(Pelanggan $pelanggan): void
     {
         if (empty($pelanggan->mikrotik_secret_id) || !$pelanggan->router) {
             return;
         }
 
-        $pelanggan->loadMissing('router', 'tagihans');
+        $pelanggan->loadMissing('router');
 
         $harusDiisolir = $pelanggan->status !== 'Aktif'
             || $pelanggan->tagihans()
