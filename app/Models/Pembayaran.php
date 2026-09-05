@@ -18,6 +18,10 @@ class Pembayaran extends Model
         'biaya_admin', 'total_bayar', 'dibayar', 'kembalian', 'status', 'keterangan',
     ];
 
+    protected $hidden = [
+        'public_token',
+    ];
+
     protected $casts = [
         'tanggal_bayar' => 'date',
         'invoice_date' => 'date',
