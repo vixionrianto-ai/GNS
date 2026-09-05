@@ -78,8 +78,6 @@ class PelangganController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
 
-            // MikroTik is outside the DB transaction. Remove the newly-created
-            // secret when the customer insert/transaction fails.
             if ($secretId) {
                 try {
                     $this->mikrotik->disconnectActiveSessionBySecretId($router, $secretId);
@@ -193,7 +191,7 @@ class PelangganController extends Controller
         $jumlahImport = $jumlahUpdate = $jumlahKonflik = 0;
 
         foreach ($routers as $router) {
-            $secrets = $this->mikrotik->getSecrets($router);
+            $secrets = $this->mikrotik->getSecretsWithRecovery($router);
             foreach ($secrets as $secret) {
                 $username = trim((string) ($secret['name'] ?? ''));
                 if ($username === '') continue;
@@ -215,7 +213,6 @@ class PelangganController extends Controller
                     continue;
                 }
 
-                // Sync never moves an existing customer between routers.
                 if ((int) $pelanggan->router_id !== (int) $router->id) {
                     $jumlahKonflik++;
                     Log::warning('Sync PPP dilewati karena username ditemukan di router berbeda', [
@@ -263,8 +260,6 @@ class PelangganController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
 
-            // If MikroTik deletion succeeded but the DB transaction failed,
-            // restore the secret so the external and DB state remain aligned.
             if ($secretId && $router && $secret) {
                 try {
                     if (!$this->mikrotik->getSecretById($router, $secretId)) {
