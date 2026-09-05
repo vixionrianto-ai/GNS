@@ -60,25 +60,27 @@ class Tagihan extends Model
 
     public function getTotalDibayar(): float
     {
-        // Allocation is only considered paid when its parent payment succeeded.
-        // This prevents a failed/cancelled payment allocation from making an
-        // invoice appear partially or fully paid.
+        $allocatedPaymentIds = $this->alokasi()
+            ->whereHas('pembayaran', function ($query) {
+                $query->where('status', Pembayaran::STATUS_BERHASIL);
+            })
+            ->pluck('pembayaran_id');
+
         $allocated = (float) $this->alokasi()
             ->whereHas('pembayaran', function ($query) {
                 $query->where('status', Pembayaran::STATUS_BERHASIL);
             })
             ->sum('nominal');
 
-        if ($allocated > 0) {
-            return $allocated;
-        }
-
-        return (float) $this->pembayaran()
+        $legacyDirect = (float) $this->pembayaran()
             ->where('status', Pembayaran::STATUS_BERHASIL)
+            ->whereNotIn('id', $allocatedPaymentIds)
             ->get()
             ->sum(fn ($pembayaran) =>
                 (float) ($pembayaran->dibayar ?: $pembayaran->nominal ?: $pembayaran->total_bayar ?: 0)
             );
+
+        return $allocated + $legacyDirect;
     }
 
     public function getSisaTagihan(): float
