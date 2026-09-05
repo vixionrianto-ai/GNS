@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Pelanggan;
 use App\Models\Tagihan;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -38,6 +39,10 @@ class TagihanService
 
     /**
      * Generate tagihan untuk satu pelanggan.
+     *
+     * Invoice number is protected by a small retry loop because the
+     * application-level number lookup cannot by itself serialize invoice
+     * generation across different customers.
      */
     public function generate(Pelanggan $pelanggan): Tagihan
     {
@@ -57,70 +62,86 @@ class TagihanService
         $hariIni = Carbon::today();
         $periode = $hariIni->format('Y-m');
 
-        return DB::transaction(function () use (
-            $pelanggan,
-            $periode,
-            $tanggalAktif,
-            $hariIni
-        ) {
-            // Lock the customer row so cron/manual generation for the same
-            // customer cannot pass the duplicate check concurrently.
-            $pelangganTerkunci = Pelanggan::query()
-                ->whereKey($pelanggan->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return DB::transaction(function () use (
+                    $pelanggan,
+                    $periode,
+                    $tanggalAktif,
+                    $hariIni
+                ) {
+                    // Lock the customer row so cron/manual generation for the same
+                    // customer cannot pass the duplicate check concurrently.
+                    $pelangganTerkunci = Pelanggan::query()
+                        ->whereKey($pelanggan->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
 
-            $exists = Tagihan::where('pelanggan_id', $pelangganTerkunci->id)
-                ->where('periode', $periode)
-                ->exists();
+                    $exists = Tagihan::where('pelanggan_id', $pelangganTerkunci->id)
+                        ->where('periode', $periode)
+                        ->exists();
 
-            if ($exists) {
-                throw new \RuntimeException(
-                    "Tagihan periode {$periode} sudah ada."
-                );
+                    if ($exists) {
+                        throw new \RuntimeException(
+                            "Tagihan periode {$periode} sudah ada."
+                        );
+                    }
+
+                    $paket = $pelangganTerkunci->paket;
+                    if (!$paket) {
+                        throw new \InvalidArgumentException(
+                            "Pelanggan {$pelangganTerkunci->nama} belum memiliki paket."
+                        );
+                    }
+
+                    $jumlahHariBulanIni = Carbon::create(
+                        $hariIni->year,
+                        $hariIni->month,
+                        1
+                    )->daysInMonth;
+
+                    $hariTagihan = min($tanggalAktif->day, $jumlahHariBulanIni);
+
+                    $tanggalTagihan = Carbon::create(
+                        $hariIni->year,
+                        $hariIni->month,
+                        $hariTagihan
+                    );
+
+                    $tanggalJatuhTempo = $tanggalTagihan->copy()->addDays(10);
+                    $nominal = (float) $paket->harga;
+
+                    return Tagihan::create([
+                        'pelanggan_id' => $pelangganTerkunci->id,
+                        'invoice_no' => $this->generateInvoiceNumber(),
+                        'periode' => $periode,
+                        'bulan' => $tanggalTagihan->month,
+                        'tahun' => $tanggalTagihan->year,
+                        'tanggal_tagihan' => $tanggalTagihan,
+                        'tanggal_jatuh_tempo' => $tanggalJatuhTempo,
+                        'nominal' => $nominal,
+                        'denda' => 0,
+                        'total' => $nominal,
+                        'dibayar' => 0,
+                        'sisa' => $nominal,
+                        'status' => Tagihan::STATUS_BELUM_BAYAR,
+                        'keterangan' => 'Tagihan Internet Periode ' . $periode,
+                    ]);
+                });
+            } catch (QueryException $e) {
+                $message = strtolower($e->getMessage());
+                $isInvoiceDuplicate = (string) $e->getCode() === '23000'
+                    && str_contains($message, 'invoice_no');
+
+                if (!$isInvoiceDuplicate || $attempt === 3) {
+                    throw $e;
+                }
+
+                usleep(100000 * $attempt);
             }
+        }
 
-            $paket = $pelangganTerkunci->paket;
-            if (!$paket) {
-                throw new \InvalidArgumentException(
-                    "Pelanggan {$pelangganTerkunci->nama} belum memiliki paket."
-                );
-            }
-
-            $jumlahHariBulanIni = Carbon::create(
-                $hariIni->year,
-                $hariIni->month,
-                1
-            )->daysInMonth;
-
-            $hariTagihan = min($tanggalAktif->day, $jumlahHariBulanIni);
-
-            $tanggalTagihan = Carbon::create(
-                $hariIni->year,
-                $hariIni->month,
-                $hariTagihan
-            );
-
-            $tanggalJatuhTempo = $tanggalTagihan->copy()->addDays(10);
-            $nominal = (float) $paket->harga;
-
-            return Tagihan::create([
-                'pelanggan_id' => $pelangganTerkunci->id,
-                'invoice_no' => $this->generateInvoiceNumber(),
-                'periode' => $periode,
-                'bulan' => $tanggalTagihan->month,
-                'tahun' => $tanggalTagihan->year,
-                'tanggal_tagihan' => $tanggalTagihan,
-                'tanggal_jatuh_tempo' => $tanggalJatuhTempo,
-                'nominal' => $nominal,
-                'denda' => 0,
-                'total' => $nominal,
-                'dibayar' => 0,
-                'sisa' => $nominal,
-                'status' => Tagihan::STATUS_BELUM_BAYAR,
-                'keterangan' => 'Tagihan Internet Periode ' . $periode,
-            ]);
-        });
+        throw new \RuntimeException('Gagal membuat nomor invoice unik.');
     }
 
     /**
