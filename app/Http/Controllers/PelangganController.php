@@ -239,6 +239,13 @@ class PelangganController extends Controller
     public function destroy(string $id)
     {
         $pelanggan = Pelanggan::findOrFail($id);
+
+        // Tagihan dan riwayat pembayaran adalah data finansial. Jangan biarkan
+        // penghapusan pelanggan menghapus invoice melalui FK cascade.
+        if ($pelanggan->tagihans()->exists()) {
+            return back()->with('error', 'Pelanggan tidak dapat dihapus karena sudah memiliki tagihan. Hapus data pelanggan hanya jika belum pernah dibuatkan tagihan.');
+        }
+
         $router = $pelanggan->router_id ? Router::findOrFail($pelanggan->router_id) : null;
         $secretId = $pelanggan->mikrotik_secret_id;
         $secret = null;
