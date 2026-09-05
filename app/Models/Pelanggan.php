@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Paket;
 
-
 class Pelanggan extends Model
 {
     protected $fillable = [
@@ -24,21 +23,22 @@ class Pelanggan extends Model
         'tanggal_aktif',
         'status',
         'keterangan',
-        
     ];
 
+    protected $hidden = [
+        'password_pppoe',
+    ];
 
     public function router()
     {
-    return $this->belongsTo(Router::class);
+        return $this->belongsTo(Router::class);
     }
+
     public function paket()
     {
         return $this->belongsTo(Paket::class);
     }
-    /**
-     * Relasi ke Tagihan
-     */
+
     public function tagihans()
     {
         return $this->hasMany(Tagihan::class);
