@@ -191,7 +191,7 @@ class PelangganController extends Controller
         $jumlahImport = $jumlahUpdate = $jumlahKonflik = 0;
 
         foreach ($routers as $router) {
-            $secrets = $this->mikrotik->getSecretsWithRecovery($router);
+            $secrets = $this->mikrotik->getSecretsForSync($router);
             foreach ($secrets as $secret) {
                 $username = trim((string) ($secret['name'] ?? ''));
                 if ($username === '') continue;
