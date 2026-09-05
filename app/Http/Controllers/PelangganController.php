@@ -51,6 +51,7 @@ class PelangganController extends Controller
         $router = Router::findOrFail($request->router_id);
         $paket = Paket::findOrFail($request->paket_id);
         $secretId = null;
+        $pelanggan = null;
 
         DB::beginTransaction();
         try {
@@ -65,7 +66,7 @@ class PelangganController extends Controller
                 $this->mikrotik->disableSecretById($router, $secretId);
             }
 
-            Pelanggan::create([
+            $pelanggan = Pelanggan::create([
                 'kode_pelanggan' => $kode, 'nama' => $request->nama, 'alamat' => $request->alamat, 'no_hp' => $request->no_hp,
                 'paket_id' => $request->paket_id, 'router_id' => $request->router_id, 'mikrotik_secret_id' => $secretId,
                 'username_pppoe' => $request->username_pppoe, 'password_pppoe' => $request->password_pppoe,
@@ -74,6 +75,15 @@ class PelangganController extends Controller
             ]);
 
             DB::commit();
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data pelanggan berhasil ditambahkan.',
+                    'data' => $pelanggan->load(['paket', 'router']),
+                ], 201);
+            }
+
             return redirect()->route('pelanggan.index')->with('success', 'Data pelanggan berhasil ditambahkan.');
         } catch (Exception $e) {
             DB::rollBack();
@@ -93,6 +103,14 @@ class PelangganController extends Controller
             }
 
             Log::error('Gagal menambah pelanggan', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->withInput()->withErrors(['mikrotik' => $e->getMessage()]);
         }
     }
@@ -169,6 +187,15 @@ class PelangganController extends Controller
                     Log::warning('PPP Secret lama gagal dibersihkan setelah perpindahan router', ['pelanggan_id' => $pelanggan->id, 'old_router_id' => $oldRouter->id, 'old_secret_id' => $oldSecretId, 'message' => $cleanupError->getMessage()]);
                 }
             }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data pelanggan berhasil diperbarui.',
+                    'data' => $pelanggan->fresh(['paket', 'router']),
+                ]);
+            }
+
             return redirect()->route('pelanggan.index')->with('success', 'Data pelanggan berhasil diperbarui.');
         } catch (Exception $e) {
             DB::rollBack();
@@ -181,6 +208,14 @@ class PelangganController extends Controller
                 }
             }
             Log::error('Gagal memperbarui pelanggan', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->withInput()->withErrors(['mikrotik' => $e->getMessage()]);
         }
     }
@@ -233,6 +268,18 @@ class PelangganController extends Controller
             }
         }
 
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Sinkronisasi pelanggan berhasil.',
+                'data' => [
+                    'import' => $jumlahImport,
+                    'update' => $jumlahUpdate,
+                    'konflik_dilewati' => $jumlahKonflik,
+                ],
+            ]);
+        }
+
         return redirect()->route('pelanggan.index')->with('success', "Sinkronisasi selesai.\nImport : {$jumlahImport}\nUpdate : {$jumlahUpdate}\nKonflik dilewati : {$jumlahKonflik}");
     }
 
@@ -243,7 +290,13 @@ class PelangganController extends Controller
         // Tagihan dan riwayat pembayaran adalah data finansial. Jangan biarkan
         // penghapusan pelanggan menghapus invoice melalui FK cascade.
         if ($pelanggan->tagihans()->exists()) {
-            return back()->with('error', 'Pelanggan tidak dapat dihapus karena sudah memiliki tagihan. Hapus data pelanggan hanya jika belum pernah dibuatkan tagihan.');
+            $message = 'Pelanggan tidak dapat dihapus karena sudah memiliki tagihan. Hapus data pelanggan hanya jika belum pernah dibuatkan tagihan.';
+
+            if (request()->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 422);
+            }
+
+            return back()->with('error', $message);
         }
 
         $router = $pelanggan->router_id ? Router::findOrFail($pelanggan->router_id) : null;
@@ -263,6 +316,14 @@ class PelangganController extends Controller
 
             $pelanggan->delete();
             DB::commit();
+
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data pelanggan berhasil dihapus.',
+                ]);
+            }
+
             return redirect()->route('pelanggan.index')->with('success', 'Data pelanggan berhasil dihapus.');
         } catch (Exception $e) {
             DB::rollBack();
@@ -294,6 +355,14 @@ class PelangganController extends Controller
             }
 
             Log::error('Gagal menghapus pelanggan', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->withErrors($e->getMessage());
         }
     }
