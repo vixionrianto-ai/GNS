@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Pelanggan;
 use App\Services\PembayaranService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class SyncPelangganAccessCommand extends Command
 {
@@ -24,17 +23,12 @@ class SyncPelangganAccessCommand extends Command
             ->whereNotNull('mikrotik_secret_id')
             ->chunkById(100, function ($pelanggans) use ($pembayaranService, &$jumlah, &$gagal): void {
                 foreach ($pelanggans as $pelanggan) {
-                    try {
-                        $pembayaranService->syncCustomerAccess($pelanggan);
+                    if ($pembayaranService->syncCustomerAccess($pelanggan)) {
                         $jumlah++;
-                    } catch (\Throwable $e) {
-                        $gagal++;
-                        Log::error('Gagal sinkronisasi akses pelanggan terjadwal', [
-                            'pelanggan_id' => $pelanggan->id,
-                            'message' => $e->getMessage(),
-                            'exception' => $e::class,
-                        ]);
+                        continue;
                     }
+
+                    $gagal++;
                 }
             });
 
