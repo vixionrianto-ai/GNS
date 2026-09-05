@@ -59,7 +59,7 @@ class MikroTikService
 
     public function getSecretsWithRecovery(Router $router): array
     {
-        $secrets = $this->readSecrets($router);
+        $secrets = $this->readSecrets($router, true);
         $byName = [];
         foreach ($secrets as $secret) if (!empty($secret['name'])) $byName[$secret['name']] = $secret;
         $pelanggans = Pelanggan::where('router_id',$router->id)->whereNotNull('username_pppoe')->where('username_pppoe','!=','')->get();
@@ -80,7 +80,7 @@ class MikroTikService
                 }
             } catch (\Throwable $e) { report($e); }
         }
-        return $this->readSecrets($router);
+        return $this->readSecrets($router, true);
     }
 
     public function getSecretByName(Router $router, string $username): ?array
