@@ -272,6 +272,9 @@ class PelangganController extends Controller
                         if (($secret['disabled'] ?? 'false') === 'true') {
                             $this->mikrotik->disableSecretById($router, $restoredId);
                         }
+                        if ($restoredId !== $secretId) {
+                            $pelanggan->update(['mikrotik_secret_id' => $restoredId]);
+                        }
                     }
                 } catch (\Throwable $restoreError) {
                     Log::critical('Gagal memulihkan PPP Secret setelah penghapusan pelanggan gagal', [
