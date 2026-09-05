@@ -78,19 +78,30 @@ class MikroTikService
         }
     }
 
-    private function readSecrets(Router $router): array
+    private function readSecrets(Router $router, bool $includePassword = false): array
     {
         $query = new Query('/ppp/secret/print');
-        // Never request PPP passwords from MikroTik for a list/edit screen.
-        $query->equal('.proplist', '.id,name,service,profile,disabled');
+        $properties = '.id,name,service,profile,disabled';
+
+        if ($includePassword) {
+            $properties .= ',password';
+        }
+
+        $query->equal('.proplist', $properties);
 
         return $this->connect($router)->query($query)->read();
     }
 
-    /** Read-only PPP secret listing. */
+    /** Read-only PPP secret listing without passwords. */
     public function getSecrets(Router $router): array
     {
         return $this->readSecrets($router);
+    }
+
+    /** Explicit sync operation which may read PPP passwords for importing customers. */
+    public function getSecretsForSync(Router $router): array
+    {
+        return $this->readSecrets($router, true);
     }
 
     /** Explicit recovery operation for database customers missing a PPP secret. */
