@@ -142,10 +142,10 @@ class PembayaranService
     }
 
     /** Synchronize PPP access from current customer and invoice state. */
-    public function syncCustomerAccess(Pelanggan $pelanggan): void
+    public function syncCustomerAccess(Pelanggan $pelanggan): bool
     {
         if (empty($pelanggan->mikrotik_secret_id) || !$pelanggan->router) {
-            return;
+            return true;
         }
 
         $pelanggan->loadMissing('router');
@@ -164,16 +164,18 @@ class PembayaranService
             if ($harusDiisolir) {
                 $this->mikrotik->disableSecretById($pelanggan->router, $pelanggan->mikrotik_secret_id);
                 $this->mikrotik->disconnectActiveSessionBySecretId($pelanggan->router, $pelanggan->mikrotik_secret_id);
-                return;
+                return true;
             }
 
             $this->mikrotik->enableSecretById($pelanggan->router, $pelanggan->mikrotik_secret_id);
+            return true;
         } catch (\Throwable $e) {
             Log::warning('Gagal sinkronisasi akses PPP', [
                 'pelanggan_id' => $pelanggan->id,
                 'mikrotik_secret_id' => $pelanggan->mikrotik_secret_id,
                 'message' => $e->getMessage(),
             ]);
+            return false;
         }
     }
 }
