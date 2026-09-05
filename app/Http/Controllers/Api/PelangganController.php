@@ -52,21 +52,25 @@ class PelangganController extends Controller
 
     public function store(Request $request)
     {
+        $request->headers->set('Accept', 'application/json');
         return app(WebPelangganController::class)->store($request);
     }
 
     public function update(Request $request, Pelanggan $pelanggan)
     {
+        $request->headers->set('Accept', 'application/json');
         return app(WebPelangganController::class)->update($request, (string) $pelanggan->id);
     }
 
-    public function destroy(Pelanggan $pelanggan)
+    public function destroy(Request $request, Pelanggan $pelanggan)
     {
+        $request->headers->set('Accept', 'application/json');
         return app(WebPelangganController::class)->destroy((string) $pelanggan->id);
     }
 
     public function sync(Request $request)
     {
+        $request->headers->set('Accept', 'application/json');
         return app(WebPelangganController::class)->sync();
     }
 }
