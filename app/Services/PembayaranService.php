@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\AlokasiPembayaran;
 use App\Models\Pembayaran;
 use App\Models\Tagihan;
+use App\Models\Pelanggan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Exception;
 
@@ -24,7 +26,12 @@ class PembayaranService
     public function bayar(array $data): Pembayaran
     {
         return DB::transaction(function () use ($data) {
-            $tagihan = Tagihan::query()->with(['pelanggan.router'])->whereKey($data['tagihan_id'])->lockForUpdate()->firstOrFail();
+            $tagihan = Tagihan::query()
+                ->with(['pelanggan.router'])
+                ->whereKey($data['tagihan_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $tagihan->refreshStatus();
             $tagihan = $tagihan->fresh(['pelanggan.router']);
 
@@ -69,19 +76,8 @@ class PembayaranService
             $tagihan->refreshStatus();
             $tagihan = $tagihan->fresh(['pelanggan.router']);
 
-            $pelanggan = $tagihan->pelanggan;
-            if ($pelanggan && $pelanggan->mikrotik_secret_id) {
-                try {
-                    $this->mikrotik->enableSecretById($pelanggan->router, $pelanggan->mikrotik_secret_id);
-                    $this->mikrotik->disconnectActiveSessionBySecretId($pelanggan->router, $pelanggan->mikrotik_secret_id);
-                } catch (\Throwable $e) {
-                    \Log::warning('Gagal memperbarui status PPP secret saat pembayaran', [
-                        'tagihan_id' => $tagihan->id,
-                        'pelanggan_id' => $pelanggan->id,
-                        'mikrotik_secret_id' => $pelanggan->mikrotik_secret_id,
-                        'message' => $e->getMessage(),
-                    ]);
-                }
+            if ($tagihan->pelanggan) {
+                $this->syncCustomerAccess($tagihan->pelanggan);
             }
 
             return $pembayaran;
@@ -92,7 +88,7 @@ class PembayaranService
     {
         return DB::transaction(function () use ($pembayaran) {
             $pembayaran = Pembayaran::query()
-                ->with('tagihan')
+                ->with('tagihan.pelanggan.router')
                 ->whereKey($pembayaran->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -110,12 +106,64 @@ class PembayaranService
                 'status' => Pembayaran::STATUS_DIBATALKAN,
             ]);
 
-            // Remove only allocations belonging to this payment. The tagihan
-            // balance is then recalculated from remaining successful payments.
             AlokasiPembayaran::where('pembayaran_id', $pembayaran->id)->delete();
             $tagihan->refreshStatus();
+            $tagihan = $tagihan->fresh(['pelanggan.router']);
+
+            if ($tagihan->pelanggan) {
+                $this->syncCustomerAccess($tagihan->pelanggan);
+            }
 
             return $pembayaran->fresh(['tagihan']);
         });
+    }
+
+    /**
+     * Sinkronkan akses PPP pelanggan berdasarkan seluruh tagihan aktifnya.
+     * Satu pembayaran yang lunas tidak cukup untuk membuka akses jika masih
+     * ada tagihan lain yang sudah jatuh tempo dan belum lunas.
+     */
+    protected function syncCustomerAccess(Pelanggan $pelanggan): void
+    {
+        if (empty($pelanggan->mikrotik_secret_id) || !$pelanggan->router) {
+            return;
+        }
+
+        $pelanggan->loadMissing('router', 'tagihans');
+
+        $harusDiisolir = $pelanggan->status !== 'Aktif'
+            || $pelanggan->tagihans()
+                ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
+                ->whereDate('tanggal_jatuh_tempo', '<=', now()->toDateString())
+                ->where(function ($query) {
+                    $query->where('sisa', '>', 0)
+                        ->orWhereNull('sisa');
+                })
+                ->exists();
+
+        try {
+            if ($harusDiisolir) {
+                $this->mikrotik->disableSecretById(
+                    $pelanggan->router,
+                    $pelanggan->mikrotik_secret_id
+                );
+                $this->mikrotik->disconnectActiveSessionBySecretId(
+                    $pelanggan->router,
+                    $pelanggan->mikrotik_secret_id
+                );
+                return;
+            }
+
+            $this->mikrotik->enableSecretById(
+                $pelanggan->router,
+                $pelanggan->mikrotik_secret_id
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Gagal sinkronisasi akses PPP setelah perubahan pembayaran', [
+                'pelanggan_id' => $pelanggan->id,
+                'mikrotik_secret_id' => $pelanggan->mikrotik_secret_id,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 }
