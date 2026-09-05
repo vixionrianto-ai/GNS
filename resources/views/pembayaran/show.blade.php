@@ -41,9 +41,20 @@ Tanggal Bayar :
 </tbody>
 </table>
 
-<div class="mt-8 flex gap-3">
+<div class="mt-8 flex gap-3 items-center">
 <a href="{{ route('pembayaran.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2 rounded">Kembali</a>
+<a href="{{ route('pembayaran.invoice', $pembayaran) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded">Invoice</a>
+<a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded">PDF</a>
 <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded">Cetak</button>
+
+@if(!$pembayaran->isDibatalkan())
+<form action="{{ route('pembayaran.cancel', $pembayaran) }}" method="POST" class="ml-auto" onsubmit="return confirm('Yakin ingin membatalkan pembayaran ini? Status tagihan akan dihitung ulang.');">
+    @csrf
+    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded">
+        Batalkan Pembayaran
+    </button>
+</form>
+@endif
 </div>
 
 </div>
