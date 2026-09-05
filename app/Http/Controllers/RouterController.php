@@ -15,7 +15,6 @@ class RouterController extends Controller
     public function index()
     {
         $routers = Router::all();
-
         return view('router.index', compact('routers'));
     }
 
@@ -36,14 +35,9 @@ class RouterController extends Controller
             'versi_routeros' => ['nullable', 'string', 'max:100'],
             'status' => ['required', 'string', 'max:50'],
         ]);
-
         $data['ssl'] = $request->boolean('ssl');
-
         Router::create($data);
-
-        return redirect()
-            ->route('router.index')
-            ->with('success', 'Router berhasil ditambahkan.');
+        return redirect()->route('router.index')->with('success', 'Router berhasil ditambahkan.');
     }
 
     public function show(Router $router)
@@ -68,46 +62,29 @@ class RouterController extends Controller
             'versi_routeros' => ['nullable', 'string', 'max:100'],
             'status' => ['required', 'string', 'max:50'],
         ]);
-
         $data['ssl'] = $request->boolean('ssl');
-
         $router->update($data);
-
-        return redirect()
-            ->route('router.index')
-            ->with('success', 'Router berhasil diperbarui.');
+        return redirect()->route('router.index')->with('success', 'Router berhasil diperbarui.');
     }
 
     public function test(Router $router)
     {
         $result = $this->mikrotik->testConnectionDetail($router);
-
-        if ($result['success']) {
-            return redirect()
-                ->route('router.index')
-                ->with(
-                    'success',
-                    'Berhasil terhubung : '
-                    . ($result['board'] ?? 'MikroTik')
-                    . ' | RouterOS '
-                    . ($result['version'] ?? '-')
-                );
-        }
-
-        return redirect()
-            ->route('router.index')
-            ->with('error', $result['message']);
+        return redirect()->route('router.index')->with(
+            $result['success'] ? 'success' : 'error',
+            $result['success']
+                ? 'Berhasil terhubung : ' . ($result['board'] ?? 'MikroTik') . ' | RouterOS ' . ($result['version'] ?? '-')
+                : $result['message']
+        );
     }
 
     public function pppSecret(Router $router)
     {
         try {
             $secrets = $this->mikrotik->getSecrets($router);
-
             return view('router.ppp-secret', compact('router', 'secrets'));
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
@@ -116,11 +93,9 @@ class RouterController extends Controller
     {
         try {
             $profiles = $this->mikrotik->getProfiles($router);
-
             return view('router.ppp-profile', compact('router', 'profiles'));
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
@@ -129,14 +104,10 @@ class RouterController extends Controller
     {
         try {
             $profiles = $this->mikrotik->getProfileNames($router);
-
             return view('router.create-secret', compact('router', 'profiles'));
         } catch (\Throwable $e) {
             report($e);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('error', $e->getMessage());
+            return redirect()->route('router.pppsecret', $router)->with('error', $e->getMessage());
         }
     }
 
@@ -148,25 +119,12 @@ class RouterController extends Controller
             'service' => ['required', 'string', 'max:50'],
             'profile' => ['required', 'string', 'max:100'],
         ]);
-
         try {
-            $this->mikrotik->createSecret(
-                $router,
-                $data['username'],
-                $data['password'],
-                $data['profile'],
-                $data['service']
-            );
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('success', 'PPP Secret berhasil ditambahkan.');
+            $this->mikrotik->createSecret($router, $data['username'], $data['password'], $data['profile'], $data['service']);
+            return redirect()->route('router.pppsecret', $router)->with('success', 'PPP Secret berhasil ditambahkan.');
         } catch (\Throwable $e) {
             report($e);
-
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
@@ -175,20 +133,13 @@ class RouterController extends Controller
         try {
             $secret = $this->mikrotik->getSecretByName($router, $username);
             if (!$secret) {
-                return redirect()
-                    ->route('router.pppsecret', $router)
-                    ->with('error', 'PPP Secret tidak ditemukan.');
+                return redirect()->route('router.pppsecret', $router)->with('error', 'PPP Secret tidak ditemukan.');
             }
-
             $profiles = $this->mikrotik->getProfileNames($router);
-
             return view('router.edit-secret', compact('router', 'secret', 'profiles'));
         } catch (\Throwable $e) {
             report($e);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('error', $e->getMessage());
+            return redirect()->route('router.pppsecret', $router)->with('error', $e->getMessage());
         }
     }
 
@@ -201,15 +152,12 @@ class RouterController extends Controller
             'profile' => ['required', 'string', 'max:100'],
             'disabled' => ['required', 'string', 'in:yes,no'],
         ]);
-
         try {
             $existing = $this->mikrotik->getSecretByName($router, $secret);
             $secretId = $existing['.id'] ?? null;
-
             if (!$secretId) {
                 return back()->with('error', 'PPP Secret tidak ditemukan.');
             }
-
             $this->mikrotik->updateSecretById(
                 $router,
                 (string) $secretId,
@@ -219,33 +167,25 @@ class RouterController extends Controller
                 $data['service'],
                 $data['disabled']
             );
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('success', 'PPP Secret berhasil diupdate.');
+            return redirect()->route('router.pppsecret', $router)->with('success', 'PPP Secret berhasil diupdate.');
         } catch (\Throwable $e) {
             report($e);
-
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
     public function deleteSecret(Router $router, string $secret)
     {
         try {
+            if (!$this->mikrotik->getSecretById($router, $secret)) {
+                return back()->with('error', 'PPP Secret tidak ditemukan.');
+            }
+            $this->mikrotik->disconnectActiveSessionBySecretId($router, $secret);
             $this->mikrotik->deleteSecretById($router, $secret);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('success', 'PPP Secret berhasil dihapus.');
+            return redirect()->route('router.pppsecret', $router)->with('success', 'PPP Secret berhasil dihapus.');
         } catch (\Throwable $e) {
             report($e);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('error', $e->getMessage());
+            return redirect()->route('router.pppsecret', $router)->with('error', $e->getMessage());
         }
     }
 
@@ -253,13 +193,9 @@ class RouterController extends Controller
     {
         try {
             $this->mikrotik->enableSecretById($router, $secret);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('success', 'PPP Secret berhasil diaktifkan.');
+            return redirect()->route('router.pppsecret', $router)->with('success', 'PPP Secret berhasil diaktifkan.');
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
@@ -268,13 +204,10 @@ class RouterController extends Controller
     {
         try {
             $this->mikrotik->disableSecretById($router, $secret);
-
-            return redirect()
-                ->route('router.pppsecret', $router)
-                ->with('success', 'PPP Secret berhasil dinonaktifkan.');
+            $this->mikrotik->disconnectActiveSessionBySecretId($router, $secret);
+            return redirect()->route('router.pppsecret', $router)->with('success', 'PPP Secret berhasil dinonaktifkan.');
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
@@ -293,26 +226,12 @@ class RouterController extends Controller
             'rate_limit' => ['nullable', 'string', 'max:255'],
             'only_one' => ['nullable', 'string', 'max:20'],
         ]);
-
         try {
-            $this->mikrotik->createProfile(
-                $router,
-                $data['name'],
-                $data['local_address'] ?? null,
-                $data['remote_address'] ?? null,
-                $data['rate_limit'] ?? null,
-                $data['only_one'] ?? null
-            );
-
-            return redirect()
-                ->route('router.pppprofile', $router)
-                ->with('success', 'PPP Profile berhasil ditambahkan.');
+            $this->mikrotik->createProfile($router, $data['name'], $data['local_address'] ?? null, $data['remote_address'] ?? null, $data['rate_limit'] ?? null, $data['only_one'] ?? null);
+            return redirect()->route('router.pppprofile', $router)->with('success', 'PPP Profile berhasil ditambahkan.');
         } catch (\Throwable $e) {
             report($e);
-
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
@@ -323,11 +242,9 @@ class RouterController extends Controller
             if (!$data) {
                 return back()->with('error', 'PPP Profile tidak ditemukan.');
             }
-
             return view('router.ppp-profile-edit', compact('router', 'data'));
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
@@ -341,27 +258,12 @@ class RouterController extends Controller
             'rate_limit' => ['nullable', 'string', 'max:255'],
             'only_one' => ['nullable', 'string', 'max:20'],
         ]);
-
         try {
-            $this->mikrotik->updateProfile(
-                $router,
-                $profile,
-                $data['name'],
-                $data['local_address'] ?? null,
-                $data['remote_address'] ?? null,
-                $data['rate_limit'] ?? null,
-                $data['only_one'] ?? null
-            );
-
-            return redirect()
-                ->route('router.pppprofile', $router)
-                ->with('success', 'PPP Profile berhasil diupdate.');
+            $this->mikrotik->updateProfile($router, $profile, $data['name'], $data['local_address'] ?? null, $data['remote_address'] ?? null, $data['rate_limit'] ?? null, $data['only_one'] ?? null);
+            return redirect()->route('router.pppprofile', $router)->with('success', 'PPP Profile berhasil diupdate.');
         } catch (\Throwable $e) {
             report($e);
-
-            return back()
-                ->withInput()
-                ->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
     }
 
@@ -369,23 +271,21 @@ class RouterController extends Controller
     {
         try {
             $this->mikrotik->deleteProfile($router, $profile);
-
-            return redirect()
-                ->route('router.pppprofile', $router)
-                ->with('success', 'PPP Profile berhasil dihapus.');
+            return redirect()->route('router.pppprofile', $router)->with('success', 'PPP Profile berhasil dihapus.');
         } catch (\Throwable $e) {
             report($e);
-
             return back()->with('error', $e->getMessage());
         }
     }
 
     public function destroy(Router $router)
     {
-        $router->delete();
+        if ($router->pelanggans()->exists()) {
+            return redirect()->route('router.index')
+                ->with('error', 'Router tidak dapat dihapus karena masih digunakan pelanggan.');
+        }
 
-        return redirect()
-            ->route('router.index')
-            ->with('success', 'Router berhasil dihapus.');
+        $router->delete();
+        return redirect()->route('router.index')->with('success', 'Router berhasil dihapus.');
     }
 }
