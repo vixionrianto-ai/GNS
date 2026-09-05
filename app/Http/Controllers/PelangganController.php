@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use App\Models\Pelanggan;
 use App\Models\Paket;
 use App\Models\Router;
@@ -39,7 +40,9 @@ class PelangganController extends Controller
             'nama' => 'required', 'alamat' => 'required', 'no_hp' => 'required',
             'router_id' => 'required|exists:routers,id',
             'paket_id' => 'required|exists:pakets,id',
-            'username_pppoe' => 'required', 'password_pppoe' => 'required', 'status' => 'required',
+            'username_pppoe' => 'required|string|max:255|unique:pelanggans,username_pppoe',
+            'password_pppoe' => 'required|string|max:255',
+            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
         ]);
 
         $last = Pelanggan::orderByDesc('id')->first();
@@ -47,11 +50,20 @@ class PelangganController extends Controller
         $kode = 'GNS' . str_pad($nomor, 5, '0', STR_PAD_LEFT);
         $router = Router::findOrFail($request->router_id);
         $paket = Paket::findOrFail($request->paket_id);
+        $secretId = null;
 
         DB::beginTransaction();
         try {
-            $secretId = $this->mikrotik->createSecret($router, $request->username_pppoe, $request->password_pppoe, $paket->profile_mikrotik);
-            if ($request->status !== 'Aktif') $this->mikrotik->disableSecretById($router, $secretId);
+            $secretId = $this->mikrotik->createSecret(
+                $router,
+                $request->username_pppoe,
+                $request->password_pppoe,
+                $paket->profile_mikrotik
+            );
+
+            if ($request->status !== 'Aktif') {
+                $this->mikrotik->disableSecretById($router, $secretId);
+            }
 
             Pelanggan::create([
                 'kode_pelanggan' => $kode, 'nama' => $request->nama, 'alamat' => $request->alamat, 'no_hp' => $request->no_hp,
@@ -65,6 +77,23 @@ class PelangganController extends Controller
             return redirect()->route('pelanggan.index')->with('success', 'Data pelanggan berhasil ditambahkan.');
         } catch (Exception $e) {
             DB::rollBack();
+
+            // MikroTik is outside the DB transaction. Remove the newly-created
+            // secret when the customer insert/transaction fails.
+            if ($secretId) {
+                try {
+                    $this->mikrotik->disconnectActiveSessionBySecretId($router, $secretId);
+                    $this->mikrotik->deleteSecretById($router, $secretId);
+                } catch (\Throwable $cleanupError) {
+                    Log::critical('PPP Secret yatim setelah gagal menambah pelanggan', [
+                        'router_id' => $router->id,
+                        'secret_id' => $secretId,
+                        'username_pppoe' => $request->username_pppoe,
+                        'message' => $cleanupError->getMessage(),
+                    ]);
+                }
+            }
+
             Log::error('Gagal menambah pelanggan', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return back()->withInput()->withErrors(['mikrotik' => $e->getMessage()]);
         }
@@ -82,13 +111,16 @@ class PelangganController extends Controller
 
     public function update(Request $request, string $id)
     {
+        $pelanggan = Pelanggan::findOrFail($id);
+
         $request->validate([
             'nama' => 'required', 'alamat' => 'required', 'no_hp' => 'required',
             'router_id' => 'required|exists:routers,id', 'paket_id' => 'required|exists:pakets,id',
-            'username_pppoe' => 'required', 'password_pppoe' => 'required', 'status' => 'required',
+            'username_pppoe' => ['required', 'string', 'max:255', Rule::unique('pelanggans', 'username_pppoe')->ignore($pelanggan->id)],
+            'password_pppoe' => 'required|string|max:255',
+            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
         ]);
 
-        $pelanggan = Pelanggan::findOrFail($id);
         $oldRouter = $pelanggan->router_id ? Router::findOrFail($pelanggan->router_id) : null;
         $newRouter = Router::findOrFail($request->router_id);
         $paket = Paket::findOrFail($request->paket_id);
@@ -210,18 +242,52 @@ class PelangganController extends Controller
     public function destroy(string $id)
     {
         $pelanggan = Pelanggan::findOrFail($id);
+        $router = $pelanggan->router_id ? Router::findOrFail($pelanggan->router_id) : null;
+        $secretId = $pelanggan->mikrotik_secret_id;
+        $secret = null;
+
         DB::beginTransaction();
         try {
-            if (!empty($pelanggan->mikrotik_secret_id)) {
-                $router = Router::findOrFail($pelanggan->router_id);
-                $this->mikrotik->disconnectActiveSessionBySecretId($router, $pelanggan->mikrotik_secret_id);
-                $this->mikrotik->deleteSecretById($router, $pelanggan->mikrotik_secret_id);
+            if ($secretId && $router) {
+                $secret = $this->mikrotik->getSecretById($router, $secretId);
+                if (!$secret) {
+                    throw new Exception('PPP Secret pelanggan tidak ditemukan di MikroTik. Penghapusan dibatalkan agar data tidak menjadi tidak sinkron.');
+                }
+                $this->mikrotik->disconnectActiveSessionBySecretId($router, $secretId);
+                $this->mikrotik->deleteSecretById($router, $secretId);
             }
+
             $pelanggan->delete();
             DB::commit();
             return redirect()->route('pelanggan.index')->with('success', 'Data pelanggan berhasil dihapus.');
         } catch (Exception $e) {
             DB::rollBack();
+
+            // If MikroTik deletion succeeded but the DB transaction failed,
+            // restore the secret so the external and DB state remain aligned.
+            if ($secretId && $router && $secret) {
+                try {
+                    if (!$this->mikrotik->getSecretById($router, $secretId)) {
+                        $restoredId = $this->mikrotik->createSecret(
+                            $router,
+                            (string) ($secret['name'] ?? $pelanggan->username_pppoe),
+                            (string) ($secret['password'] ?? $pelanggan->password_pppoe),
+                            (string) ($secret['profile'] ?? $pelanggan->paket?->profile_mikrotik ?? '')
+                        );
+                        if (($secret['disabled'] ?? 'false') === 'true') {
+                            $this->mikrotik->disableSecretById($router, $restoredId);
+                        }
+                    }
+                } catch (\Throwable $restoreError) {
+                    Log::critical('Gagal memulihkan PPP Secret setelah penghapusan pelanggan gagal', [
+                        'pelanggan_id' => $pelanggan->id,
+                        'router_id' => $router->id,
+                        'secret_id' => $secretId,
+                        'message' => $restoreError->getMessage(),
+                    ]);
+                }
+            }
+
             Log::error('Gagal menghapus pelanggan', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return back()->withErrors($e->getMessage());
         }
