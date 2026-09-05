@@ -81,7 +81,14 @@ class MikroTikService
         return $this->connect($router)->query($query)->read();
     }
 
+    /** Read-only PPP secret listing. */
     public function getSecrets(Router $router): array
+    {
+        return $this->readSecrets($router);
+    }
+
+    /** Explicit recovery operation for database customers missing a PPP secret. */
+    public function getSecretsWithRecovery(Router $router): array
     {
         $secrets = $this->readSecrets($router);
         $byName = [];
@@ -89,9 +96,6 @@ class MikroTikService
             if (!empty($secret['name'])) $byName[$secret['name']] = $secret;
         }
 
-        // DATABASE MENJADI SUMBER PEMULIHAN SETELAH RESTORE.
-        // Jika pelanggan masih ada di database tetapi PPP Secret hilang di MikroTik,
-        // buat kembali dan simpan .id baru ke database.
         $pelanggans = Pelanggan::where('router_id', $router->id)
             ->whereNotNull('username_pppoe')
             ->where('username_pppoe', '!=', '')
