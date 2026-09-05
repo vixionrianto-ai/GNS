@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\Router;
 use App\Models\Pelanggan;
 use App\Models\Paket;
+use App\Models\Router;
+use Exception;
 use RouterOS\Client;
 use RouterOS\Config;
 use RouterOS\Query;
-use Exception;
 
 class MikroTikService
 {
@@ -17,7 +17,9 @@ class MikroTikService
     public function connect(Router $router): Client
     {
         $key = $router->id;
-        if (isset($this->clients[$key])) return $this->clients[$key];
+        if (isset($this->clients[$key])) {
+            return $this->clients[$key];
+        }
 
         $config = new Config([
             'host' => trim((string) $router->ip_router),
@@ -49,6 +51,7 @@ class MikroTikService
         try {
             $result = $this->connect($router)->query(new Query('/system/resource/print'))->read();
             $resource = $result[0] ?? [];
+
             return [
                 'success' => true,
                 'identity' => $this->getIdentity($router),
@@ -61,6 +64,7 @@ class MikroTikService
             ];
         } catch (\Throwable $e) {
             report($e);
+
             return [
                 'success' => false,
                 'identity' => null,
@@ -77,7 +81,9 @@ class MikroTikService
     private function readSecrets(Router $router): array
     {
         $query = new Query('/ppp/secret/print');
-        $query->equal('.proplist', '.id,name,password,service,profile,disabled');
+        // Never request PPP passwords from MikroTik for a list/edit screen.
+        $query->equal('.proplist', '.id,name,service,profile,disabled');
+
         return $this->connect($router)->query($query)->read();
     }
 
@@ -93,7 +99,9 @@ class MikroTikService
         $secrets = $this->readSecrets($router);
         $byName = [];
         foreach ($secrets as $secret) {
-            if (!empty($secret['name'])) $byName[$secret['name']] = $secret;
+            if (!empty($secret['name'])) {
+                $byName[$secret['name']] = $secret;
+            }
         }
 
         $pelanggans = Pelanggan::where('router_id', $router->id)
@@ -103,33 +111,24 @@ class MikroTikService
 
         foreach ($pelanggans as $pelanggan) {
             $username = trim((string) $pelanggan->username_pppoe);
-            if ($username === '' || isset($byName[$username])) continue;
+            if ($username === '' || isset($byName[$username])) {
+                continue;
+            }
 
             $password = (string) ($pelanggan->password_pppoe ?? '');
-            if ($password === '') continue;
+            if ($password === '') {
+                continue;
+            }
 
             $paket = $pelanggan->paket_id ? Paket::find($pelanggan->paket_id) : null;
             $profile = trim((string) ($paket?->profile_mikrotik ?? ''));
-            if ($profile === '') continue;
+            if ($profile === '') {
+                continue;
+            }
 
             try {
-                $query = new Query('/ppp/secret/add');
-                $query->equal('name', $username);
-                $query->equal('password', $password);
-                $query->equal('profile', $profile);
-                $query->equal('service', 'pppoe');
-                $this->connect($router)->query($query)->read();
-
-                $created = null;
-                for ($i = 0; $i < 5; $i++) {
-                    usleep(200000);
-                    foreach ($this->readSecrets($router) as $secret) {
-                        if (($secret['name'] ?? '') === $username) {
-                            $created = $secret;
-                            break 2;
-                        }
-                    }
-                }
+                $this->createSecret($router, $username, $password, $profile, 'pppoe');
+                $created = $this->getSecretByName($router, $username);
 
                 if ($created) {
                     $pelanggan->mikrotik_secret_id = $created['.id'] ?? null;
@@ -153,49 +152,79 @@ class MikroTikService
     public function getSecretByName(Router $router, string $username): ?array
     {
         foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['name'] ?? '') === $username) return $secret;
+            if (($secret['name'] ?? '') === $username) {
+                return $secret;
+            }
         }
+
         return null;
     }
 
     public function getSecretById(Router $router, string $id): ?array
     {
         foreach ($this->readSecrets($router) as $secret) {
-            if (($secret['.id'] ?? '') === $id) return $secret;
+            if (($secret['.id'] ?? '') === $id) {
+                return $secret;
+            }
         }
+
         return null;
     }
 
-    public function createSecret(Router $router, string $username, string $password, string $profile, string $service = 'pppoe'): string
-    {
-        $client = $this->connect($router);
+    public function createSecret(
+        Router $router,
+        string $username,
+        string $password,
+        string $profile,
+        string $service = 'pppoe'
+    ): string {
         if ($this->getSecretByName($router, $username)) {
             throw new Exception("PPP Secret {$username} sudah ada.");
         }
+
         $query = new Query('/ppp/secret/add');
         $query->equal('name', $username);
         $query->equal('password', $password);
         $query->equal('profile', $profile);
         $query->equal('service', $service);
-        $client->query($query)->read();
+        $this->connect($router)->query($query)->read();
 
         for ($i = 0; $i < 5; $i++) {
             usleep(200000);
             $secret = $this->getSecretByName($router, $username);
-            if ($secret) return $secret['.id'];
+            if ($secret) {
+                return (string) $secret['.id'];
+            }
         }
+
         throw new Exception('PPP Secret berhasil dibuat tetapi ID MikroTik tidak ditemukan.');
     }
 
-    public function updateSecretById(Router $router, string $id, string $username, string $password, string $profile, string $service = 'pppoe'): bool
-    {
+    public function updateSecretById(
+        Router $router,
+        string $id,
+        string $username,
+        ?string $password,
+        string $profile,
+        string $service = 'pppoe',
+        ?string $disabled = null
+    ): bool {
         $query = new Query('/ppp/secret/set');
         $query->equal('.id', $id);
         $query->equal('name', $username);
-        $query->equal('password', $password);
         $query->equal('profile', $profile);
         $query->equal('service', $service);
+
+        if ($password !== null && $password !== '') {
+            $query->equal('password', $password);
+        }
+
+        if ($disabled !== null && $disabled !== '') {
+            $query->equal('disabled', $disabled);
+        }
+
         $this->connect($router)->query($query)->read();
+
         return true;
     }
 
@@ -204,6 +233,7 @@ class MikroTikService
         $query = new Query('/ppp/secret/remove');
         $query->equal('.id', $id);
         $this->connect($router)->query($query)->read();
+
         return true;
     }
 
@@ -212,6 +242,7 @@ class MikroTikService
         $query = new Query('/ppp/secret/enable');
         $query->equal('.id', $id);
         $this->connect($router)->query($query)->read();
+
         return true;
     }
 
@@ -220,6 +251,7 @@ class MikroTikService
         $query = new Query('/ppp/secret/disable');
         $query->equal('.id', $id);
         $this->connect($router)->query($query)->read();
+
         return true;
     }
 
@@ -227,14 +259,18 @@ class MikroTikService
     {
         $query = new Query('/ppp/active/print');
         $query->equal('.proplist', '.id,name,address,caller-id,uptime,service');
+
         return $this->connect($router)->query($query)->read();
     }
 
     public function getActiveByUsername(Router $router, string $username): ?array
     {
         foreach ($this->getActiveSessions($router) as $active) {
-            if (($active['name'] ?? '') === $username) return $active;
+            if (($active['name'] ?? '') === $username) {
+                return $active;
+            }
         }
+
         return null;
     }
 
@@ -246,16 +282,21 @@ class MikroTikService
     public function disconnectActiveSession(Router $router, string $username): bool
     {
         $active = $this->getActiveByUsername($router, $username);
-        if (!$active) return false;
+        if (!$active) {
+            return false;
+        }
+
         $query = new Query('/ppp/active/remove');
         $query->equal('.id', $active['.id']);
         $this->connect($router)->query($query)->read();
+
         return true;
     }
 
     public function disconnectActiveSessionBySecretId(Router $router, string $secretId): bool
     {
         $secret = $this->getSecretById($router, $secretId);
+
         return $secret ? $this->disconnectActiveSession($router, $secret['name']) : false;
     }
 
@@ -263,12 +304,16 @@ class MikroTikService
     {
         $count = 0;
         foreach ($this->getActiveSessions($router) as $active) {
-            if (($active['name'] ?? '') !== $username) continue;
+            if (($active['name'] ?? '') !== $username) {
+                continue;
+            }
+
             $query = new Query('/ppp/active/remove');
             $query->equal('.id', $active['.id']);
             $this->connect($router)->query($query)->read();
             $count++;
         }
+
         return $count;
     }
 
@@ -276,17 +321,96 @@ class MikroTikService
     {
         $query = new Query('/ppp/profile/print');
         $query->equal('.proplist', '.id,name,local-address,remote-address,rate-limit,only-one');
+
         return $this->connect($router)->query($query)->read();
+    }
+
+    public function getProfileById(Router $router, string $id): ?array
+    {
+        foreach ($this->getProfiles($router) as $profile) {
+            if (($profile['.id'] ?? '') === $id) {
+                return $profile;
+            }
+        }
+
+        return null;
     }
 
     public function getProfileNames(Router $router): array
     {
         $profiles = [];
         foreach ($this->getProfiles($router) as $profile) {
-            if (!empty($profile['name'])) $profiles[] = $profile['name'];
+            if (!empty($profile['name'])) {
+                $profiles[] = $profile['name'];
+            }
         }
+
         sort($profiles);
+
         return $profiles;
+    }
+
+    public function createProfile(
+        Router $router,
+        string $name,
+        ?string $localAddress = null,
+        ?string $remoteAddress = null,
+        ?string $rateLimit = null,
+        ?string $onlyOne = null
+    ): bool {
+        $query = new Query('/ppp/profile/add');
+        $query->equal('name', $name);
+
+        if ($localAddress !== null && $localAddress !== '') {
+            $query->equal('local-address', $localAddress);
+        }
+        if ($remoteAddress !== null && $remoteAddress !== '') {
+            $query->equal('remote-address', $remoteAddress);
+        }
+        if ($rateLimit !== null && $rateLimit !== '') {
+            $query->equal('rate-limit', $rateLimit);
+        }
+        if ($onlyOne !== null && $onlyOne !== '') {
+            $query->equal('only-one', $onlyOne);
+        }
+
+        $this->connect($router)->query($query)->read();
+
+        return true;
+    }
+
+    public function updateProfile(
+        Router $router,
+        string $id,
+        string $name,
+        ?string $localAddress = null,
+        ?string $remoteAddress = null,
+        ?string $rateLimit = null,
+        ?string $onlyOne = null
+    ): bool {
+        $query = new Query('/ppp/profile/set');
+        $query->equal('.id', $id);
+        $query->equal('name', $name);
+        $query->equal('local-address', (string) ($localAddress ?? ''));
+        $query->equal('remote-address', (string) ($remoteAddress ?? ''));
+        $query->equal('rate-limit', (string) ($rateLimit ?? ''));
+
+        if ($onlyOne !== null && $onlyOne !== '') {
+            $query->equal('only-one', $onlyOne);
+        }
+
+        $this->connect($router)->query($query)->read();
+
+        return true;
+    }
+
+    public function deleteProfile(Router $router, string $id): bool
+    {
+        $query = new Query('/ppp/profile/remove');
+        $query->equal('.id', $id);
+        $this->connect($router)->query($query)->read();
+
+        return true;
     }
 
     public function secretExists(Router $router, string $username): bool
@@ -297,30 +421,35 @@ class MikroTikService
     public function getSecretId(Router $router, string $username): ?string
     {
         $secret = $this->getSecretByName($router, $username);
+
         return $secret['.id'] ?? null;
     }
 
     public function getIdentity(Router $router): ?string
     {
         $result = $this->connect($router)->query(new Query('/system/identity/print'))->read();
+
         return $result[0]['name'] ?? null;
     }
 
     public function getRouterVersion(Router $router): ?string
     {
         $result = $this->connect($router)->query(new Query('/system/resource/print'))->read();
+
         return $result[0]['version'] ?? null;
     }
 
     public function getBoardName(Router $router): ?string
     {
         $result = $this->connect($router)->query(new Query('/system/resource/print'))->read();
+
         return $result[0]['board-name'] ?? null;
     }
 
     public function getUptime(Router $router): ?string
     {
         $result = $this->connect($router)->query(new Query('/system/resource/print'))->read();
+
         return $result[0]['uptime'] ?? null;
     }
 }
