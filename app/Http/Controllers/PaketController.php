@@ -1,22 +1,18 @@
 <?php
 
 namespace App\Http\Controllers;
+
+use App\Models\Paket;
 use App\Models\Router;
 use App\Services\MikroTikService;
-use App\Models\Paket;
 use Illuminate\Http\Request;
 
 class PaketController extends Controller
 {
-    protected $mikrotik;
-
-    public function __construct(MikroTikService $mikrotik)
+    public function __construct(protected MikroTikService $mikrotik)
     {
-        $this->mikrotik = $mikrotik;
     }
-    /**
-     * Display a listing of the resource.
-     */
+
     public function index()
     {
         $pakets = Paket::all();
@@ -24,103 +20,90 @@ class PaketController extends Controller
         return view('paket.index', compact('pakets'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-
     public function create()
     {
         $routers = Router::orderBy('nama_router')->get();
+
         return view('paket.create', compact('routers'));
     }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    
-    /*
-    |--------------------------------------------------------------------------
-    | AJAX : AMBIL PPP PROFILE DARI MIKROTIK
-    |--------------------------------------------------------------------------
-    */
 
     public function getProfiles(Router $router)
     {
         try {
-
             $profiles = $this->mikrotik->getProfileNames($router);
 
             return response()->json($profiles);
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            report($e);
 
             return response()->json([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
-
         }
     }
+
     public function store(Request $request)
     {
-        $request->validate([
-        'router_id'         => 'required',
-        'nama_paket'        => 'required',
-        'kecepatan'         => 'required',
-        'profile_mikrotik'  => 'required',
-        'harga'             => 'required|numeric',
-        'status'            => 'required',
-    ]);
+        $data = $request->validate([
+            'router_id' => ['required', 'integer', 'exists:routers,id'],
+            'nama_paket' => ['required', 'string', 'max:100'],
+            'kecepatan' => ['required', 'string', 'max:100'],
+            'profile_mikrotik' => ['required', 'string', 'max:100'],
+            'harga' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'string', 'max:50'],
+            'keterangan' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-        Paket::create($request->all());
+        Paket::create($data);
 
-        return redirect()->route('paket.index')
-                        ->with('success', 'Paket berhasil ditambahkan.');
+        return redirect()
+            ->route('paket.index')
+            ->with('success', 'Paket berhasil ditambahkan.');
     }
-    /**
-     * Display the specified resource.
-     */
+
     public function show(Paket $paket)
     {
-        //
+        return redirect()->route('paket.edit', $paket);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Paket $paket)
     {
-        $routers = \App\Models\Router::orderBy('nama_router')->get();
+        $routers = Router::orderBy('nama_router')->get();
 
         return view('paket.edit', compact('paket', 'routers'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Paket $paket)
     {
-        $request->validate([
-            'nama_paket'       => 'required',
-            'kecepatan'        => 'required',
-            'profile_mikrotik' => 'required',
-            'harga'            => 'required|numeric',
-            'status'           => 'required',
+        $data = $request->validate([
+            'router_id' => ['sometimes', 'required', 'integer', 'exists:routers,id'],
+            'nama_paket' => ['required', 'string', 'max:100'],
+            'kecepatan' => ['required', 'string', 'max:100'],
+            'profile_mikrotik' => ['required', 'string', 'max:100'],
+            'harga' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'string', 'max:50'],
+            'keterangan' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $paket->update($request->all());
+        $paket->update($data);
 
-        return redirect()->route('paket.index')
-                        ->with('success', 'Paket berhasil diupdate.');
+        return redirect()
+            ->route('paket.index')
+            ->with('success', 'Paket berhasil diupdate.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Paket $paket)
     {
+        if ($paket->pelanggans()->exists()) {
+            return redirect()
+                ->route('paket.index')
+                ->with('error', 'Paket tidak dapat dihapus karena masih digunakan pelanggan.');
+        }
+
         $paket->delete();
 
-        return redirect()->route('paket.index')
-                         ->with('success', 'Paket berhasil dihapus.');
+        return redirect()
+            ->route('paket.index')
+            ->with('success', 'Paket berhasil dihapus.');
     }
 }
