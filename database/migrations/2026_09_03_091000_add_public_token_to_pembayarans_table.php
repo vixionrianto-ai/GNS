@@ -2,22 +2,60 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Add public invoice tokens and their unique index when they are not
+     * already present in the deployed database.
+     */
     public function up(): void
     {
-        Schema::table('pembayarans', function (Blueprint $table) {
-            $table->string('public_token', 64)->nullable()->unique()->after('invoice_pdf');
-        });
+        if (! Schema::hasColumn('pembayarans', 'public_token')) {
+            Schema::table('pembayarans', function (Blueprint $table) {
+                $table->string('public_token', 64)
+                    ->nullable()
+                    ->after('invoice_pdf');
+            });
+        }
+
+        $hasUniqueIndex = DB::selectOne(
+            "SELECT COUNT(*) AS aggregate
+             FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'pembayarans'
+               AND INDEX_NAME = 'pembayarans_public_token_unique'"
+        );
+
+        if ((int) $hasUniqueIndex->aggregate === 0) {
+            Schema::table('pembayarans', function (Blueprint $table) {
+                $table->unique('public_token', 'pembayarans_public_token_unique');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('pembayarans', function (Blueprint $table) {
-            $table->dropUnique(['public_token']);
-            $table->dropColumn('public_token');
-        });
+        $hasUniqueIndex = DB::selectOne(
+            "SELECT COUNT(*) AS aggregate
+             FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'pembayarans'
+               AND INDEX_NAME = 'pembayarans_public_token_unique'"
+        );
+
+        if ((int) $hasUniqueIndex->aggregate > 0) {
+            Schema::table('pembayarans', function (Blueprint $table) {
+                $table->dropUnique('pembayarans_public_token_unique');
+            });
+        }
+
+        if (Schema::hasColumn('pembayarans', 'public_token')) {
+            Schema::table('pembayarans', function (Blueprint $table) {
+                $table->dropColumn('public_token');
+            });
+        }
     }
 };
