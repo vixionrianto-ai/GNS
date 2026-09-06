@@ -213,6 +213,10 @@ class RouterController extends Controller
                 $data['disabled']
             );
 
+            if ($data['disabled'] === 'yes') {
+                $this->mikrotik->disconnectActiveSessionBySecretId($router, $secret);
+            }
+
             return response()->json(['success' => true, 'message' => 'PPP Secret berhasil diupdate.']);
         } catch (\Throwable $e) {
             report($e);
@@ -228,6 +232,7 @@ class RouterController extends Controller
                 return response()->json(['success' => false, 'message' => 'PPP Secret tidak ditemukan.'], 404);
             }
 
+            $this->mikrotik->disconnectActiveSessionBySecretId($router, $secret);
             $this->mikrotik->deleteSecretById($router, $secret);
 
             return response()->json(['success' => true, 'message' => 'PPP Secret berhasil dihapus.']);
@@ -310,7 +315,7 @@ class RouterController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'local_address' => ['nullable', 'string', 'max:255'],
+            'local_address' => ['nullable', 'string', 'max:100'],
             'remote_address' => ['nullable', 'string', 'max:255'],
             'rate_limit' => ['nullable', 'string', 'max:255'],
             'only_one' => ['nullable', 'string', 'max:20'],
@@ -367,6 +372,7 @@ class RouterController extends Controller
                 $this->mikrotik->enableSecretById($router, $secret);
             } else {
                 $this->mikrotik->disableSecretById($router, $secret);
+                $this->mikrotik->disconnectActiveSessionBySecretId($router, $secret);
             }
 
             return response()->json([
