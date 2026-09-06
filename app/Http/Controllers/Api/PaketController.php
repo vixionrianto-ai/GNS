@@ -69,12 +69,28 @@ class PaketController extends Controller
 
     public function destroy(Paket $paket)
     {
-        $paket->delete();
+        if ($paket->pelanggans()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paket tidak dapat dihapus karena masih digunakan pelanggan.',
+            ], 422);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket berhasil dihapus.',
-        ]);
+        try {
+            $paket->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Paket berhasil dihapus.',
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     public function profiles(Router $router)
