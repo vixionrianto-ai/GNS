@@ -14,15 +14,21 @@ class DashboardController extends Controller
     public function index(): JsonResponse
     {
         $pembayaranTerakhir = Pembayaran::with(['tagihan.pelanggan'])
+            ->where('status', Pembayaran::STATUS_BERHASIL)
             ->latest('tanggal_bayar')
             ->take(5)
             ->get();
 
         $tagihanJatuhTempo = Tagihan::with('pelanggan')
-            ->whereIn('status', [
-                Tagihan::STATUS_BELUM_BAYAR,
-                Tagihan::STATUS_JATUH_TEMPO,
+            ->whereNotIn('status', [
+                Tagihan::STATUS_LUNAS,
+                Tagihan::STATUS_DIBATALKAN,
             ])
+            ->whereDate('tanggal_jatuh_tempo', '<=', today())
+            ->where(function ($query) {
+                $query->where('sisa', '>', 0)
+                    ->orWhereNull('sisa');
+            })
             ->orderBy('tanggal_jatuh_tempo')
             ->take(5)
             ->get();
@@ -46,8 +52,8 @@ class DashboardController extends Controller
             'tagihanJatuhTempo' => $tagihanJatuhTempo,
             'serverTime' => now()->toIso8601String(),
             'routerOffline' => Router::where('status', '!=', 'Aktif')->count(),
-            'tagihanBelumLunas' => Tagihan::where('status', '!=', Tagihan::STATUS_LUNAS)->count(),
-            'tagihanSebagian' => Tagihan::where('status', 'Sebagian')->count(),
+            'tagihanBelumLunas' => Tagihan::whereNotIn('status', [Tagihan::STATUS_LUNAS, Tagihan::STATUS_DIBATALKAN])->count(),
+            'tagihanSebagian' => Tagihan::where('status', Tagihan::STATUS_SEBAGIAN)->count(),
             'tagihanJatuhTempoCount' => Tagihan::where('status', Tagihan::STATUS_JATUH_TEMPO)->count(),
             'tagihanHariIni' => Tagihan::whereDate('tanggal_tagihan', today())->count(),
             'totalPembayaran' => Pembayaran::count(),
