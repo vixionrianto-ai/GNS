@@ -315,7 +315,7 @@ class RouterController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'local_address' => ['nullable', 'string', 'max:100'],
+            'local_address' => ['nullable', 'string', 'max:255'],
             'remote_address' => ['nullable', 'string', 'max:255'],
             'rate_limit' => ['nullable', 'string', 'max:255'],
             'only_one' => ['nullable', 'string', 'max:20'],
