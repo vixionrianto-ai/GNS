@@ -30,16 +30,17 @@ class DashboardController extends Controller
             ->where('status', Pembayaran::STATUS_BERHASIL)
             ->sum('total_bayar');
 
+        // Dashboard only shows successful payments, never cancelled records.
         $pembayaranTerakhir = Pembayaran::with([
             'tagihan.pelanggan',
             'user',
         ])
+            ->where('status', Pembayaran::STATUS_BERHASIL)
             ->latest('tanggal_bayar')
             ->take(5)
             ->get();
 
-        // Tampilkan semua tagihan yang sudah jatuh tempo dan masih memiliki sisa,
-        // termasuk tagihan yang baru terbayar sebagian.
+        // A partially paid invoice can still be overdue when it has a remaining balance.
         $tagihanJatuhTempo = Tagihan::with('pelanggan')
             ->whereNotIn('status', [
                 Tagihan::STATUS_LUNAS,
