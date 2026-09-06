@@ -34,15 +34,22 @@ class DashboardController extends Controller
             'tagihan.pelanggan',
             'user',
         ])
-        ->latest('tanggal_bayar')
-        ->take(5)
-        ->get();
+            ->latest('tanggal_bayar')
+            ->take(5)
+            ->get();
 
+        // Tampilkan semua tagihan yang sudah jatuh tempo dan masih memiliki sisa,
+        // termasuk tagihan yang baru terbayar sebagian.
         $tagihanJatuhTempo = Tagihan::with('pelanggan')
-            ->whereIn('status', [
-                Tagihan::STATUS_BELUM_BAYAR,
-                Tagihan::STATUS_JATUH_TEMPO,
+            ->whereNotIn('status', [
+                Tagihan::STATUS_LUNAS,
+                Tagihan::STATUS_DIBATALKAN,
             ])
+            ->whereDate('tanggal_jatuh_tempo', '<=', today())
+            ->where(function ($query) {
+                $query->where('sisa', '>', 0)
+                    ->orWhereNull('sisa');
+            })
             ->orderBy('tanggal_jatuh_tempo')
             ->take(5)
             ->get();
