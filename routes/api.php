@@ -34,7 +34,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/router/{router}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile']);
 
         Route::apiResource('paket', PaketController::class);
-        Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles']);
+        Route::get('/router/{router}/profiles', [PaketController::class, 'profiles']);
 
         Route::apiResource('pelanggan', PelangganController::class);
         Route::post('/pelanggan/sync', [PelangganController::class, 'sync']);
