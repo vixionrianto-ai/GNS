@@ -35,7 +35,10 @@
                             <select name="status" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 <option value="">Semua</option>
                                 <option value="Belum Bayar" {{ request('status') == 'Belum Bayar' ? 'selected' : '' }}>Belum Bayar</option>
+                                <option value="Sebagian" {{ request('status') == 'Sebagian' ? 'selected' : '' }}>Sebagian</option>
+                                <option value="Jatuh Tempo" {{ request('status') == 'Jatuh Tempo' ? 'selected' : '' }}>Jatuh Tempo</option>
                                 <option value="Lunas" {{ request('status') == 'Lunas' ? 'selected' : '' }}>Lunas</option>
+                                <option value="Dibatalkan" {{ request('status') == 'Dibatalkan' ? 'selected' : '' }}>Dibatalkan</option>
                             </select>
                         </div>
 
@@ -70,6 +73,15 @@
                         </thead>
                         <tbody>
                             @forelse($tagihans as $tagihan)
+                                @php
+                                    $statusClass = match ($tagihan->status) {
+                                        'Lunas' => 'bg-green-100 text-green-700',
+                                        'Sebagian' => 'bg-yellow-100 text-yellow-700',
+                                        'Jatuh Tempo' => 'bg-orange-100 text-orange-700',
+                                        'Dibatalkan' => 'bg-gray-100 text-gray-700',
+                                        default => 'bg-red-100 text-red-700',
+                                    };
+                                @endphp
                                 <tr class="border-t border-gray-200">
                                     <td class="px-4 py-3 text-center">{{ $tagihans->firstItem() + $loop->index }}</td>
                                     <td class="px-4 py-3 font-medium text-gray-900">{{ $tagihan->invoice_no }}</td>
@@ -81,11 +93,9 @@
                                     <td class="px-4 py-3">{{ $tagihan->periode }}</td>
                                     <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp {{ number_format($tagihan->total,0,',','.') }}</td>
                                     <td class="px-4 py-3 text-center">
-                                        @if($tagihan->status == 'Lunas')
-                                            <span class="rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-700">Lunas</span>
-                                        @else
-                                            <span class="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">Belum Bayar</span>
-                                        @endif
+                                        <span class="rounded-full px-3 py-1 text-sm font-semibold {{ $statusClass }}">
+                                            {{ $tagihan->status }}
+                                        </span>
                                     </td>
                                     <td class="px-4 py-3">
                                         <div class="flex flex-wrap justify-center gap-2">
@@ -93,7 +103,7 @@
                                                 👁 Detail
                                             </a>
 
-                                            @if($tagihan->status != 'Lunas')
+                                            @if($tagihan->status !== 'Lunas' && $tagihan->status !== 'Dibatalkan')
                                                 <form action="{{ route('tagihan.destroy', $tagihan->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus tagihan ini?')">
                                                     @csrf
                                                     @method('DELETE')
