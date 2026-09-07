@@ -66,9 +66,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])
         ->name('paket.getProfiles');
 
-    // Pelanggan has no dedicated show page; keep resource routes aligned with the actual UI.
-    Route::resource('pelanggan', PelangganController::class)
-        ->except(['show']);
+    Route::resource('pelanggan', PelangganController::class);
     Route::post('/pelanggan/sync', [PelangganController::class, 'sync'])
         ->name('pelanggan.sync');
 
