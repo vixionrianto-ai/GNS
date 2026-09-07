@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -21,15 +20,7 @@ return new class extends Migration
             });
         }
 
-        $hasUniqueIndex = DB::selectOne(
-            "SELECT COUNT(*) AS aggregate
-             FROM information_schema.STATISTICS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'pembayarans'
-               AND INDEX_NAME = 'pembayarans_public_token_unique'"
-        );
-
-        if ((int) $hasUniqueIndex->aggregate === 0) {
+        if (! Schema::hasIndex('pembayarans', 'pembayarans_public_token_unique')) {
             Schema::table('pembayarans', function (Blueprint $table) {
                 $table->unique('public_token', 'pembayarans_public_token_unique');
             });
@@ -38,15 +29,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $hasUniqueIndex = DB::selectOne(
-            "SELECT COUNT(*) AS aggregate
-             FROM information_schema.STATISTICS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'pembayarans'
-               AND INDEX_NAME = 'pembayarans_public_token_unique'"
-        );
-
-        if ((int) $hasUniqueIndex->aggregate > 0) {
+        if (Schema::hasIndex('pembayarans', 'pembayarans_public_token_unique')) {
             Schema::table('pembayarans', function (Blueprint $table) {
                 $table->dropUnique('pembayarans_public_token_unique');
             });
