@@ -115,7 +115,10 @@ class PelangganController extends Controller
         }
     }
 
-    public function show(string $id) { /* intentionally unused */ }
+    public function show(string $id)
+    {
+        return redirect()->route('pelanggan.edit', $id);
+    }
 
     public function edit(string $id)
     {
