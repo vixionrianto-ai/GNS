@@ -18,18 +18,6 @@ use App\Http\Controllers\BackupController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\WhatsAppLogController;
 
-use App\Models\Router;
-use App\Services\MikroTikService;
-
-Route::get('/test-mikrotik', function (MikroTikService $mikrotik) {
-    $router = Router::first();
-
-    dd([
-        'identity' => $mikrotik->getIdentity($router),
-        'version' => $mikrotik->getRouterVersion($router),
-    ]);
-});
-
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('dashboard');
@@ -105,7 +93,8 @@ Route::middleware('auth')->group(function () {
     });
 
     /* ROUTER & MIKROTIK */
-    Route::resource('router', RouterController::class);
+    Route::resource('router', RouterController::class)
+        ->except(['show']);
 
     Route::get('/router/{id}/test', [RouterController::class, 'test'])
         ->name('router.test');
@@ -162,7 +151,8 @@ Route::middleware('auth')->group(function () {
         ->name('router.pppprofile.delete');
 
     /* PAKET */
-    Route::resource('paket', PaketController::class);
+    Route::resource('paket', PaketController::class)
+        ->except(['show']);
 
     Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])
         ->name('paket.getProfiles');
