@@ -36,7 +36,7 @@
 
         <div class="text-sm text-blue-600">
 
-            Administrator
+            Pengguna
 
         </div>
 
@@ -577,7 +577,7 @@ height="240">
 
 <br>
 
-GNS Billing v2.0
+GNS Billing v4
 
 </div>
 
@@ -845,23 +845,24 @@ Tidak ada tagihan jatuh tempo.
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+const serverTimeOrigin = new Date(@json(now()->toIso8601String())).getTime();
+const clientTimeOrigin = Date.now();
+
+function getServerNow() {
+    return new Date(serverTimeOrigin + (Date.now() - clientTimeOrigin));
+}
 
 function updateClock(){
+    const now = getServerNow();
 
-const now=new Date();
+    document.getElementById('clock').textContent =
+        now.toLocaleTimeString('id-ID');
 
-document.getElementById('clock').innerHTML=
-
-now.toLocaleTimeString('id-ID');
-
-document.getElementById('serverClock').innerHTML=
-
-now.toLocaleString('id-ID');
-
+    document.getElementById('serverClock').textContent =
+        now.toLocaleString('id-ID');
 }
 
 setInterval(updateClock,1000);
-
 updateClock();
 
 const pendapatanChart=document.getElementById('pendapatanChart');
