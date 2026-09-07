@@ -6,6 +6,7 @@ use App\Models\AlokasiPembayaran;
 use App\Models\Tagihan;
 use App\Models\Pelanggan;
 use App\Models\Pembayaran;
+use App\Models\SaldoPelanggan;
 use App\Services\TagihanService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -78,7 +79,8 @@ class TagihanController extends Controller
     {
         $this->tagihanService->updateStatusOtomatis();
 
-        $query = Tagihan::with(['pelanggan', 'pelanggan.paket']);
+        $query = Tagihan::with(['pelanggan', 'pelanggan.paket'])
+            ->withCount(['pembayaran', 'alokasi', 'saldoUsages']);
         $query = $this->filter($query, $request);
         $tagihans = $query->latest('id')->paginate(50)->withQueryString();
         $statistik = $this->statistik();
@@ -197,7 +199,7 @@ class TagihanController extends Controller
             ) {
                 return redirect()
                     ->route('tagihan.index')
-                    ->with('error', 'Tagihan tidak dapat dihapus karena sudah memiliki histori pembayaran, alokasi, atau penggunaan saldo.');
+                    ->with('error', 'Tagihan tidak dapat dihapus karena sudah memiliki histori pembayaran, alokasi, atau penggunaan saldo. Gunakan Batalkan Alokasi & Hapus untuk tagihan yang hanya memiliki alokasi/penggunaan saldo.');
             }
 
             $invoice = $tagihan->invoice_no;
@@ -215,6 +217,109 @@ class TagihanController extends Controller
         } catch (\Throwable $e) {
             Log::error('Hapus tagihan gagal', ['message' => $e->getMessage()]);
             return redirect()->route('tagihan.index')->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Batalkan alokasi/penggunaan saldo untuk tagihan yang tidak memiliki
+     * pembayaran langsung, lalu hapus tagihan secara atomik.
+     *
+     * - SaldoUsage dikembalikan ke saldo pelanggan.
+     * - Alokasi pembayaran yang berasal dari pembayaran lain dikembalikan
+     *   menjadi saldo pelanggan, sementara record pembayaran induknya tetap ada.
+     * - Pembayaran langsung pada tagihan sengaja ditolak agar histori pembayaran
+     *   tidak ikut dihapus/diubah secara otomatis.
+     */
+    public function destroyWithRollback(Tagihan $tagihan)
+    {
+        try {
+            $tagihan->loadMissing(['pembayaran', 'alokasi.pembayaran', 'saldoUsages']);
+
+            if ($tagihan->pembayaran()->exists()) {
+                return redirect()
+                    ->route('tagihan.index')
+                    ->with('error', 'Tagihan memiliki pembayaran langsung. Pembayaran harus dibatalkan/dikelola dari menu Pembayaran terlebih dahulu.');
+            }
+
+            if (! $tagihan->alokasi()->exists() && ! $tagihan->saldoUsages()->exists()) {
+                return redirect()
+                    ->route('tagihan.index')
+                    ->with('error', 'Tagihan ini tidak memiliki alokasi atau penggunaan saldo untuk dibatalkan.');
+            }
+
+            $invoice = $tagihan->invoice_no;
+            $pelangganId = $tagihan->pelanggan_id;
+
+            $hasil = DB::transaction(function () use ($tagihan, $pelangganId) {
+                $saldo = SaldoPelanggan::milik($pelangganId);
+                $saldo = SaldoPelanggan::whereKey($saldo->id)->lockForUpdate()->firstOrFail();
+
+                $saldoDikembalikan = 0.0;
+
+                // Penggunaan saldo yang benar-benar mengurangi saldo pelanggan
+                // dikembalikan terlebih dahulu.
+                $saldoUsages = $tagihan->saldoUsages()->lockForUpdate()->get();
+                foreach ($saldoUsages as $usage) {
+                    $jumlah = (float) $usage->jumlah;
+                    if ($jumlah > 0) {
+                        $saldo->tambah(
+                            $jumlah,
+                            'Pengembalian saldo dari pembatalan tagihan ' . $tagihan->invoice_no
+                        );
+                        $saldoDikembalikan += $jumlah;
+                    }
+
+                    $usage->delete();
+                }
+
+                // Alokasi dari pembayaran normal yang dialokasikan FIFO ke tagihan
+                // ini dikembalikan menjadi saldo pelanggan. Pembayaran induknya
+                // tetap utuh dan tidak dihapus.
+                $alokasiSaldoUsage = $saldoUsages->sum(fn ($usage) => (float) $usage->jumlah);
+                $alokasi = $tagihan->alokasi()->with('pembayaran')->lockForUpdate()->get();
+
+                foreach ($alokasi as $item) {
+                    $nominal = (float) $item->nominal;
+                    $metodeSaldo = $item->pembayaran?->metode === 'Saldo';
+
+                    // Jika alokasi ini sudah punya pasangan SaldoUsage, pengembalian
+                    // saldo sudah dilakukan di atas; jangan mengembalikannya dua kali.
+                    if ($metodeSaldo && $alokasiSaldoUsage >= $nominal) {
+                        $alokasiSaldoUsage -= $nominal;
+                    } elseif ($nominal > 0) {
+                        $saldo->tambah(
+                            $nominal,
+                            'Pengembalian alokasi dari pembatalan tagihan ' . $tagihan->invoice_no
+                        );
+                        $saldoDikembalikan += $nominal;
+                    }
+
+                    $item->delete();
+                }
+
+                $tagihan->delete();
+
+                return $saldoDikembalikan;
+            });
+
+            Log::warning('Tagihan dihapus setelah pembatalan alokasi/saldo', [
+                'invoice' => $invoice,
+                'pelanggan_id' => $pelangganId,
+                'saldo_dikembalikan' => $hasil,
+                'user_id' => auth()->id(),
+            ]);
+
+            return redirect()
+                ->route('tagihan.index')
+                ->with('success', "Tagihan {$invoice} berhasil dihapus. Alokasi/penggunaan saldo dibatalkan dan saldo pelanggan dikembalikan Rp " . number_format($hasil, 0, ',', '.') . '.');
+        } catch (\Throwable $e) {
+            Log::error('Batalkan alokasi dan hapus tagihan gagal', [
+                'tagihan_id' => $tagihan->id,
+                'invoice' => $tagihan->invoice_no,
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('tagihan.index')->with('error', 'Gagal membatalkan alokasi dan menghapus tagihan: ' . $e->getMessage());
         }
     }
 
