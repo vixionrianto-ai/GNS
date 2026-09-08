@@ -1,1 +1,0 @@
-Standalone payment invoice print route.
