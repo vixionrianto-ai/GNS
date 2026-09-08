@@ -228,6 +228,13 @@ body {
     <div class="clear"></div>
 </div>
 
+@php
+    $alokasiTagihan = $pembayaran->alokasi
+        ->whereNotNull('tagihan_id')
+        ->sortBy('id')
+        ->values();
+@endphp
+
 <!-- Data Pelanggan & Informasi -->
 <div class="info-card">
     <div class="card-header">DATA PELANGGAN & INVOICE</div>
@@ -257,7 +264,15 @@ body {
             </tr>
             <tr>
                 <td>Periode</td>
-                <td>{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+                <td>
+                    @if($alokasiTagihan->isNotEmpty())
+                        @foreach($alokasiTagihan as $alokasi)
+                            <div>{{ optional($alokasi->tagihan)->periode ?? '-' }}</div>
+                        @endforeach
+                    @else
+                        {{ optional($pembayaran->tagihan)->periode ?? '-' }}
+                    @endif
+                </td>
             </tr>
             <tr>
                 <td>Metode</td>
@@ -272,35 +287,44 @@ body {
     </div>
 </div>
 
-<!-- Tabel Rincian -->
+<!-- Tabel Detail Periode yang Dibayar -->
 <table class="rincian">
     <thead>
         <tr>
             <th width="6%">NO</th>
-            <th width="44%">KETERANGAN</th>
-            <th width="18%">NOMINAL</th>
-            <th width="15%">ADMIN</th>
-            <th width="17%">TOTAL</th>
+            <th width="20%">PERIODE</th>
+            <th width="25%">INVOICE TAGIHAN</th>
+            <th width="24%">PAKET</th>
+            <th width="25%">DIBAYAR</th>
         </tr>
     </thead>
     <tbody>
-        <tr>
-            <td class="text-center">1</td>
-            <td>
-                <strong>Tagihan Internet</strong><br>
-                <span class="small">{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</span>
-            </td>
-            <td class="text-right">Rp {{ number_format($pembayaran->nominal ?? 0, 0, ',', '.') }}</td>
-            <td class="text-right">Rp {{ number_format($pembayaran->biaya_admin ?? 0, 0, ',', '.') }}</td>
-            <td class="text-right total">Rp {{ number_format($pembayaran->total_bayar ?? 0, 0, ',', '.') }}</td>
-        </tr>
+        @if($alokasiTagihan->isNotEmpty())
+            @foreach($alokasiTagihan as $index => $alokasi)
+                <tr>
+                    <td class="text-center">{{ $index + 1 }}</td>
+                    <td>{{ optional($alokasi->tagihan)->periode ?? '-' }}</td>
+                    <td>{{ optional($alokasi->tagihan)->invoice_no ?? '-' }}</td>
+                    <td>{{ optional(optional(optional($alokasi->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td>
+                    <td class="text-right total">Rp {{ number_format((float) $alokasi->nominal, 0, ',', '.') }}</td>
+                </tr>
+            @endforeach
+        @else
+            <tr>
+                <td class="text-center">1</td>
+                <td>{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+                <td>{{ optional($pembayaran->tagihan)->invoice_no ?? '-' }}</td>
+                <td>{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td>
+                <td class="text-right total">Rp {{ number_format((float) ($pembayaran->nominal ?? 0), 0, ',', '.') }}</td>
+            </tr>
+        @endif
     </tbody>
 </table>
 
 <!-- Tabel Summary -->
 <table class="summary">
     <tr>
-        <td>TOTAL TAGIHAN</td>
+        <td>TOTAL PEMBAYARAN</td>
         <td class="text-right total">Rp {{ number_format($pembayaran->total_bayar ?? 0, 0, ',', '.') }}</td>
     </tr>
     <tr>
