@@ -141,13 +141,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/router/{id}/ppp-profile/store', [RouterController::class, 'storeProfile'])
         ->name('router.pppprofile.store');
 
-    Route::get('/router/{id}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile'])
-        ->name('router.pppprofile.edit');
-
-    Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])
+    Route::put('/router/{id}/ppp-profile/{secret}', [RouterController::class, 'updateProfile'])
         ->name('router.pppprofile.update');
 
-    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])
+    Route::delete('/router/{id}/ppp-profile/{secret}', [RouterController::class, 'deleteProfile'])
         ->name('router.pppprofile.delete');
 
     /* PAKET */
@@ -194,6 +191,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/pembayaran/{pembayaran}/invoice', [PembayaranController::class, 'invoice'])
         ->name('pembayaran.invoice');
+
+    Route::get('/pembayaran/{pembayaran}/cetak', [PembayaranController::class, 'print'])
+        ->name('pembayaran.print');
 
     Route::get('/pembayaran/{pembayaran}/pdf', [PembayaranController::class, 'pdf'])
         ->name('pembayaran.pdf');
