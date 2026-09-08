@@ -153,7 +153,14 @@
             </thead>
             <tbody>
                 @forelse($tagihans as $index => $item)
-                @php $status = strtolower(trim($item->status ?? '')); @endphp
+                @php
+                    $status = strtolower(trim($item->status ?? ''));
+                    $hasHistory = ($item->pembayaran_count ?? 0) > 0
+                        || ($item->alokasi_count ?? 0) > 0
+                        || ($item->saldo_usages_count ?? 0) > 0;
+                    $canRollbackDelete = ($item->pembayaran_count ?? 0) === 0
+                        && (($item->alokasi_count ?? 0) > 0 || ($item->saldo_usages_count ?? 0) > 0);
+                @endphp
                 <tr>
                     <td class="text-center py-2 align-middle">{{ $tagihans->firstItem() + $index }}</td>
                     <td class="py-2 align-middle"><strong class="text-dark">{{ $item->invoice_no ?? '-' }}</strong></td>
@@ -180,13 +187,24 @@
                                 <i class="fas fa-money-bill-wave"></i>
                             </a>
                             @endif
-                            <form action="{{ route('tagihan.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus tagihan ini beserta data pembayarannya?')">
+
+                            @if($canRollbackDelete)
+                            <form action="{{ route('tagihan.destroy.with-rollback', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tagihan ini memiliki alokasi/penggunaan saldo. Alokasi akan dibatalkan, saldo pelanggan dikembalikan, lalu tagihan dihapus. Lanjutkan?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-warning btn-sm ml-1" title="Batalkan Alokasi & Hapus">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                            </form>
+                            @else
+                            <form action="{{ route('tagihan.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ $hasHistory ? 'Tagihan memiliki histori transaksi dan tidak dapat dihapus dengan cara biasa. Lanjutkan?' : 'Yakin ingin menghapus tagihan ini?' }}')">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm ml-1" title="Hapus">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>
+                            @endif
                         </div>
                     </td>
                 </tr>

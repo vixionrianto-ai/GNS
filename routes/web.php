@@ -179,6 +179,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/tagihan/{tagihan}/whatsapp', [TagihanController::class, 'sendWhatsapp'])
         ->name('tagihan.whatsapp');
 
+    Route::delete('/tagihan/{tagihan}/batalkan-alokasi', [TagihanController::class, 'destroyWithRollback'])
+        ->name('tagihan.destroy.with-rollback');
+
     /* PEMBAYARAN */
     Route::get('/tagihan/{tagihan}/bayar', [PembayaranController::class, 'create'])
         ->name('pembayaran.create');

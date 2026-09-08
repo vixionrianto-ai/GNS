@@ -6,6 +6,7 @@ use App\Models\AlokasiPembayaran;
 use App\Models\Tagihan;
 use App\Models\Pelanggan;
 use App\Models\Pembayaran;
+use App\Models\SaldoPelanggan;
 use App\Services\TagihanService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -78,7 +79,14 @@ class TagihanController extends Controller
     {
         $this->tagihanService->updateStatusOtomatis();
 
-        $query = Tagihan::with(['pelanggan', 'pelanggan.paket']);
+        $query = Tagihan::with(['pelanggan', 'pelanggan.paket'])
+            ->withCount([
+                'pembayaran as pembayaran_count' => function ($query) {
+                    $query->where('metode', '!=', 'Saldo');
+                },
+                'alokasi',
+                'saldoUsages',
+            ]);
         $query = $this->filter($query, $request);
         $tagihans = $query->latest('id')->paginate(50)->withQueryString();
         $statistik = $this->statistik();
@@ -197,7 +205,7 @@ class TagihanController extends Controller
             ) {
                 return redirect()
                     ->route('tagihan.index')
-                    ->with('error', 'Tagihan tidak dapat dihapus karena sudah memiliki histori pembayaran, alokasi, atau penggunaan saldo.');
+                    ->with('error', 'Tagihan tidak dapat dihapus karena sudah memiliki histori pembayaran, alokasi, atau penggunaan saldo. Gunakan Batalkan Alokasi & Hapus untuk tagihan yang hanya memiliki alokasi/penggunaan saldo.');
             }
 
             $invoice = $tagihan->invoice_no;
@@ -215,6 +223,127 @@ class TagihanController extends Controller
         } catch (\Throwable $e) {
             Log::error('Hapus tagihan gagal', ['message' => $e->getMessage()]);
             return redirect()->route('tagihan.index')->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Batalkan alokasi/penggunaan saldo untuk tagihan yang tidak memiliki
+     * pembayaran manual. Pembayaran otomatis metode Saldo boleh dibatalkan
+     * bersama tagihan; pembayaran normal tetap dipertahankan.
+     */
+    public function destroyWithRollback(Tagihan $tagihan)
+    {
+        try {
+            $tagihan->loadMissing(['pembayaran', 'alokasi.pembayaran', 'saldoUsages']);
+
+            $pembayaranLangsung = $tagihan->pembayaran;
+            $pembayaranSaldoOtomatis = $pembayaranLangsung
+                && $pembayaranLangsung->metode === 'Saldo'
+                && $pembayaranLangsung->status === Pembayaran::STATUS_BERHASIL;
+
+            if ($pembayaranLangsung && ! $pembayaranSaldoOtomatis) {
+                return redirect()
+                    ->route('tagihan.index')
+                    ->with('error', 'Tagihan memiliki pembayaran langsung. Pembayaran harus dibatalkan/dikelola dari menu Pembayaran terlebih dahulu.');
+            }
+
+            if (! $tagihan->alokasi()->exists() && ! $tagihan->saldoUsages()->exists()) {
+                return redirect()
+                    ->route('tagihan.index')
+                    ->with('error', 'Tagihan ini tidak memiliki alokasi atau penggunaan saldo untuk dibatalkan.');
+            }
+
+            if ($pembayaranSaldoOtomatis) {
+                $alokasiPembayaranSaldo = $tagihan->alokasi()
+                    ->where('pembayaran_id', $pembayaranLangsung->id)
+                    ->get();
+
+                $alokasiPembayaranLain = $tagihan->alokasi()
+                    ->where('pembayaran_id', '!=', $pembayaranLangsung->id)
+                    ->exists();
+
+                $alokasiDiPembayaranLain = AlokasiPembayaran::where('pembayaran_id', $pembayaranLangsung->id)
+                    ->where('tagihan_id', '!=', $tagihan->id)
+                    ->exists();
+
+                if ($alokasiPembayaranLain || $alokasiDiPembayaranLain || $alokasiPembayaranSaldo->isEmpty()) {
+                    return redirect()
+                        ->route('tagihan.index')
+                        ->with('error', 'Pembayaran otomatis Saldo pada tagihan ini memiliki struktur alokasi yang tidak aman untuk dihapus otomatis. Kelola dari menu Pembayaran terlebih dahulu.');
+                }
+            }
+
+            $invoice = $tagihan->invoice_no;
+            $pelangganId = $tagihan->pelanggan_id;
+
+            $hasil = DB::transaction(function () use ($tagihan, $pelangganId, $pembayaranLangsung, $pembayaranSaldoOtomatis) {
+                $saldo = SaldoPelanggan::milik($pelangganId);
+                $saldo = SaldoPelanggan::whereKey($saldo->id)->lockForUpdate()->firstOrFail();
+
+                $saldoDikembalikan = 0.0;
+
+                $saldoUsages = $tagihan->saldoUsages()->lockForUpdate()->get();
+                foreach ($saldoUsages as $usage) {
+                    $jumlah = (float) $usage->jumlah;
+                    if ($jumlah > 0) {
+                        $saldo->tambah(
+                            $jumlah,
+                            'Pengembalian saldo dari pembatalan tagihan ' . $tagihan->invoice_no
+                        );
+                        $saldoDikembalikan += $jumlah;
+                    }
+
+                    $usage->delete();
+                }
+
+                $alokasiSaldoUsage = $saldoUsages->sum(fn ($usage) => (float) $usage->jumlah);
+                $alokasi = $tagihan->alokasi()->with('pembayaran')->lockForUpdate()->get();
+
+                foreach ($alokasi as $item) {
+                    $nominal = (float) $item->nominal;
+                    $metodeSaldo = $item->pembayaran?->metode === 'Saldo';
+
+                    if ($metodeSaldo && $alokasiSaldoUsage >= $nominal) {
+                        $alokasiSaldoUsage -= $nominal;
+                    } elseif (! $pembayaranSaldoOtomatis && $nominal > 0) {
+                        $saldo->tambah(
+                            $nominal,
+                            'Pengembalian alokasi dari pembatalan tagihan ' . $tagihan->invoice_no
+                        );
+                        $saldoDikembalikan += $nominal;
+                    }
+
+                    $item->delete();
+                }
+
+                if ($pembayaranSaldoOtomatis && $pembayaranLangsung) {
+                    $pembayaranLangsung->delete();
+                }
+
+                $tagihan->delete();
+
+                return $saldoDikembalikan;
+            });
+
+            Log::warning('Tagihan dihapus setelah pembatalan alokasi/saldo', [
+                'invoice' => $invoice,
+                'pelanggan_id' => $pelangganId,
+                'saldo_dikembalikan' => $hasil,
+                'pembayaran_saldo_otomatis' => $pembayaranSaldoOtomatis,
+                'user_id' => auth()->id(),
+            ]);
+
+            return redirect()
+                ->route('tagihan.index')
+                ->with('success', "Tagihan {$invoice} berhasil dihapus. Alokasi/penggunaan saldo dibatalkan dan saldo pelanggan dikembalikan Rp " . number_format($hasil, 0, ',', '.') . '.');
+        } catch (\Throwable $e) {
+            Log::error('Batalkan alokasi dan hapus tagihan gagal', [
+                'tagihan_id' => $tagihan->id,
+                'invoice' => $tagihan->invoice_no,
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('tagihan.index')->with('error', 'Gagal membatalkan alokasi dan menghapus tagihan: ' . $e->getMessage());
         }
     }
 
