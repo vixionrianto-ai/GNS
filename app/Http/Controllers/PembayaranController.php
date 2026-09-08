@@ -121,6 +121,21 @@ class PembayaranController extends Controller
         ]);
     }
 
+    public function print(Pembayaran $pembayaran)
+    {
+        $this->loadPembayaran($pembayaran);
+
+        $alokasiTagihan = $pembayaran->alokasi
+            ->whereNotNull('tagihan_id')
+            ->sortBy('id')
+            ->values();
+
+        return view('pembayaran.print', [
+            'pembayaran' => $pembayaran,
+            'alokasiTagihan' => $alokasiTagihan,
+        ]);
+    }
+
     public function pdf(Pembayaran $pembayaran)
     {
         $this->loadPembayaran($pembayaran);
