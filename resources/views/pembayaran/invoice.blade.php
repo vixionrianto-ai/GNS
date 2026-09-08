@@ -31,6 +31,13 @@
         </div>
     </div>
 
+    @php
+        $alokasiTagihan = $pembayaran->alokasi
+            ->whereNotNull('tagihan_id')
+            ->sortBy('id')
+            ->values();
+    @endphp
+
     <!-- Layout Utama 2 Kolom (Pas 1 Halaman) -->
     <div class="row g-2 mb-2">
         <!-- Kolom Kiri: Informasi Invoice & Pelanggan -->
@@ -119,7 +126,15 @@
                         <table class="table table-borderless align-middle mb-0 small">
                             <tr>
                                 <td class="text-muted py-1.5">Periode</td>
-                                <td class="fw-semibold text-dark text-end py-1.5">{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+                                <td class="text-end py-1.5">
+                                    @if($alokasiTagihan->isNotEmpty())
+                                        @foreach($alokasiTagihan as $alokasi)
+                                            <div class="fw-semibold text-dark">{{ optional($alokasi->tagihan)->periode ?? '-' }}</div>
+                                        @endforeach
+                                    @else
+                                        <div class="fw-semibold text-dark">{{ optional($pembayaran->tagihan)->periode ?? '-' }}</div>
+                                    @endif
+                                </td>
                             </tr>
                             <tr>
                                 <td class="text-muted py-1.5">Router</td>
@@ -140,6 +155,52 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Tagihan yang Dibayar -->
+    <div class="card border-0 shadow-sm rounded-3 mb-2 overflow-hidden">
+        <div class="card-header bg-white py-2 px-3 border-0 d-flex align-items-center">
+            <div class="bg-primary bg-opacity-10 text-primary p-1.5 rounded-2 me-2">
+                <i class="fas fa-list"></i>
+            </div>
+            <h6 class="mb-0 fw-bold text-dark">Detail Tagihan yang Dibayar</h6>
+        </div>
+        <div class="card-body bg-light bg-opacity-50 border-top py-2 px-3">
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle mb-0 small">
+                    <thead class="table-primary">
+                        <tr>
+                            <th style="width: 8%;">No</th>
+                            <th style="width: 22%;">Periode</th>
+                            <th style="width: 25%;">Invoice Tagihan</th>
+                            <th style="width: 25%;">Paket</th>
+                            <th style="width: 20%;" class="text-end">Dibayar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if($alokasiTagihan->isNotEmpty())
+                            @foreach($alokasiTagihan as $index => $alokasi)
+                                <tr>
+                                    <td>{{ $index + 1 }}</td>
+                                    <td>{{ optional($alokasi->tagihan)->periode ?? '-' }}</td>
+                                    <td>{{ optional($alokasi->tagihan)->invoice_no ?? '-' }}</td>
+                                    <td>{{ optional(optional(optional($alokasi->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td>
+                                    <td class="text-end fw-semibold">Rp {{ number_format((float) $alokasi->nominal, 0, ',', '.') }}</td>
+                                </tr>
+                            @endforeach
+                        @else
+                            <tr>
+                                <td>1</td>
+                                <td>{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+                                <td>{{ optional($pembayaran->tagihan)->invoice_no ?? '-' }}</td>
+                                <td>{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td>
+                                <td class="text-end fw-semibold">Rp {{ number_format((float) ($pembayaran->nominal ?? 0), 0, ',', '.') }}</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
