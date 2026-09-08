@@ -52,6 +52,8 @@ class PembayaranController extends Controller
         return $pembayaran->load([
             'tagihan.pelanggan.paket',
             'tagihan.pelanggan.router',
+            'alokasi.tagihan.pelanggan.paket',
+            'alokasi.tagihan.pelanggan.router',
             'user',
         ]);
     }
