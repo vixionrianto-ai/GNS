@@ -90,7 +90,7 @@ class BackupService
             );
         }
 
-        if (filter_var(env('MYSQLDUMP_SKIP_SSL', false), FILTER_VALIDATE_BOOLEAN)) {
+        if (filter_var(Config::get('services.backup.mysqldump_skip_ssl', false), FILTER_VALIDATE_BOOLEAN)) {
             $arguments[] = '--skip-ssl';
         }
 
