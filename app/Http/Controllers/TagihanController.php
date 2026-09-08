@@ -222,20 +222,20 @@ class TagihanController extends Controller
 
     /**
      * Batalkan alokasi/penggunaan saldo untuk tagihan yang tidak memiliki
-     * pembayaran langsung, lalu hapus tagihan secara atomik.
-     *
-     * - SaldoUsage dikembalikan ke saldo pelanggan.
-     * - Alokasi pembayaran yang berasal dari pembayaran lain dikembalikan
-     *   menjadi saldo pelanggan, sementara record pembayaran induknya tetap ada.
-     * - Pembayaran langsung pada tagihan sengaja ditolak agar histori pembayaran
-     *   tidak ikut dihapus/diubah secara otomatis.
+     * pembayaran manual. Pembayaran otomatis metode Saldo boleh dibatalkan
+     * bersama tagihan; pembayaran normal tetap dipertahankan.
      */
     public function destroyWithRollback(Tagihan $tagihan)
     {
         try {
             $tagihan->loadMissing(['pembayaran', 'alokasi.pembayaran', 'saldoUsages']);
 
-            if ($tagihan->pembayaran()->exists()) {
+            $pembayaranLangsung = $tagihan->pembayaran;
+            $pembayaranSaldoOtomatis = $pembayaranLangsung
+                && $pembayaranLangsung->metode === 'Saldo'
+                && $pembayaranLangsung->status === Pembayaran::STATUS_BERHASIL;
+
+            if ($pembayaranLangsung && ! $pembayaranSaldoOtomatis) {
                 return redirect()
                     ->route('tagihan.index')
                     ->with('error', 'Tagihan memiliki pembayaran langsung. Pembayaran harus dibatalkan/dikelola dari menu Pembayaran terlebih dahulu.');
@@ -247,17 +247,35 @@ class TagihanController extends Controller
                     ->with('error', 'Tagihan ini tidak memiliki alokasi atau penggunaan saldo untuk dibatalkan.');
             }
 
+            if ($pembayaranSaldoOtomatis) {
+                $alokasiPembayaranSaldo = $tagihan->alokasi()
+                    ->where('pembayaran_id', $pembayaranLangsung->id)
+                    ->get();
+
+                $alokasiPembayaranLain = $tagihan->alokasi()
+                    ->where('pembayaran_id', '!=', $pembayaranLangsung->id)
+                    ->exists();
+
+                $alokasiDiPembayaranLain = AlokasiPembayaran::where('pembayaran_id', $pembayaranLangsung->id)
+                    ->where('tagihan_id', '!=', $tagihan->id)
+                    ->exists();
+
+                if ($alokasiPembayaranLain || $alokasiDiPembayaranLain || $alokasiPembayaranSaldo->isEmpty()) {
+                    return redirect()
+                        ->route('tagihan.index')
+                        ->with('error', 'Pembayaran otomatis Saldo pada tagihan ini memiliki struktur alokasi yang tidak aman untuk dihapus otomatis. Kelola dari menu Pembayaran terlebih dahulu.');
+                }
+            }
+
             $invoice = $tagihan->invoice_no;
             $pelangganId = $tagihan->pelanggan_id;
 
-            $hasil = DB::transaction(function () use ($tagihan, $pelangganId) {
+            $hasil = DB::transaction(function () use ($tagihan, $pelangganId, $pembayaranLangsung, $pembayaranSaldoOtomatis) {
                 $saldo = SaldoPelanggan::milik($pelangganId);
                 $saldo = SaldoPelanggan::whereKey($saldo->id)->lockForUpdate()->firstOrFail();
 
                 $saldoDikembalikan = 0.0;
 
-                // Penggunaan saldo yang benar-benar mengurangi saldo pelanggan
-                // dikembalikan terlebih dahulu.
                 $saldoUsages = $tagihan->saldoUsages()->lockForUpdate()->get();
                 foreach ($saldoUsages as $usage) {
                     $jumlah = (float) $usage->jumlah;
@@ -272,9 +290,6 @@ class TagihanController extends Controller
                     $usage->delete();
                 }
 
-                // Alokasi dari pembayaran normal yang dialokasikan FIFO ke tagihan
-                // ini dikembalikan menjadi saldo pelanggan. Pembayaran induknya
-                // tetap utuh dan tidak dihapus.
                 $alokasiSaldoUsage = $saldoUsages->sum(fn ($usage) => (float) $usage->jumlah);
                 $alokasi = $tagihan->alokasi()->with('pembayaran')->lockForUpdate()->get();
 
@@ -282,11 +297,9 @@ class TagihanController extends Controller
                     $nominal = (float) $item->nominal;
                     $metodeSaldo = $item->pembayaran?->metode === 'Saldo';
 
-                    // Jika alokasi ini sudah punya pasangan SaldoUsage, pengembalian
-                    // saldo sudah dilakukan di atas; jangan mengembalikannya dua kali.
                     if ($metodeSaldo && $alokasiSaldoUsage >= $nominal) {
                         $alokasiSaldoUsage -= $nominal;
-                    } elseif ($nominal > 0) {
+                    } elseif (! $pembayaranSaldoOtomatis && $nominal > 0) {
                         $saldo->tambah(
                             $nominal,
                             'Pengembalian alokasi dari pembatalan tagihan ' . $tagihan->invoice_no
@@ -295,6 +308,10 @@ class TagihanController extends Controller
                     }
 
                     $item->delete();
+                }
+
+                if ($pembayaranSaldoOtomatis && $pembayaranLangsung) {
+                    $pembayaranLangsung->delete();
                 }
 
                 $tagihan->delete();
@@ -306,6 +323,7 @@ class TagihanController extends Controller
                 'invoice' => $invoice,
                 'pelanggan_id' => $pelangganId,
                 'saldo_dikembalikan' => $hasil,
+                'pembayaran_saldo_otomatis' => $pembayaranSaldoOtomatis,
                 'user_id' => auth()->id(),
             ]);
 
