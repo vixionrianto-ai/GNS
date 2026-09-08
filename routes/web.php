@@ -109,9 +109,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/router/{id}/ppp-secret/store', [RouterController::class, 'storeSecret'])
         ->name('router.pppsecret.store');
 
-    Route::get('/router/{id}/ppp-secret/{username}/edit', [RouterController::class, 'editSecret'])
-        ->name('router.pppsecret.edit');
-
     Route::put('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'updateSecret'])
         ->name('router.pppsecret.update');
 
@@ -141,10 +138,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/router/{id}/ppp-profile/store', [RouterController::class, 'storeProfile'])
         ->name('router.pppprofile.store');
 
-    Route::put('/router/{id}/ppp-profile/{secret}', [RouterController::class, 'updateProfile'])
+    Route::get('/router/{id}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile'])
+        ->name('router.pppprofile.edit');
+
+    Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])
         ->name('router.pppprofile.update');
 
-    Route::delete('/router/{id}/ppp-profile/{secret}', [RouterController::class, 'deleteProfile'])
+    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])
         ->name('router.pppprofile.delete');
 
     /* PAKET */
