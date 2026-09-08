@@ -76,6 +76,7 @@ class BackupService
             "--host={$host}",
             "--port={$port}",
             "--user={$username}",
+            "--skip-ssl",
             "--skip-comments",
             "--result-file={$filepath}",
             $database,
