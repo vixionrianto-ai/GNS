@@ -1,0 +1,1 @@
+Print action uses a clean standalone invoice view.
