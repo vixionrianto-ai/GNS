@@ -132,7 +132,16 @@
                             </tr>
                             <tr>
                                 <td class="text-muted py-1.5">Periode</td>
-                                <td class="fw-semibold text-dark text-end py-1.5">{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td>
+                                <td class="fw-semibold text-dark text-end py-1.5">
+                                    @php($alokasiTagihan = $pembayaran->alokasi->whereNotNull('tagihan_id')->sortBy('id')->values())
+                                    @if($alokasiTagihan->isNotEmpty())
+                                        @foreach($alokasiTagihan as $alokasi)
+                                            <div>{{ optional($alokasi->tagihan)->periode ?? '-' }}</div>
+                                        @endforeach
+                                    @else
+                                        {{ optional($pembayaran->tagihan)->periode ?? '-' }}
+                                    @endif
+                                </td>
                             </tr>
                             <tr class="border-top">
                                 <td class="fw-bold text-dark py-2">Status</td>
@@ -163,9 +172,9 @@
                 <a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="btn btn-danger btn-sm px-3 rounded-pill fw-bold shadow-sm">
                     <i class="fas fa-file-pdf me-1"></i> PDF
                 </a>
-                <button type="button" onclick="window.print()" class="btn btn-primary btn-sm px-3 rounded-pill fw-bold shadow-sm">
-                    <i class="fas fa-print me-1"></i> Cetak
-                </button>
+                <a href="{{ route('pembayaran.print', $pembayaran) }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm px-3 rounded-pill fw-bold shadow-sm">
+                    <i class="fas fa-print me-1"></i> Cetak Invoice
+                </a>
                 @if(isset($waUrl) && $waUrl)
                     <a href="{{ $waUrl }}" target="_blank" class="btn btn-success btn-sm px-3 rounded-pill fw-bold shadow-sm">
                         <i class="fab fa-whatsapp me-1"></i> WhatsApp
