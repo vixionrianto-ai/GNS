@@ -1,1 +1,0 @@
-Standalone invoice print behavior update.
