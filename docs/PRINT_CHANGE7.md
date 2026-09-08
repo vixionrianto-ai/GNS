@@ -1,1 +1,0 @@
-Clean standalone payment invoice printing.
