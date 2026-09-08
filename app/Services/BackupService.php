@@ -76,7 +76,6 @@ class BackupService
             "--host={$host}",
             "--port={$port}",
             "--user={$username}",
-            "--skip-ssl",
             "--skip-comments",
             "--result-file={$filepath}",
             $database,
@@ -89,6 +88,10 @@ class BackupService
                 0,
                 "--password={$password}"
             );
+        }
+
+        if (filter_var(env('MYSQLDUMP_SKIP_SSL', false), FILTER_VALIDATE_BOOLEAN)) {
+            $arguments[] = '--skip-ssl';
         }
 
         $process = new Process($arguments);
