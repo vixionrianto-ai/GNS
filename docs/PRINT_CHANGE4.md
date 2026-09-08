@@ -1,0 +1,1 @@
+The payment print button opens a standalone invoice layout rather than printing application UI.
