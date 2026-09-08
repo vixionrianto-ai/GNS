@@ -1,1 +1,0 @@
-The print button opens the standalone invoice.
