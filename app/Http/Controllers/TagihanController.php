@@ -80,7 +80,13 @@ class TagihanController extends Controller
         $this->tagihanService->updateStatusOtomatis();
 
         $query = Tagihan::with(['pelanggan', 'pelanggan.paket'])
-            ->withCount(['pembayaran', 'alokasi', 'saldoUsages']);
+            ->withCount([
+                'pembayaran as pembayaran_count' => function ($query) {
+                    $query->where('metode', '!=', 'Saldo');
+                },
+                'alokasi',
+                'saldoUsages',
+            ]);
         $query = $this->filter($query, $request);
         $tagihans = $query->latest('id')->paginate(50)->withQueryString();
         $statistik = $this->statistik();
