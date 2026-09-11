@@ -66,6 +66,10 @@ return [
     'right_sidebar_push' => true,
     'right_sidebar_scrollbar_theme' => 'os-theme-light',
     'right_sidebar_scrollbar_auto_hide' => 'l',
+    'right_sidebar_scrollbar_auto_hide' => 'l',
+    'right_sidebar_push' => true,
+    'right_sidebar_scrollbar_theme' => 'os-theme-light',
+    'right_sidebar_scrollbar_auto_hide' => 'l',
     'use_route_url' => true,
     'dashboard_url' => 'dashboard',
     'logout_url' => 'logout',
@@ -81,21 +85,21 @@ return [
 
     'menu' => [
         ['header' => 'LAPORAN'],
-        ['text' => 'Dashboard Analitik', 'route' => 'dashboard', 'icon' => 'fas fa-chart-line'],
-        ['text' => 'Laporan', 'route' => 'laporan.index', 'icon' => 'fas fa-chart-bar'],
+        ['text' => 'Dashboard Analitik', 'route' => 'dashboard', 'icon' => 'fas fa-chart-line', 'can' => 'dashboard.view'],
+        ['text' => 'Laporan', 'route' => 'laporan.index', 'icon' => 'fas fa-chart-bar', 'can' => 'laporan.view'],
 
         ['header' => 'MASTER DATA'],
-        ['text' => 'Router', 'route' => 'router.index', 'icon' => 'fas fa-network-wired'],
-        ['text' => 'Paket Internet', 'route' => 'paket.index', 'icon' => 'fas fa-wifi'],
-        ['text' => 'Pelanggan', 'route' => 'pelanggan.index', 'icon' => 'fas fa-users'],
+        ['text' => 'Router', 'route' => 'router.index', 'icon' => 'fas fa-network-wired', 'can' => 'router.view'],
+        ['text' => 'Paket Internet', 'route' => 'paket.index', 'icon' => 'fas fa-wifi', 'can' => 'paket.view'],
+        ['text' => 'Pelanggan', 'route' => 'pelanggan.index', 'icon' => 'fas fa-users', 'can' => 'pelanggan.view'],
 
         ['header' => 'TRANSAKSI'],
-        ['text' => 'Tagihan', 'route' => 'tagihan.index', 'icon' => 'fas fa-file-invoice'],
-        ['text' => 'Pembayaran', 'route' => 'pembayaran.index', 'icon' => 'fas fa-money-check-alt'],
-        ['text' => 'Riwayat WhatsApp', 'route' => 'whatsapp.index', 'icon' => 'fab fa-whatsapp'],
+        ['text' => 'Tagihan', 'route' => 'tagihan.index', 'icon' => 'fas fa-file-invoice', 'can' => 'tagihan.view'],
+        ['text' => 'Pembayaran', 'route' => 'pembayaran.index', 'icon' => 'fas fa-money-check-alt', 'can' => 'pembayaran.view'],
+        ['text' => 'Riwayat WhatsApp', 'route' => 'whatsapp.index', 'icon' => 'fab fa-whatsapp', 'can' => 'whatsapp.view'],
 
         ['header' => 'MIKROTIK'],
-        ['text' => 'Monitoring MikroTik', 'route' => 'mikrotik.monitor', 'icon' => 'fas fa-network-wired'],
+        ['text' => 'Monitoring MikroTik', 'route' => 'mikrotik.monitor', 'icon' => 'fas fa-network-wired', 'can' => 'mikrotik.view'],
 
         ['header' => 'SYSTEM'],
         ['text' => 'User Management', 'route' => 'users.index', 'icon' => 'fas fa-users-cog', 'can' => 'user.view'],
@@ -104,10 +108,10 @@ return [
         ['text' => 'Pengaturan', 'route' => 'settings.index', 'icon' => 'fas fa-cogs', 'can' => 'setting.manage'],
         ['text' => 'Profile', 'route' => 'profile.edit', 'icon' => 'fas fa-user'],
 
-        ['header' => 'SUPER ADMIN'],
-        ['text' => 'Backup Database', 'route' => 'backup.index', 'icon' => 'fas fa-database'],
-        ['text' => 'Restore Database', 'route' => 'restore.index', 'icon' => 'fas fa-upload'],
-        ['text' => 'Reset Data', 'route' => 'superadmin.index', 'icon' => 'fas fa-trash-alt'],
+        ['header' => 'SUPER ADMIN', 'can' => 'permission.view'],
+        ['text' => 'Backup Database', 'route' => 'backup.index', 'icon' => 'fas fa-database', 'can' => 'permission.view'],
+        ['text' => 'Restore Database', 'route' => 'restore.index', 'icon' => 'fas fa-upload', 'can' => 'permission.view'],
+        ['text' => 'Reset Data', 'route' => 'superadmin.index', 'icon' => 'fas fa-trash-alt', 'can' => 'permission.view'],
 
         ['header' => 'ACCOUNT'],
         ['text' => 'Logout', 'url' => 'logout', 'method' => 'post', 'icon' => 'fas fa-sign-out-alt'],
