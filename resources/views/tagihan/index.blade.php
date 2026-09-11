@@ -89,6 +89,7 @@
             <i class="fas fa-file-invoice text-primary mr-2"></i>Daftar Tagihan
         </h3>
         <div class="card-tools d-flex align-items-center flex-wrap">
+            @can('tagihan.generate')
             <form action="{{ route('tagihan.generate.semua') }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-success px-3 shadow-sm font-weight-bold">
@@ -104,6 +105,7 @@
             <button type="button" class="btn btn-sm btn-info text-white px-3 shadow-sm font-weight-bold ml-1" data-toggle="modal" data-target="#modalGeneratePeriode">
                 <i class="fas fa-calendar-alt mr-1"></i>Generate Periode
             </button>
+            @endcan
             <a href="{{ route('tagihan.index') }}" class="btn btn-sm btn-light border px-3 shadow-sm font-weight-bold ml-1">
                 <i class="fas fa-sync-alt mr-1"></i>Refresh
             </a>
@@ -182,12 +184,15 @@
                             <a href="{{ route('tagihan.show', $item->id) }}" class="btn btn-info btn-sm" title="Detail">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            @can('pembayaran.create')
                             @if(Route::has('pembayaran.create'))
                             <a href="{{ route('pembayaran.create', $item->id) }}" class="btn btn-success btn-sm" title="Proses Pembayaran">
                                 <i class="fas fa-money-bill-wave"></i>
                             </a>
                             @endif
+                            @endcan
 
+                            @can('tagihan.delete')
                             @if($canRollbackDelete)
                             <form action="{{ route('tagihan.destroy.with-rollback', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tagihan ini memiliki alokasi/penggunaan saldo. Alokasi akan dibatalkan, saldo pelanggan dikembalikan, lalu tagihan dihapus. Lanjutkan?')">
                                 @csrf
@@ -205,6 +210,7 @@
                                 </button>
                             </form>
                             @endif
+                            @endcan
                         </div>
                     </td>
                 </tr>
@@ -232,6 +238,7 @@
     </div>
 </div>
 
+@can('tagihan.generate')
 <div class="modal fade" id="modalGeneratePeriode" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <form action="{{ route('tagihan.generate.periode') }}" method="POST" class="modal-content border-0 shadow-lg">
@@ -263,6 +270,7 @@
         </form>
     </div>
 </div>
+@endcan
 @stop
 
 @section('css')
