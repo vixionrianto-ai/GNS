@@ -14,158 +14,117 @@ class RolePermissionSeeder extends Seeder
         app()[PermissionRegistrar::class]
             ->forgetCachedPermissions();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Permissions
-        |--------------------------------------------------------------------------
-        */
-
         $permissions = [
-
-            /*
-            | Dashboard
-            */
-
             'dashboard.view',
-
-            /*
-            | Pelanggan
-            */
 
             'pelanggan.view',
             'pelanggan.create',
             'pelanggan.edit',
             'pelanggan.delete',
 
-            /*
-            | Paket
-            */
-
             'paket.view',
             'paket.create',
             'paket.edit',
             'paket.delete',
-
-            /*
-            | Router
-            */
 
             'router.view',
             'router.create',
             'router.edit',
             'router.delete',
 
-            /*
-            | Tagihan
-            */
-
             'tagihan.view',
             'tagihan.generate',
             'tagihan.edit',
             'tagihan.delete',
 
-            /*
-            | Pembayaran
-            */
-
             'pembayaran.view',
             'pembayaran.create',
             'pembayaran.cancel',
 
-            /*
-            | Audit
-            */
+            'laporan.view',
+            'whatsapp.view',
+            'mikrotik.view',
 
             'audit.view',
-
-            /*
-            | User
-            */
 
             'user.view',
             'user.create',
             'user.edit',
             'user.delete',
 
-            /*
-            | Role
-            */
-
             'role.view',
             'role.create',
             'role.edit',
             'role.delete',
-
-            /*
-            | Permission
-            */
 
             'permission.view',
             'permission.create',
             'permission.edit',
             'permission.delete',
 
-            /*
-            | Setting
-            */
-
             'setting.manage',
-
         ];
 
         foreach ($permissions as $permission) {
-
             Permission::firstOrCreate([
-
                 'name' => $permission,
-
                 'guard_name' => 'web',
-
             ]);
-
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Roles
-        |--------------------------------------------------------------------------
-        */
-
-        Role::firstOrCreate([
-            'name' => 'Super Admin',
-            'guard_name' => 'web',
-        ]);
-
-        Role::firstOrCreate([
-            'name' => 'Admin',
-            'guard_name' => 'web',
-        ]);
-
-        Role::firstOrCreate([
-            'name' => 'Kasir',
-            'guard_name' => 'web',
-        ]);
-
-        Role::firstOrCreate([
-            'name' => 'Teknisi',
-            'guard_name' => 'web',
-        ]);
-
-        Role::firstOrCreate([
-            'name' => 'Viewer',
-            'guard_name' => 'web',
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Super Admin
-        |--------------------------------------------------------------------------
-        */
+        foreach (['Super Admin', 'Admin', 'Kasir', 'Teknisi', 'Viewer'] as $roleName) {
+            Role::firstOrCreate([
+                'name' => $roleName,
+                'guard_name' => 'web',
+            ]);
+        }
 
         $superAdmin = Role::findByName('Super Admin');
+        $admin = Role::findByName('Admin');
+        $kasir = Role::findByName('Kasir');
+        $teknisi = Role::findByName('Teknisi');
+        $viewer = Role::findByName('Viewer');
 
-        $superAdmin->syncPermissions(
-            Permission::all()
-        );
+        $superAdmin->syncPermissions(Permission::all());
+
+        $admin->syncPermissions([
+            'dashboard.view',
+            'pelanggan.view', 'pelanggan.create', 'pelanggan.edit', 'pelanggan.delete',
+            'paket.view', 'paket.create', 'paket.edit', 'paket.delete',
+            'router.view', 'router.create', 'router.edit', 'router.delete',
+            'tagihan.view', 'tagihan.generate', 'tagihan.edit', 'tagihan.delete',
+            'pembayaran.view', 'pembayaran.create', 'pembayaran.cancel',
+            'laporan.view', 'whatsapp.view', 'mikrotik.view',
+            'audit.view',
+            'user.view', 'user.create', 'user.edit', 'user.delete',
+            'role.view', 'role.create', 'role.edit', 'role.delete',
+            'setting.manage',
+        ]);
+
+        $kasir->syncPermissions([
+            'dashboard.view',
+            'pelanggan.view',
+            'tagihan.view',
+            'pembayaran.view',
+            'pembayaran.create',
+        ]);
+
+        $teknisi->syncPermissions([
+            'dashboard.view',
+            'pelanggan.view',
+            'paket.view',
+            'router.view', 'router.create', 'router.edit', 'router.delete',
+            'mikrotik.view',
+        ]);
+
+        $viewer->syncPermissions([
+            'dashboard.view',
+            'pelanggan.view',
+            'paket.view',
+            'router.view',
+            'tagihan.view',
+            'pembayaran.view',
+            'laporan.view',
+        ]);
     }
 }
