@@ -77,11 +77,15 @@
             <small class="d-block text-muted mt-1" style="font-size:11px;">Daftar seluruh pelanggan yang terhubung dengan sistem GNS Network.</small>
         </div>
         <div class="card-tools mt-1 mt-md-0">
-            <a href="{{ route('pelanggan.create') }}" class="btn btn-sm btn-primary px-3 shadow-sm font-weight-bold"><i class="fas fa-user-plus mr-1"></i>Tambah Pelanggan</a>
-            <form action="{{ route('pelanggan.sync') }}" method="POST" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-success px-3 shadow-sm font-weight-bold ml-1"><i class="fas fa-sync mr-1"></i>Sinkron MikroTik</button>
-            </form>
+            @can('pelanggan.create')
+                <a href="{{ route('pelanggan.create') }}" class="btn btn-sm btn-primary px-3 shadow-sm font-weight-bold"><i class="fas fa-user-plus mr-1"></i>Tambah Pelanggan</a>
+            @endcan
+            @can('pelanggan.edit')
+                <form action="{{ route('pelanggan.sync') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-success px-3 shadow-sm font-weight-bold ml-1"><i class="fas fa-sync mr-1"></i>Sinkron MikroTik</button>
+                </form>
+            @endcan
             <a href="{{ route('pelanggan.index') }}" class="btn btn-sm btn-light border px-3 shadow-sm font-weight-bold ml-1"><i class="fas fa-sync-alt mr-1"></i>Refresh</a>
         </div>
     </div>
@@ -131,13 +135,19 @@
                     </td>
                     <td class="text-center py-2 align-middle">
                         <div class="btn-group btn-group-sm shadow-sm">
-                            <a href="{{ route('pelanggan.show', $item->id) }}" class="btn btn-info btn-sm" title="Detail"><i class="fas fa-eye"></i></a>
-                            <a href="{{ route('pelanggan.edit', $item->id) }}" class="btn btn-warning btn-sm" title="Edit"><i class="fas fa-edit text-white"></i></a>
-                            <form action="{{ route('pelanggan.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus data pelanggan ini?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm" title="Hapus"><i class="fas fa-trash"></i></button>
-                            </form>
+                            @can('pelanggan.view')
+                                <a href="{{ route('pelanggan.show', $item->id) }}" class="btn btn-info btn-sm" title="Detail"><i class="fas fa-eye"></i></a>
+                            @endcan
+                            @can('pelanggan.edit')
+                                <a href="{{ route('pelanggan.edit', $item->id) }}" class="btn btn-warning btn-sm" title="Edit"><i class="fas fa-edit text-white"></i></a>
+                            @endcan
+                            @can('pelanggan.delete')
+                                <form action="{{ route('pelanggan.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus data pelanggan ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Hapus"><i class="fas fa-trash"></i></button>
+                                </form>
+                            @endcan
                         </div>
                     </td>
                 </tr>
