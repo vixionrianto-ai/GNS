@@ -50,24 +50,77 @@ Route::middleware('auth')->group(function () {
         Route::delete('/backup/{file}', [BackupController::class, 'destroy'])->name('backup.destroy');
     });
 
-    Route::resource('router', RouterController::class)->except(['show']);
-    Route::get('/router/{id}/test', [RouterController::class, 'test'])->name('router.test');
-    Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])->name('router.pppsecret');
-    Route::get('/router/{id}/ppp-secret/create', [RouterController::class, 'createSecret'])->name('router.pppsecret.create');
-    Route::post('/router/{id}/ppp-secret/store', [RouterController::class, 'storeSecret'])->name('router.pppsecret.store');
-    Route::get('/router/{id}/ppp-secret/{username}/edit', [RouterController::class, 'editSecret'])->name('router.pppsecret.edit');
-    Route::put('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'updateSecret'])->name('router.pppsecret.update');
-    Route::delete('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'deleteSecret'])->name('router.pppsecret.delete');
-    Route::put('/router/{id}/ppp-secret/{secret}/enable', [RouterController::class, 'enableSecret'])->name('router.pppsecret.enable');
-    Route::put('/router/{id}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret'])->name('router.pppsecret.disable');
-    Route::get('/router/{id}/ppp-active', [RouterController::class, 'pppActive'])->name('router.pppactive');
-    Route::delete('/router/{id}/ppp-active/{session}/disconnect', [RouterController::class, 'disconnectSession'])->name('router.pppactive.disconnect');
-    Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])->name('router.pppprofile');
-    Route::get('/router/{id}/ppp-profile/create', [RouterController::class, 'createProfile'])->name('router.pppprofile.create');
-    Route::post('/router/{id}/ppp-profile/store', [RouterController::class, 'storeProfile'])->name('router.pppprofile.store');
-    Route::get('/router/{id}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile'])->name('router.pppprofile.edit');
-    Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])->name('router.pppprofile.update');
-    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])->name('router.pppprofile.delete');
+    Route::resource('router', RouterController::class)
+        ->except(['show'])
+        ->middleware('permission:router.view');
+
+    Route::get('/router/{id}/test', [RouterController::class, 'test'])
+        ->middleware('permission:router.view')
+        ->name('router.test');
+
+    Route::get('/router/{id}/ppp-secret', [RouterController::class, 'pppSecret'])
+        ->middleware('permission:router.view')
+        ->name('router.pppsecret');
+
+    Route::get('/router/{id}/ppp-secret/create', [RouterController::class, 'createSecret'])
+        ->middleware('permission:router.create')
+        ->name('router.pppsecret.create');
+
+    Route::post('/router/{id}/ppp-secret/store', [RouterController::class, 'storeSecret'])
+        ->middleware('permission:router.create')
+        ->name('router.pppsecret.store');
+
+    Route::get('/router/{id}/ppp-secret/{username}/edit', [RouterController::class, 'editSecret'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppsecret.edit');
+
+    Route::put('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'updateSecret'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppsecret.update');
+
+    Route::delete('/router/{id}/ppp-secret/{secret}', [RouterController::class, 'deleteSecret'])
+        ->middleware('permission:router.delete')
+        ->name('router.pppsecret.delete');
+
+    Route::put('/router/{id}/ppp-secret/{secret}/enable', [RouterController::class, 'enableSecret'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppsecret.enable');
+
+    Route::put('/router/{id}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppsecret.disable');
+
+    Route::get('/router/{id}/ppp-active', [RouterController::class, 'pppActive'])
+        ->middleware('permission:router.view')
+        ->name('router.pppactive');
+
+    Route::delete('/router/{id}/ppp-active/{session}/disconnect', [RouterController::class, 'disconnectSession'])
+        ->middleware('permission:router.delete')
+        ->name('router.pppactive.disconnect');
+
+    Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])
+        ->middleware('permission:router.view')
+        ->name('router.pppprofile');
+
+    Route::get('/router/{id}/ppp-profile/create', [RouterController::class, 'createProfile'])
+        ->middleware('permission:router.create')
+        ->name('router.pppprofile.create');
+
+    Route::post('/router/{id}/ppp-profile/store', [RouterController::class, 'storeProfile'])
+        ->middleware('permission:router.create')
+        ->name('router.pppprofile.store');
+
+    Route::put('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'updateProfile'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppprofile.update');
+
+    Route::delete('/router/{id}/ppp-profile/{profile}', [RouterController::class, 'deleteProfile'])
+        ->middleware('permission:router.delete')
+        ->name('router.pppprofile.delete');
+
+    Route::get('/router/{id}/ppp-profile/{profile}/edit', [RouterController::class, 'editProfile'])
+        ->middleware('permission:router.edit')
+        ->name('router.pppprofile.edit');
 
     Route::resource('paket', PaketController::class)->except(['show']);
     Route::get('/router/{router}/profiles', [PaketController::class, 'getProfiles'])->name('paket.getProfiles');
