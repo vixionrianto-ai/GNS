@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\AuditTrailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
@@ -16,6 +17,24 @@ class UserController extends Controller
     public function __construct(AuditTrailService $auditTrail)
     {
         $this->auditTrail = $auditTrail;
+    }
+
+    private function manageableRoles()
+    {
+        $roles = Role::with('permissions')->orderBy('name')->get();
+
+        if (!Auth::user()->hasRole('Super Admin')) {
+            $roles = $roles->reject(fn ($role) => $role->name === 'Super Admin');
+        }
+
+        return $roles->values();
+    }
+
+    private function validateManageableRole(string $role): void
+    {
+        if ($role === 'Super Admin' && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, 'Role Super Admin hanya dapat dikelola oleh Super Admin.');
+        }
     }
 
     public function index(Request $request)
@@ -30,18 +49,20 @@ class UserController extends Controller
         }
 
         if ($request->filled('role')) {
-            $query->role($request->role);
+            $query->whereHas('roles', function ($q) use ($request) {
+                $q->where('name', $request->role);
+            });
         }
 
         $users = $query->latest()->paginate(15)->withQueryString();
-        $roles = Role::with('permissions')->orderBy('name')->get();
+        $roles = $this->manageableRoles();
 
         return view('users.index', compact('users', 'roles'));
     }
 
     public function create()
     {
-        $roles = Role::with('permissions')->orderBy('name')->get();
+        $roles = $this->manageableRoles();
 
         return view('users.create', compact('roles'));
     }
@@ -54,6 +75,8 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
             'role' => ['required', 'exists:roles,name'],
         ]);
+
+        $this->validateManageableRole($validated['role']);
 
         $user = User::create([
             'name' => $validated['name'],
@@ -82,7 +105,12 @@ class UserController extends Controller
     public function edit(string $id)
     {
         $user = User::with('roles')->findOrFail($id);
-        $roles = Role::with('permissions')->orderBy('name')->get();
+
+        if ($user->hasRole('Super Admin') && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, 'User Super Admin hanya dapat dikelola oleh Super Admin.');
+        }
+
+        $roles = $this->manageableRoles();
 
         return view('users.edit', compact('user', 'roles'));
     }
@@ -91,12 +119,18 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
+        if ($user->hasRole('Super Admin') && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, 'User Super Admin hanya dapat dikelola oleh Super Admin.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
             'role' => ['required', 'exists:roles,name'],
             'password' => ['nullable', 'confirmed', Password::defaults()],
         ]);
+
+        $this->validateManageableRole($validated['role']);
 
         $user->name = $validated['name'];
         $user->email = $validated['email'];
@@ -120,6 +154,10 @@ class UserController extends Controller
     public function destroy(string $id)
     {
         $user = User::findOrFail($id);
+
+        if ($user->hasRole('Super Admin') && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, 'User Super Admin hanya dapat dikelola oleh Super Admin.');
+        }
 
         if (auth()->id() === $user->id) {
             return back()->with('error', 'Anda tidak dapat menghapus akun yang sedang digunakan.');
