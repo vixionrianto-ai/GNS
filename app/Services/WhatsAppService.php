@@ -122,9 +122,12 @@ class WhatsAppService
                 default => '⚪',
             };
 
+            $jatuhTempo = optional($item->tanggal_jatuh_tempo)->format('d-m-Y') ?: '-';
+
             $rincian[] = $nomorRincian . ".\n" .
                 "📅 Periode : " . $this->periodeIndonesia($item) . "\n" .
                 "📄 Invoice : {$item->invoice_no}\n" .
+                "⏰ Jatuh Tempo : {$jatuhTempo}\n" .
                 "{$statusIcon} Status : {$item->status}\n" .
                 "❗ Sisa yang harus dibayar : Rp " . $this->rupiah($sisa);
         }
@@ -154,7 +157,7 @@ class WhatsAppService
         $tagihan = $pembayaran->tagihan;
         $pelanggan = $tagihan->pelanggan;
         $tagihanData = $this->tagihanPlaceholder($tagihan);
-        $pdfUrl = url('/public-invoice/' . $pembayaran->public_token . '/pdf');
+        $pdfUrl = 'http://billing.syauqi.net:10017/public-invoice/' . $pembayaran->public_token . '/pdf';
 
         return array_merge([
             'nama' => $pelanggan->nama,
