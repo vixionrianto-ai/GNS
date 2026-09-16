@@ -122,7 +122,7 @@ class WhatsAppService
                 default => '⚪',
             };
 
-            $jatuhTempo = optional($item->tanggal_jatuh_tempo)->format('d-m-Y') ?: '-';
+            $jatuhTempo = optional($item->tanggal_jatuh_tempo)->format("d-m-Y") ?: "-";
 
             $rincian[] = $nomorRincian . ".\n" .
                 "📅 Periode : " . $this->periodeIndonesia($item) . "\n" .
@@ -301,3 +301,4 @@ class WhatsAppService
         return $berhasil;
     }
 }
+
