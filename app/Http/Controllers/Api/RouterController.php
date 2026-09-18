@@ -142,9 +142,9 @@ class RouterController extends Controller
 
             'uptime' => $mikrotik->getUptime($router),
 
-            'secret_count' => $mikrotik->getSecretCount($router),
+            'secret_count' => count($mikrotik->getSecrets($router)),
 
-            'active_count' => $mikrotik->getActivePppCount($router),
+            'active_count' => count($mikrotik->getActiveSessions($router)),
 
         ], 'Informasi router berhasil diambil.');
     }

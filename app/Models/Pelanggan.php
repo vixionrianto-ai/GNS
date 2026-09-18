@@ -33,12 +33,20 @@ class Pelanggan extends Model
         'isolation_use_default',
         'isolation_period_limit',
         'keterangan',
+        'ppp_status',
+        'ppp_ip_address',
+        'ppp_caller_id',
+        'ppp_uptime',
+        'last_ppp_checked_at',
+        'ppp_last_change_at',
     ];
 
     protected $casts = [
         'is_isolated' => 'boolean',
         'isolation_use_default' => 'boolean',
         'isolated_at' => 'datetime',
+        'last_ppp_checked_at' => 'datetime',
+        'ppp_last_change_at' => 'datetime',
     ];
 
     protected static function booted(): void

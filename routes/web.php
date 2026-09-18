@@ -17,6 +17,7 @@ use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\WhatsAppLogController;
+use App\Http\Controllers\PppMonitoringController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -110,10 +111,16 @@ Route::middleware('auth')->group(function () {
     Route::put('/router/{id}/ppp-secret/{secret}/disable', [RouterController::class, 'disableSecret'])
         ->middleware('permission:router.edit')
         ->name('router.pppsecret.disable');
-    Route::get('/router/{id}/ppp-active', [RouterController::class, 'pppActive'])
+    Route::get('/monitoring-ppp', [PppMonitoringController::class, 'index'])
+        ->middleware('permission:mikrotik.view')
+        ->name('mikrotik.ppp.monitor');
+    Route::post('/monitoring-ppp/sync', [PppMonitoringController::class, 'sync'])
+        ->middleware('permission:mikrotik.view')
+        ->name('mikrotik.ppp.monitor.sync');
+    Route::get('/router/{router}/ppp-active', [PppMonitoringController::class, 'active'])
         ->middleware('permission:router.view')
         ->name('router.pppactive');
-    Route::delete('/router/{id}/ppp-active/{session}/disconnect', [RouterController::class, 'disconnectSession'])
+    Route::delete('/router/{router}/ppp-active/{session}/disconnect', [PppMonitoringController::class, 'disconnect'])
         ->middleware('permission:router.delete')
         ->name('router.pppactive.disconnect');
     Route::get('/router/{id}/ppp-profile', [RouterController::class, 'pppProfile'])
