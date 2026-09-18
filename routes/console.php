@@ -24,3 +24,8 @@ Schedule::command('wa:reminder')
     ->when(fn () => now()->format('H:i') === (string) Setting::value('whatsapp.send_time', '08:00'))
     ->withoutOverlapping()
     ->runInBackground();
+
+Schedule::command('ppp:monitor')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
