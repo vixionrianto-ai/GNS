@@ -26,7 +26,7 @@ class PppMonitoringController extends Controller
                     ->orWhere('username_pppoe','like',"%{$s}%"));
             })->latest()->paginate(25)->withQueryString();
 
-        $base = Pelanggan::query()->whereNotNull('username_pppoe')->where('username_pppoe','!=')
+        $base = Pelanggan::query()->whereNotNull('username_pppoe')->where('username_pppoe','!=','')
             ->when($routerId, fn ($q) => $q->where('router_id',$routerId));
         $summary = [
             'online'=>(clone $base)->where('ppp_status','online')->count(),
