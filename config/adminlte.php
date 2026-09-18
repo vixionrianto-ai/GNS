@@ -96,6 +96,7 @@ return [
 
         ['header' => 'MIKROTIK'],
         ['text' => 'Monitoring MikroTik', 'route' => 'mikrotik.monitor', 'icon' => 'fas fa-network-wired', 'can' => 'mikrotik.view'],
+        ['text' => 'Monitoring PPP Pelanggan', 'route' => 'mikrotik.ppp.monitor', 'icon' => 'fas fa-satellite-dish', 'can' => 'mikrotik.view'],
 
         ['header' => 'SYSTEM'],
         ['text' => 'User Management', 'route' => 'users.index', 'icon' => 'fas fa-users-cog', 'can' => 'user.view'],
