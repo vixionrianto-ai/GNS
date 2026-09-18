@@ -283,6 +283,19 @@ class MikroTikService
         return $this->connect($router)->query($query)->read();
     }
 
+    public function getSecretStatusMap(Router $router): array
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->equal('.proplist', '.id,name,disabled,service,profile');
+
+        $map = [];
+        foreach ($this->connect($router)->query($query)->read() as $secret) {
+            $username = trim((string) ($secret['name'] ?? ''));
+            if ($username !== '') $map[$username] = $secret;
+        }
+        return $map;
+    }
+
     public function getActiveByUsername(Router $router, string $username): ?array
     {
         foreach ($this->getActiveSessions($router) as $active) {
