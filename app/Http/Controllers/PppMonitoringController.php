@@ -16,7 +16,7 @@ class PppMonitoringController extends Controller
         $routers = Router::query()->orderBy('nama_router')->get();
 
         $pelanggans = Pelanggan::query()->with(['router', 'paket'])
-            ->whereNotNull('username_pppoe')->where('username_pppoe', '!=')
+            ->whereNotNull('username_pppoe')->where('username_pppoe', '!=', '')
             ->when($routerId, fn ($q) => $q->where('router_id', $routerId))
             ->when($request->filled('status'), fn ($q) => $q->where('ppp_status', $request->string('status')->toString()))
             ->when($request->filled('search'), function ($q) use ($request) {
@@ -67,7 +67,7 @@ class PppMonitoringController extends Controller
     public function disconnect(Router $router, string $session, MikroTikService $mikrotik)
     {
         try {
-            $ok = $mikrotik->disconnectActiveSessionBySecretId($router, $session);
+            $ok = $mikrotik->disconnectActiveSession($router, $session);
             return back()->with($ok ? 'success' : 'error', $ok ? 'PPP Session berhasil diputus.' : 'PPP Session tidak ditemukan.');
         } catch (\Throwable $e) {
             return back()->with('error', $e->getMessage());
