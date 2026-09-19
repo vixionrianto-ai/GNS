@@ -160,15 +160,28 @@ class PppListenCommand extends Command
                         continue;
                     }
 
+                    // RouterOS sends deleted / disappeared listen entries as =.dead=yes.
+                    // Detect it directly from the raw sentence first, then normalize the parsed event.
+                    $dead = false;
+                    foreach ($raw as $word) {
+                        if ($word === '=.dead=yes') {
+                            $dead = true;
+                            break;
+                        }
+                    }
+
                     $parsed = $client->parseResponse($raw);
                     $event = $parsed[0] ?? $parsed['after'] ?? [];
 
                     if (!is_array($event)) {
-                        continue;
+                        $event = [];
+                    }
+
+                    if ($dead) {
+                        $event['.dead'] = 'yes';
                     }
 
                     $name = trim((string) ($event['name'] ?? ''));
-                    $dead = (($event['.dead'] ?? '') === 'yes');
 
                     $record = $eventService->handle($router, $event);
 
