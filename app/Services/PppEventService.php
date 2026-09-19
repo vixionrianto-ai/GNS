@@ -98,13 +98,13 @@ class PppEventService
 
         // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
         if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
-            $this->telegram->send($this->formatDisconnectMessage($router, $event));
+            $this->telegram->send($this->formatDisconnectMessage($router, $event, $pelanggan));
         }
 
         return $record;
     }
 
-    protected function formatDisconnectMessage(Router $router, array $event): string
+    protected function formatDisconnectMessage(Router $router, array $event, ?Pelanggan $pelanggan = null): string
     {
         $today = now()->startOfDay();
 
@@ -146,7 +146,7 @@ class PppEventService
             'User: ' . ($event['name'] ?? '-') . "\n" .
             'IP Client: ' . ($event['address'] ?? '-') . "\n" .
             'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
-            'Profile: ' . ($event['profile'] ?? '-') . "\n\n" .
+            'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
             'Jumlah Gangguan : ' . $gangguan . 'x Terputus hari ini' . "\n" .
             "====================\n" .
             'Total Secrets: ' . $totalSecrets . "\n" .
