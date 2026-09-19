@@ -3,32 +3,144 @@
 namespace App\Console\Commands;
 
 use App\Models\Router;
+use App\Services\PppEventService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use RouterOS\Query;
+use Symfony\Component\Process\Process;
 use Throwable;
 
-#[Signature('ppp:listen {--router= : ID router yang dipantau, default router aktif pertama}')]
+#[Signature('ppp:listen {--router= : ID router yang dipantau} {--worker : Jalankan satu listener router sebagai worker internal}')]
 
-#[Description('Mendengarkan event realtime PPP Active dari MikroTik melalui RouterOS API')]
+#[Description('Mendengarkan event realtime PPP Active dari seluruh MikroTik aktif')]
 
 class PppListenCommand extends Command
 {
-    public function handle(): int
-    {
-        $router = $this->resolveRouter();
+    /** @var array<int, Process> */
+    private array $workers = [];
 
-        if (!$router) {
-            $this->error('Router tidak ditemukan atau tidak aktif.');
-            return self::FAILURE;
+    public function handle(PppEventService $eventService): int
+    {
+        if ($this->option('worker')) {
+            $router = $this->resolveRouter();
+
+            if (!$router) {
+                $this->error('Router tidak ditemukan atau tidak aktif.');
+                return self::FAILURE;
+            }
+
+            return $this->listenRouter($router, $eventService);
         }
 
-        $this->info("PPP listener aktif: {$router->nama_router} ({$router->ip_router})");
-        $this->line('Mode TEST: belum menyimpan event ke database dan belum mengirim Telegram.');
-        $this->line('Silakan hapus satu PPP Active Connection di WinBox untuk menguji event DISCONNECT.');
+        $this->info('PPP realtime listener GNS aktif.');
+        $this->line('Semua router MikroTik dengan status Aktif akan dipantau otomatis.');
+        $this->line('Event PPP disimpan ke database. Telegram belum diaktifkan pada tahap ini.');
         $this->line('Tekan Ctrl+C untuk berhenti.');
         $this->newLine();
+
+        try {
+            while (true) {
+                $activeRouters = Router::query()
+                    ->where('status', 'Aktif')
+                    ->orderBy('id')
+                    ->get();
+
+                $activeIds = $activeRouters->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+                foreach ($activeRouters as $router) {
+                    $id = (int) $router->id;
+
+                    if (isset($this->workers[$id]) && $this->workers[$id]->isRunning()) {
+                        continue;
+                    }
+
+                    $this->startWorker($router);
+                }
+
+                foreach ($this->workers as $id => $worker) {
+                    if (!in_array($id, $activeIds, true) && $worker->isRunning()) {
+                        $this->warn("Menghentikan listener router ID {$id} karena status router tidak Aktif.");
+                        $worker->stop(3);
+                    }
+
+                    if (!$worker->isRunning()) {
+                        unset($this->workers[$id]);
+                    }
+                }
+
+                if ($activeRouters->isEmpty()) {
+                    $this->warn('Belum ada router aktif. Cek lagi dalam 10 detik...');
+                }
+
+                $this->drainWorkerOutput();
+                sleep(1);
+            }
+        } finally {
+            foreach ($this->workers as $worker) {
+                if ($worker->isRunning()) {
+                    $worker->stop(3);
+                }
+            }
+        }
+    }
+
+    private function startWorker(Router $router): void
+    {
+        $id = (int) $router->id;
+
+        $worker = new Process([
+            PHP_BINARY,
+            base_path('artisan'),
+            'ppp:listen',
+            '--router=' . $id,
+            '--worker',
+        ], base_path());
+
+        $worker->setTimeout(null);
+        $worker->start(function (string $type, string $buffer) use ($router): void {
+            $prefix = '[' . $router->nama_router . '] ';
+            foreach (preg_split('/\r\n|\r|\n/', trim($buffer)) as $line) {
+                if ($line !== '') {
+                    $this->output->writeln($prefix . $line);
+                }
+            }
+        });
+
+        $this->workers[$id] = $worker;
+        $this->info("Listener dimulai: {$router->nama_router} (ID {$id})");
+    }
+
+    private function drainWorkerOutput(): void
+    {
+        foreach ($this->workers as $id => $worker) {
+            $output = trim($worker->getIncrementalOutput());
+            if ($output !== '') {
+                $router = Router::find($id);
+                $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
+                foreach (preg_split('/\\r\\n|\\r|\\n/', $output) as $line) {
+                    if ($line !== '') {
+                        $this->output->writeln($prefix . $line);
+                    }
+                }
+            }
+
+            $error = trim($worker->getIncrementalErrorOutput());
+            if ($error !== '') {
+                $router = Router::find($id);
+                $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
+                foreach (preg_split('/\\r\\n|\\r|\\n/', $error) as $line) {
+                    if ($line !== '') {
+                        $this->output->writeln($prefix . $line);
+                    }
+                }
+            }
+        }
+    }
+
+    private function listenRouter(Router $router, PppEventService $eventService): int
+    {
+        $this->info("Listener aktif: {$router->nama_router} ({$router->ip_router})");
 
         while (true) {
             try {
@@ -39,20 +151,17 @@ class PppListenCommand extends Command
 
                 $client->query($query);
 
-                $this->info('Terhubung ke RouterOS API, listener menunggu event...');
+                $this->info('Terhubung ke RouterOS API, menunggu event...');
 
                 while (true) {
-                    // RouterOS /ppp/active/listen tidak mengirim !done selama
-                    // listener aktif. count=1 membuat library mengembalikan
-                    // satu blok !re sekaligus agar event dapat diproses.
                     $raw = $client->readRAW(['count' => 1]);
 
                     if (empty($raw)) {
                         continue;
                     }
 
-                    $event = $client->parseResponse($raw);
-                    $event = $event[0] ?? $event['after'] ?? [];
+                    $parsed = $client->parseResponse($raw);
+                    $event = $parsed[0] ?? $parsed['after'] ?? [];
 
                     if (!is_array($event)) {
                         continue;
@@ -61,22 +170,24 @@ class PppListenCommand extends Command
                     $name = trim((string) ($event['name'] ?? ''));
                     $dead = (($event['.dead'] ?? '') === 'yes');
 
+                    $record = $eventService->handle($router, $event);
+
                     if ($dead) {
                         $this->warn(sprintf(
-                            '[%s] DISCONNECT | user=%s | id=%s',
+                            '[%s] DISCONNECT | user=%s | event_id=%s',
                             now()->format('Y-m-d H:i:s'),
                             $name !== '' ? $name : '-',
-                            $event['.id'] ?? '-'
+                            $record?->id ?? '-'
                         ));
                     } else {
                         $this->line(sprintf(
-                            '[%s] CONNECT/UPDATE | user=%s | ip=%s | caller=%s | uptime=%s | service=%s',
+                            '[%s] CONNECT/UPDATE | user=%s | ip=%s | caller=%s | uptime=%s | event_id=%s',
                             now()->format('Y-m-d H:i:s'),
                             $name !== '' ? $name : '-',
                             $event['address'] ?? '-',
                             $event['caller-id'] ?? '-',
                             $event['uptime'] ?? '-',
-                            $event['service'] ?? '-'
+                            $record?->id ?? '-'
                         ));
                     }
                 }
@@ -114,14 +225,7 @@ class PppListenCommand extends Command
             'port' => (int) $router->api_port,
             'ssl' => (bool) $router->ssl,
             'timeout' => 10,
-
-            // Listener memang harus menunggu lama ketika tidak ada event.
-            // Library RouterOS API-php default-nya 30 detik, yang membuat
-            // listener terlihat "putus" padahal router masih sehat.
-            // 24 jam hanya menjadi batas baca; koneksi TCP yang benar-benar
-            // putus tetap akan masuk ke blok reconnect.
             'socket_timeout' => 86400,
-
             'attempts' => 2,
             'delay' => 1,
         ]));

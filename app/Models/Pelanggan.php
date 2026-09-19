@@ -91,4 +91,9 @@ class Pelanggan extends Model
     {
         return $this->hasOne(SaldoPelanggan::class);
     }
+
+    public function pppEvents()
+    {
+        return $this->hasMany(PppEvent::class);
+    }
 }
