@@ -73,7 +73,8 @@ class PppListenCommand extends Command
                     $this->warn('Belum ada router aktif. Cek lagi dalam 10 detik...');
                 }
 
-                sleep(10);
+                $this->drainWorkerOutput();
+                sleep(1);
             }
         } finally {
             foreach ($this->workers as $worker) {
@@ -108,6 +109,33 @@ class PppListenCommand extends Command
 
         $this->workers[$id] = $worker;
         $this->info("Listener dimulai: {$router->nama_router} (ID {$id})");
+    }
+
+    private function drainWorkerOutput(): void
+    {
+        foreach ($this->workers as $id => $worker) {
+            $output = trim($worker->getIncrementalOutput());
+            if ($output !== '') {
+                $router = Router::find($id);
+                $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
+                foreach (preg_split('/\\r\\n|\\r|\\n/', $output) as $line) {
+                    if ($line !== '') {
+                        $this->output->writeln($prefix . $line);
+                    }
+                }
+            }
+
+            $error = trim($worker->getIncrementalErrorOutput());
+            if ($error !== '') {
+                $router = Router::find($id);
+                $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
+                foreach (preg_split('/\\r\\n|\\r|\\n/', $error) as $line) {
+                    if ($line !== '') {
+                        $this->output->writeln($prefix . $line);
+                    }
+                }
+            }
+        }
     }
 
     private function listenRouter(Router $router, PppEventService $eventService): int
