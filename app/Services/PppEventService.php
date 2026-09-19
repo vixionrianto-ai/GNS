@@ -9,9 +9,14 @@ use Illuminate\Support\Facades\DB;
 
 class PppEventService
 {
+    public function __construct(
+        protected TelegramService $telegram
+    ) {
+    }
+
     /**
-     * Simpan event realtime PPP dan sinkronkan status pelanggan.
-     * Tahap ini belum mengirim Telegram.
+     * Simpan event realtime PPP, sinkronkan status pelanggan,
+     * lalu kirim Telegram hanya untuk disconnect baru.
      */
     public function handle(Router $router, array $event): ?PppEvent
     {
@@ -26,8 +31,6 @@ class PppEventService
         $sessionId = trim((string) ($event['session-id'] ?? ''));
         $routerItemId = trim((string) ($event['.id'] ?? ''));
 
-        // Session ID/.id menjadi dasar deduplikasi. Untuk event connect yang
-        // dikirim saat listener pertama kali subscribe, event tetap dicatat.
         $fingerprint = implode('|', [
             $router->id,
             $eventType,
@@ -44,7 +47,15 @@ class PppEventService
             ->where('username_pppoe', $username)
             ->first();
 
-        return DB::transaction(function () use ($router, $pelanggan, $eventType, $username, $event, $sessionId, $eventKey) {
+        $record = DB::transaction(function () use (
+            $router,
+            $pelanggan,
+            $eventType,
+            $username,
+            $event,
+            $sessionId,
+            $eventKey
+        ) {
             $record = PppEvent::firstOrCreate(
                 ['event_key' => $eventKey],
                 [
@@ -84,6 +95,64 @@ class PppEventService
 
             return $record;
         });
+
+        // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
+        if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
+            $this->telegram->send($this->formatDisconnectMessage($router, $event));
+        }
+
+        return $record;
+    }
+
+    protected function formatDisconnectMessage(Router $router, array $event): string
+    {
+        $today = now()->startOfDay();
+
+        $totalSecrets = Pelanggan::query()
+            ->where('router_id', $router->id)
+            ->whereNotNull('username_pppoe')
+            ->where('username_pppoe', '!=', '')
+            ->count();
+
+        $totalActive = Pelanggan::query()
+            ->where('router_id', $router->id)
+            ->where('ppp_status', 'online')
+            ->count();
+
+        $disconnects = PppEvent::query()
+            ->where('router_id', $router->id)
+            ->where('event_type', 'disconnect')
+            ->where('event_at', '>=', $today)
+            ->orderBy('event_at')
+            ->get(['username'])
+            ->unique('username')
+            ->values();
+
+        $disconnectedUsers = $disconnects->map(
+            fn (PppEvent $item) => '- ' . $item->username
+        )->implode("\n");
+
+        if ($disconnectedUsers === '') {
+            $disconnectedUsers = '-';
+        }
+
+        $gangguan = $disconnects->count();
+
+        return
+            'OFFLINE ' . $router->nama_router . "\n" .
+            "====================\n" .
+            'Time: ' . now()->format('Y-m-d H:i:s') . "\n" .
+            "====================\n" .
+            'User: ' . ($event['name'] ?? '-') . "\n" .
+            'IP Client: ' . ($event['address'] ?? '-') . "\n" .
+            'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
+            'Profile: ' . ($event['profile'] ?? '-') . "\n\n" .
+            'Jumlah Gangguan : ' . $gangguan . 'x Terputus hari ini' . "\n" .
+            "====================\n" .
+            'Total Secrets: ' . $totalSecrets . "\n" .
+            'Total Active: ' . $totalActive . "\n" .
+            'Disconnected Users (' . $gangguan . "):\n" .
+            $disconnectedUsers;
     }
 
     public function disconnectCount(Pelanggan $pelanggan, ?string $from = null, ?string $to = null): int
