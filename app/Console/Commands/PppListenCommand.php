@@ -20,6 +20,9 @@ class PppListenCommand extends Command
     /** @var array<int, Process> */
     private array $workers = [];
 
+    /** @var array<string, array<string, mixed>> */
+    private array $knownPppItems = [];
+
     public function handle(PppEventService $eventService): int
     {
         if ($this->option('worker')) {
@@ -146,9 +149,31 @@ class PppListenCommand extends Command
             try {
                 $client = $this->createClient($router);
 
+                // Ambil snapshot PPP Active yang sudah terhubung.
+                // Event .dead dari RouterOS hanya membawa .id, sehingga
+                // snapshot diperlukan untuk mengetahui username saat disconnect.
+                $snapshotQuery = new Query('/ppp/active/print');
+                $snapshotQuery->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id');
+
+                $snapshot = $client->query($snapshotQuery)->read();
+
+                foreach ($snapshot as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+
+                    $itemId = trim((string) ($item['.id'] ?? ''));
+                    $itemName = trim((string) ($item['name'] ?? ''));
+
+                    if ($itemId !== '' && $itemName !== '') {
+                        $this->knownPppItems[$itemId] = $item;
+                    }
+                }
+
                 $query = new Query('/ppp/active/listen');
                 $query->equal('.proplist', '.id,.dead,name,address,caller-id,uptime,service,session-id');
 
+                // Setelah snapshot tersimpan, baru pasang listener realtime.
                 $client->query($query);
 
                 $this->info('Terhubung ke RouterOS API, menunggu event...');
@@ -160,11 +185,11 @@ class PppListenCommand extends Command
                         continue;
                     }
 
-                    // RouterOS sends deleted / disappeared listen entries as =.dead=yes.
-                    // Detect it directly from the raw sentence first, then normalize the parsed event.
+                    // RouterOS dapat mengirim event item yang hilang sebagai
+                    // =.dead=yes atau =.dead=true. Deteksi langsung dari RAW.
                     $dead = false;
                     foreach ($raw as $word) {
-                        if ($word === '=.dead=yes') {
+                        if ($word === '=.dead=yes' || $word === '=.dead=true') {
                             $dead = true;
                             break;
                         }
@@ -177,13 +202,28 @@ class PppListenCommand extends Command
                         $event = [];
                     }
 
+                    $itemId = trim((string) ($event['.id'] ?? ''));
+
                     if ($dead) {
+                        // Normalisasi agar PppEventService memakai satu format.
                         $event['.dead'] = 'yes';
+
+                        // Event delete RouterOS biasanya hanya membawa .id + .dead.
+                        // Gabungkan dengan data item yang disimpan dari snapshot / update.
+                        if ($itemId !== '' && isset($this->knownPppItems[$itemId])) {
+                            $event = array_merge($this->knownPppItems[$itemId], $event);
+                        }
+                    } elseif ($itemId !== '' && !empty($event['name'])) {
+                        $this->knownPppItems[$itemId] = $event;
                     }
 
                     $name = trim((string) ($event['name'] ?? ''));
 
                     $record = $eventService->handle($router, $event);
+
+                    if ($dead && $itemId !== '') {
+                        unset($this->knownPppItems[$itemId]);
+                    }
 
                     if ($dead) {
                         $this->warn(sprintf(
