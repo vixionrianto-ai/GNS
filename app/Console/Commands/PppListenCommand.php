@@ -42,8 +42,9 @@ class PppListenCommand extends Command
                 $this->info('Terhubung ke RouterOS API, listener menunggu event...');
 
                 while (true) {
-                    // count=1 membuat readRAW mengembalikan satu !re block.
-                    // /ppp/active/listen tidak pernah mengirim !done selama listener aktif.
+                    // RouterOS /ppp/active/listen tidak mengirim !done selama
+                    // listener aktif. count=1 membuat library mengembalikan
+                    // satu blok !re sekaligus agar event dapat diproses.
                     $raw = $client->readRAW(['count' => 1]);
 
                     if (empty($raw)) {
@@ -113,9 +114,14 @@ class PppListenCommand extends Command
             'port' => (int) $router->api_port,
             'ssl' => (bool) $router->ssl,
             'timeout' => 10,
-            // Listener boleh menunggu event. Timeout 30 detik dipakai
-            // sebagai watchdog agar koneksi mati bisa dideteksi dan reconnect.
-            'socket_timeout' => 30,
+
+            // Listener memang harus menunggu lama ketika tidak ada event.
+            // Library RouterOS API-php default-nya 30 detik, yang membuat
+            // listener terlihat "putus" padahal router masih sehat.
+            // 24 jam hanya menjadi batas baca; koneksi TCP yang benar-benar
+            // putus tetap akan masuk ke blok reconnect.
+            'socket_timeout' => 86400,
+
             'attempts' => 2,
             'delay' => 1,
         ]));
