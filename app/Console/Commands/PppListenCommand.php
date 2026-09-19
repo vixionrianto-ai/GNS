@@ -35,7 +35,7 @@ class PppListenCommand extends Command
 
         $this->info('PPP realtime listener GNS aktif.');
         $this->line('Semua router MikroTik dengan status Aktif akan dipantau otomatis.');
-        $this->line('Event PPP disimpan ke database. Telegram belum diaktifkan pada tahap ini.');
+        $this->line('Event PPP disimpan ke database dan disconnect baru dikirim ke Telegram.');
         $this->line('Tekan Ctrl+C untuk berhenti.');
         $this->newLine();
 
@@ -147,7 +147,7 @@ class PppListenCommand extends Command
                 $client = $this->createClient($router);
 
                 $query = new Query('/ppp/active/listen');
-                $query->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id');
+                $query->equal('.proplist', '.id,.dead,name,address,caller-id,uptime,service,session-id');
 
                 $client->query($query);
 
