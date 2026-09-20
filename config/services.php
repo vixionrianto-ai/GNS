@@ -44,6 +44,14 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
     ],
 
+    'olt' => [
+        'enabled' => env('OLT_ENABLED', false),
+        'base_url' => env('OLT_BASE_URL'),
+        'username' => env('OLT_USERNAME'),
+        'password' => env('OLT_PASSWORD'),
+        'timeout' => env('OLT_TIMEOUT', 10),
+    ],
+
     'backup' => [
         'mysqldump_skip_ssl' => env('MYSQLDUMP_SKIP_SSL', false),
     ],
