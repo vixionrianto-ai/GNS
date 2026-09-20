@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\DB;
 class PppEventService
 {
     public function __construct(
-        protected TelegramService $telegram
+        protected TelegramService $telegram,
+        protected OltService $olt
     ) {
     }
 
@@ -98,13 +99,22 @@ class PppEventService
 
         // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
         if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
-            $this->telegram->send($this->formatDisconnectMessage($router, $event, $pelanggan));
+            $oltData = $this->olt->findByUsername($username);
+
+            $this->telegram->send(
+                $this->formatDisconnectMessage($router, $event, $pelanggan, $oltData)
+            );
         }
 
         return $record;
     }
 
-    protected function formatDisconnectMessage(Router $router, array $event, ?Pelanggan $pelanggan = null): string
+    protected function formatDisconnectMessage(
+        Router $router,
+        array $event,
+        ?Pelanggan $pelanggan = null,
+        ?array $oltData = null
+    ): string
     {
         $today = now()->startOfDay();
 
@@ -147,6 +157,9 @@ class PppEventService
             'IP Client: ' . ($event['address'] ?? '-') . "\n" .
             'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
             'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
+            'ONU: ' . ($oltData['onu'] ?? '-') . "\n" .
+            'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
+            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             'Jumlah Gangguan : ' . $gangguan . 'x Terputus hari ini' . "\n" .
             "====================\n" .
             'Total Secrets: ' . $totalSecrets . "\n" .
