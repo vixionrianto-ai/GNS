@@ -100,7 +100,7 @@ class PppEventService
 
         // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
         if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
-            $oltData = $this->olt->findByUsername($username);
+            $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
 
             $this->telegram->send(
                 $this->formatDisconnectMessage($router, $event, $pelanggan, $oltData)
