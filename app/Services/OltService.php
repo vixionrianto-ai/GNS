@@ -241,6 +241,14 @@ class OltService
 
         $sessionKey = $this->sessionKey($html);
 
+        Log::info('OLT request GET dibaca.', [
+            'url' => $url,
+            'status' => $response->getStatusCode(),
+            'html_length' => strlen($html),
+            'session_key_found' => $sessionKey !== '',
+            'looks_login_page' => stripos($html, 'login') !== false,
+        ]);
+
         if ($sessionKey !== '') {
             $data['SessionKey'] = $sessionKey;
         }
@@ -255,7 +263,17 @@ class OltService
             'cookies' => $jar,
         ]);
 
-        return mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
+        $postHtml = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
+
+        Log::info('OLT request POST dibaca.', [
+            'url' => $url,
+            'status' => $response->getStatusCode(),
+            'html_length' => strlen($postHtml),
+            'session_key_found' => $sessionKey !== '',
+            'looks_login_page' => stripos($postHtml, 'login') !== false,
+        ]);
+
+        return $postHtml;
     }
 
     protected function sessionKey(string $html): string
