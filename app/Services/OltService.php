@@ -15,7 +15,18 @@ class OltService
      */
     public function findByUsername(string $username, ?string $callerId = null): ?array
     {
-        if (!$this->enabled() || (trim($username) === '' && trim((string) $callerId) === '')) {
+        if (!$this->enabled()) {
+            Log::warning('OLT lookup dilewati: konfigurasi OLT belum aktif.', [
+                'username' => $username,
+                'enabled' => (bool) config('services.olt.enabled', false),
+                'base_url_filled' => filled(config('services.olt.base_url')),
+                'username_filled' => filled(config('services.olt.username')),
+                'password_filled' => filled(config('services.olt.password')),
+            ]);
+            return null;
+        }
+
+        if (trim($username) === '' && trim((string) $callerId) === '') {
             return null;
         }
 
@@ -70,6 +81,10 @@ class OltService
 
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
+            ]);
+
+            Log::info('OLT login selesai, mulai baca PON 1-4.', [
+                'base_url' => $base,
             ]);
 
             for ($pon = 1; $pon <= 4; $pon++) {
@@ -166,6 +181,11 @@ class OltService
                     'rx_power' => $opm['rx_power'] ?? null,
                 ];
             }
+
+            Log::warning('OLT ONU tidak ditemukan pada seluruh PON.', [
+                'username' => $username,
+                'caller_id' => $callerId,
+            ]);
         } catch (Throwable $e) {
             Log::error('Gagal mengambil data ONU dari OLT.', [
                 'username' => $username,
@@ -217,8 +237,15 @@ class OltService
 
     protected function sessionKey(string $html): string
     {
-        if (preg_match('/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i', $html, $match)) {
-            return $match[1];
+        $patterns = [
+            '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
+            '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $match)) {
+                return trim(html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
         }
 
         return '';
@@ -233,7 +260,7 @@ class OltService
         foreach ($matches[1] ?? [] as $rowHtml) {
             preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
 
-            if (count($cells[1] ?? []) < 9) {
+            if (count($cells[1] ?? []) < 5) {
                 continue;
             }
 
@@ -249,7 +276,7 @@ class OltService
                 'mac' => $cells[2],
                 'description' => $cells[3],
                 'distance' => $cells[4],
-                'last_deregister_reason' => $cells[8],
+                'last_deregister_reason' => $cells[8] ?? '-',
             ];
         }
 
