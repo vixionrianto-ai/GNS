@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Router;
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
