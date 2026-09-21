@@ -66,6 +66,8 @@ class OltService
 
             $loginResponse = $client->get($loginPage, [
                 'headers' => $headers,
+                'cookies' => $jar,
+                'allow_redirects' => true,
             ]);
 
             Log::info('OLT login page response.', [
@@ -83,10 +85,18 @@ class OltService
                     'button' => 'login',
                     'who' => '100',
                 ],
+                'cookies' => $jar,
+                'allow_redirects' => true,
             ]);
 
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
+                'html_length' => strlen((string) $loginResponse->getBody()),
+                'cookie_count' => count($jar->toArray()),
+                'cookie_names' => array_values(array_map(
+                    fn ($cookie) => $cookie['Name'] ?? '',
+                    $jar->toArray()
+                )),
             ]);
 
             Log::info('OLT login selesai, mulai baca PON 1-4.', [
