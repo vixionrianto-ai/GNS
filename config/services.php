@@ -50,6 +50,11 @@ return [
         'username' => env('OLT_USERNAME'),
         'password' => env('OLT_PASSWORD'),
         'timeout' => env('OLT_TIMEOUT', 10),
+
+        // Optional per-router OLT configuration.
+        // Example:
+        // OLT_ROUTERS='{"KUWU":{"base_url":"http://olt-kuwu:725"},"RUMAH":{"base_url":"http://olt-rumah:725"}}'
+        'routers' => json_decode(env('OLT_ROUTERS', '{}'), true) ?: [],
     ],
 
     'backup' => [
