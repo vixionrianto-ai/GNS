@@ -305,15 +305,15 @@ class OltService
             return null;
         }
 
-        $python = trim((string) env('OLT_PYTHON', 'python'), " \"'");
+        $python = trim((string) env('OLT_PYTHON', ''), " \"'");
 
-        // Windows .env sering menyimpan nilai dengan quote. Buang quote
-        // sebelum dipakai sebagai nama executable.
+        // Di Windows, jangan escapeshellarg() nama executable karena hasilnya
+        // dapat ditolak oleh cmd.exe. Gunakan launcher Python Windows.
         if ($python === '') {
-            $python = 'python';
+            $python = PHP_OS_FAMILY === 'Windows' ? 'py -3' : 'python3';
         }
 
-        $command = escapeshellarg($python) . ' ' . escapeshellarg($script);
+        $command = $python . ' ' . escapeshellarg($script);
 
         $process = proc_open($command, [
             0 => ['pipe', 'r'],
