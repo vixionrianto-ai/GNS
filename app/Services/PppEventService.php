@@ -138,6 +138,20 @@ class PppEventService
                 ->count();
         }
 
+        // Daftar "disconnected" harus mencerminkan kondisi SEKARANG.
+        // Jika user sempat disconnect lalu sudah online lagi, keluarkan dari daftar.
+        $activeNames = [];
+        try {
+            foreach ($this->mikrotik->getActiveSessions($router) as $active) {
+                $name = trim((string) ($active['name'] ?? ''));
+                if ($name !== '') {
+                    $activeNames[$name] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $disconnects = PppEvent::query()
             ->where('router_id', $router->id)
             ->where('event_type', 'disconnect')
@@ -145,6 +159,8 @@ class PppEventService
             ->orderBy('event_at')
             ->get(['username'])
             ->unique('username')
+            ->values()
+            ->reject(fn (PppEvent $item) => isset($activeNames[$item->username]))
             ->values();
 
         $disconnectedUsers = $disconnects->map(
@@ -175,7 +191,7 @@ class PppEventService
             "====================\n" .
             'Total Secrets: ' . $totalSecrets . "\n" .
             'Total Active: ' . $totalActive . "\n" .
-            'Disconnected Users (' . $gangguan . "):\n" .
+            'Offline Saat Ini (' . $gangguan . "):\n" .
             $disconnectedUsers;
     }
 
