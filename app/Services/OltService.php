@@ -13,9 +13,9 @@ class OltService
      * Cari data ONU berdasarkan username PPP yang tersimpan
      * pada kolom Description di OLT.
      */
-    public function findByUsername(string $username): ?array
+    public function findByUsername(string $username, ?string $callerId = null): ?array
     {
-        if (!$this->enabled() || trim($username) === '') {
+        if (!$this->enabled() || (trim($username) === '' && trim((string) $callerId) === '')) {
             return null;
         }
 
@@ -70,14 +70,21 @@ class OltService
                 foreach ($statusRows as $row) {
                     $description = trim($row['description']);
                     $target = trim($username);
+                    $targetMac = $this->normalizeMac($callerId);
+                    $rowMac = $this->normalizeMac($row['mac'] ?? '');
 
-                    // OLT kadang menyimpan username dengan tambahan keterangan.
-                    // Cocokkan exact dahulu, lalu gunakan pencocokan case-insensitive
-                    // yang aman bila username berada di dalam Description.
-                    $matched = strcasecmp($description, $target) === 0;
+                    // Prioritas 1: username PPP di Description.
+                    $matched = $target !== '' && strcasecmp($description, $target) === 0;
 
                     if (!$matched && $target !== '') {
                         $matched = stripos($description, $target) !== false;
+                    }
+
+                    // Prioritas 2: Caller-ID PPPoE sering merupakan MAC ONU.
+                    // Ini dipakai sebagai fallback jika Description OLT tidak
+                    // berisi username PPP.
+                    if (!$matched && $targetMac !== '' && $rowMac !== '') {
+                        $matched = $targetMac === $rowMac;
                     }
 
                     if ($matched) {
@@ -244,6 +251,11 @@ class OltService
         }
 
         return $rows;
+    }
+
+    protected function normalizeMac(?string $mac): string
+    {
+        return strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', (string) $mac) ?? '');
     }
 
     protected function clean(string $cell): string
