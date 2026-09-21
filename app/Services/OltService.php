@@ -6,6 +6,7 @@ use App\Models\Router;
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use GuzzleHttp\Cookie\SetCookie;
 use Throwable;
 
 class OltService
@@ -66,27 +67,47 @@ class OltService
 
             $loginResponse = $client->get($loginPage, [
                 'headers' => $headers,
+                'cookies' => $jar,
             ]);
+
+            $this->mergeResponseCookies($loginResponse, $jar, $base);
+
+            $loginPageHtml = mb_convert_encoding((string) $loginResponse->getBody(), 'UTF-8', 'GB2312');
+            $loginSessionKey = $this->sessionKey($loginPageHtml);
 
             Log::info('OLT login page response.', [
                 'status' => $loginResponse->getStatusCode(),
+                'session_key_found' => $loginSessionKey !== '',
+                'cookie_count_after_get' => count($jar->toArray()),
             ]);
+
+            $loginForm = [
+                'user' => (string) ($oltConfig['username'] ?? ''),
+                'pass' => (string) ($oltConfig['password'] ?? ''),
+                'button' => 'login',
+                'who' => '100',
+            ];
+
+            if ($loginSessionKey !== '') {
+                $loginForm['SessionKey'] = $loginSessionKey;
+            }
 
             $loginResponse = $client->post($loginUrl, [
                 'headers' => $headers + [
                     'Content-Type' => 'application/x-www-form-urlencoded',
                     'Referer' => $loginPage,
                 ],
-                'form_params' => [
-                    'user' => (string) ($oltConfig['username'] ?? ''),
-                    'pass' => (string) ($oltConfig['password'] ?? ''),
-                    'button' => 'login',
-                    'who' => '100',
-                ],
+                'form_params' => $loginForm,
+                'cookies' => $jar,
             ]);
+
+            $this->mergeResponseCookies($loginResponse, $jar, $base);
 
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
+                'html_length' => strlen((string) $loginResponse->getBody()),
+                'cookie_count' => count($jar->toArray()),
+                'location' => $loginResponse->getHeaderLine('Location'),
             ]);
 
             Log::info('OLT login selesai, mulai baca PON 1-4.', [
@@ -263,6 +284,8 @@ class OltService
         $patterns = [
             '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
             '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
+            '/SessionKey\s*\.\s*name\s*=\s*[\'\"]SessionKey[\'\"][\s\S]*?SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
+            '/SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
         ];
 
         foreach ($patterns as $pattern) {
