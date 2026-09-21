@@ -6,7 +6,6 @@ use App\Models\Router;
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
-use GuzzleHttp\Cookie\SetCookie;
 use Throwable;
 
 class OltService
@@ -67,16 +66,10 @@ class OltService
 
             $loginResponse = $client->get($loginPage, [
                 'headers' => $headers,
-                'cookies' => $jar,
-                'allow_redirects' => true,
             ]);
-
-            $this->mergeResponseCookies($loginResponse, $jar, $base);
 
             Log::info('OLT login page response.', [
                 'status' => $loginResponse->getStatusCode(),
-                'set_cookie_names' => $this->cookieNamesFromResponse($loginResponse),
-                'cookie_count_after_get' => count($jar->toArray()),
             ]);
 
             $loginResponse = $client->post($loginUrl, [
@@ -90,22 +83,10 @@ class OltService
                     'button' => 'login',
                     'who' => '100',
                 ],
-                'cookies' => $jar,
-                'allow_redirects' => true,
             ]);
-
-            $this->mergeResponseCookies($loginResponse, $jar, $base);
 
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
-                'html_length' => strlen((string) $loginResponse->getBody()),
-                'set_cookie_names' => $this->cookieNamesFromResponse($loginResponse),
-                'cookie_count' => count($jar->toArray()),
-                'cookie_names' => array_values(array_map(
-                    fn ($cookie) => $cookie['Name'] ?? '',
-                    $jar->toArray()
-                )),
-                'location' => $loginResponse->getHeaderLine('Location'),
             ]);
 
             Log::info('OLT login selesai, mulai baca PON 1-4.', [
@@ -246,50 +227,6 @@ class OltService
         ], $specific);
     }
 
-    protected function mergeResponseCookies($response, CookieJar $jar, string $baseUrl): void
-    {
-        $host = parse_url($baseUrl, PHP_URL_HOST) ?: '';
-
-        foreach ($response->getHeader('Set-Cookie') as $header) {
-            try {
-                $cookie = SetCookie::fromString($header);
-
-                if ($cookie->getName() === '') {
-                    continue;
-                }
-
-                if ($cookie->getDomain() === '' && $host !== '') {
-                    $cookie->setDomain($host);
-                }
-
-                if ($cookie->getPath() === '') {
-                    $cookie->setPath('/');
-                }
-
-                $jar->setCookie($cookie);
-            } catch (Throwable $e) {
-                Log::warning('OLT cookie response tidak bisa diproses.', [
-                    'cookie_name' => preg_match('/^\s*([^=;\s]+)\s*=/', $header, $match) ? $match[1] : null,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-    }
-
-    protected function cookieNamesFromResponse($response): array
-    {
-        return array_values(array_filter(array_map(
-            function ($header) {
-                if (preg_match('/^\\s*([^=;\\s]+)\\s*=/', $header, $match)) {
-                    return $match[1];
-                }
-
-                return null;
-            },
-            $response->getHeader('Set-Cookie')
-        )));
-    }
-
     protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
     {
         $response = $client->get($url, [
@@ -300,19 +237,9 @@ class OltService
             'cookies' => $jar,
         ]);
 
-        $this->mergeResponseCookies($response, $jar, $url);
-
         $html = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
 
         $sessionKey = $this->sessionKey($html);
-
-        Log::info('OLT request GET dibaca.', [
-            'url' => $url,
-            'status' => $response->getStatusCode(),
-            'html_length' => strlen($html),
-            'session_key_found' => $sessionKey !== '',
-            'looks_login_page' => stripos($html, 'login') !== false,
-        ]);
 
         if ($sessionKey !== '') {
             $data['SessionKey'] = $sessionKey;
@@ -320,7 +247,7 @@ class OltService
 
         $response = $client->post($url, [
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; x64) Chrome/152',
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
                 'Referer' => $referer,
                 'Content-Type' => 'application/x-www-form-urlencoded',
             ],
@@ -328,19 +255,7 @@ class OltService
             'cookies' => $jar,
         ]);
 
-        $this->mergeResponseCookies($response, $jar, $url);
-
-        $postHtml = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
-
-        Log::info('OLT request POST dibaca.', [
-            'url' => $url,
-            'status' => $response->getStatusCode(),
-            'html_length' => strlen($postHtml),
-            'session_key_found' => $sessionKey !== '',
-            'looks_login_page' => stripos($postHtml, 'login') !== false,
-        ]);
-
-        return $postHtml;
+        return mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
     }
 
     protected function sessionKey(string $html): string
@@ -348,8 +263,6 @@ class OltService
         $patterns = [
             '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
             '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
-            '/SessionKey\s*\.\s*name\s*=\s*[\'\"]SessionKey[\'\"][\s\S]*?SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
-            '/SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
         ];
 
         foreach ($patterns as $pattern) {
