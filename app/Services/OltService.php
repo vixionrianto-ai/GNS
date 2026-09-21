@@ -288,7 +288,7 @@ class OltService
 
             $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
 
-            if (!str_starts_with($cells[0], 'EPON')) {
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
                 continue;
             }
 
