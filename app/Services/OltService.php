@@ -67,66 +67,61 @@ class OltService
 
                 $statusRows = $this->parseStatus($statusHtml);
 
-                foreach ($statusRows as $row) {
-                    $description = trim($row['description']);
-                    $target = trim($username);
-                    $targetMac = $this->normalizeMac($callerId);
-                    $rowMac = $this->normalizeMac($row['mac'] ?? '');
+                // Jika halaman status berhasil dibaca, cocokkan langsung.
+                $matchedRow = $this->matchOnuRow($statusRows, $username, $callerId);
 
-                    // Prioritas 1: username PPP di Description.
-                    $matched = $target !== '' && strcasecmp($description, $target) === 0;
+                // Fallback: cocokkan dari halaman OPM juga. Ini penting karena
+                // data OLT yang kita miliki terbukti memuat MAC + Description
+                // yang sama dengan PPP Caller-ID/username.
+                if (!$matchedRow) {
+                    $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                        'select' => (string) $pon,
+                        'searchMac' => '',
+                        'searchDescription' => '',
+                        'who' => '100',
+                    ], $opmUrl);
 
-                    if (!$matched && $target !== '') {
-                        $matched = stripos($description, $target) !== false;
-                    }
+                    $opmRows = $this->parseOpm($opmHtml);
+                    $matchedOpm = $this->matchOnuRow($opmRows, $username, $callerId);
 
-                    // Prioritas 2: Caller-ID PPPoE sering merupakan MAC ONU.
-                    // Ini dipakai sebagai fallback jika Description OLT tidak
-                    // berisi username PPP.
-                    if (!$matched && $targetMac !== '' && $rowMac !== '') {
-                        $matched = $targetMac === $rowMac;
-                    }
-
-                    if ($matched) {
-                        $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
-                            'select' => (string) $pon,
-                            'searchMac' => '',
-                            'searchDescription' => '',
-                            'who' => '100',
-                        ], $opmUrl);
-
-                        $opmRows = $this->parseOpm($opmHtml);
-                        $opm = collect($opmRows)->firstWhere('onu', $row['onu']);
-
-                        // Beberapa halaman OLT mengembalikan OPM dengan
-                        // format ONU yang sedikit berbeda. Jika exact ID
-                        // belum ketemu, cocokkan nomor ONU di bagian akhir.
-                        if (!$opm) {
-                            $rowOnu = trim((string) $row['onu']);
-                            foreach ($opmRows as $candidate) {
-                                $candidateOnu = trim((string) ($candidate['onu'] ?? ''));
-                                if ($candidateOnu !== '' && $candidateOnu === $rowOnu) {
-                                    $opm = $candidate;
-                                    break;
-                                }
-                            }
-                        }
-
-                        return [
-                            'onu' => $row['onu'],
-                            'status' => $row['status'],
-                            'mac' => $row['mac'],
-                            'description' => $row['description'],
-                            'distance' => $row['distance'],
-                            'last_deregister_reason' => $row['last_deregister_reason'],
-                            'temperature' => $opm['temperature'] ?? null,
-                            'voltage' => $opm['voltage'] ?? null,
-                            'tx_bias' => $opm['tx_bias'] ?? null,
-                            'tx_power' => $opm['tx_power'] ?? null,
-                            'rx_power' => $opm['rx_power'] ?? null,
+                    if ($matchedOpm) {
+                        $matchedRow = [
+                            'onu' => $matchedOpm['onu'],
+                            'status' => 'Unknown',
+                            'mac' => $matchedOpm['mac'] ?? '',
+                            'description' => $matchedOpm['description'] ?? '',
+                            'distance' => $matchedOpm['distance'] ?? '-',
+                            'last_deregister_reason' => '-',
                         ];
+                    } else {
+                        continue;
                     }
+                } else {
+                    $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                        'select' => (string) $pon,
+                        'searchMac' => '',
+                        'searchDescription' => '',
+                        'who' => '100',
+                    ], $opmUrl);
+
+                    $opmRows = $this->parseOpm($opmHtml);
                 }
+
+                $opm = collect($opmRows)->firstWhere('onu', $matchedRow['onu']);
+
+                return [
+                    'onu' => $matchedRow['onu'],
+                    'status' => $matchedRow['status'],
+                    'mac' => $matchedRow['mac'],
+                    'description' => $matchedRow['description'],
+                    'distance' => $matchedRow['distance'],
+                    'last_deregister_reason' => $matchedRow['last_deregister_reason'],
+                    'temperature' => $opm['temperature'] ?? null,
+                    'voltage' => $opm['voltage'] ?? null,
+                    'tx_bias' => $opm['tx_bias'] ?? null,
+                    'tx_power' => $opm['tx_power'] ?? null,
+                    'rx_power' => $opm['rx_power'] ?? null,
+                ];
             }
         } catch (Throwable $e) {
             Log::warning('Gagal mengambil data ONU dari OLT.', [
@@ -251,6 +246,31 @@ class OltService
         }
 
         return $rows;
+    }
+
+    protected function matchOnuRow(array $rows, string $username, ?string $callerId): ?array
+    {
+        $target = trim($username);
+        $targetMac = $this->normalizeMac($callerId);
+
+        foreach ($rows as $row) {
+            $description = trim((string) ($row['description'] ?? ''));
+            $rowMac = $this->normalizeMac($row['mac'] ?? '');
+
+            if ($target !== '' && strcasecmp($description, $target) === 0) {
+                return $row;
+            }
+
+            if ($target !== '' && stripos($description, $target) !== false) {
+                return $row;
+            }
+
+            if ($targetMac !== '' && $rowMac !== '' && $targetMac === $rowMac) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     protected function normalizeMac(?string $mac): string
