@@ -33,14 +33,15 @@ class PppEventService
         $sessionId = trim((string) ($event['session-id'] ?? ''));
         $routerItemId = trim((string) ($event['.id'] ?? ''));
 
+        // Satu session PPP = satu event connect/disconnect.
+        // Event /ppp/active/listen juga dapat mengirim update dari session
+        // yang sama, jadi jangan membuat event/Telegram baru hanya karena
+        // address atau caller-id berubah.
         $fingerprint = implode('|', [
             $router->id,
             $eventType,
-            $sessionId,
-            $routerItemId,
+            $sessionId !== '' ? $sessionId : $routerItemId,
             $username,
-            (string) ($event['caller-id'] ?? ''),
-            (string) ($event['address'] ?? ''),
         ]);
         $eventKey = hash('sha256', $fingerprint);
 
@@ -98,13 +99,22 @@ class PppEventService
             return $record;
         });
 
-        // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
-        if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
-            $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
+        // Telegram dikirim sekali untuk setiap perubahan session:
+        // - disconnect: OFFLINE
+        // - connect: ONLINE
+        // Update dari session yang sama tidak mengirim Telegram ulang.
+        if ($record->wasRecentlyCreated) {
+            if ($eventType === 'disconnect') {
+                $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
 
-            $this->telegram->send(
-                $this->formatDisconnectMessage($router, $event, $pelanggan, $oltData)
-            );
+                $this->telegram->send(
+                    $this->formatDisconnectMessage($router, $event, $pelanggan, $oltData)
+                );
+            } else {
+                $this->telegram->send(
+                    $this->formatConnectMessage($router, $event, $pelanggan)
+                );
+            }
         }
 
         return $record;
@@ -138,40 +148,13 @@ class PppEventService
                 ->count();
         }
 
-        // Daftar "disconnected" harus mencerminkan kondisi SEKARANG.
-        // Jika user sempat disconnect lalu sudah online lagi, keluarkan dari daftar.
-        $activeNames = [];
-        try {
-            foreach ($this->mikrotik->getActiveSessions($router) as $active) {
-                $name = trim((string) ($active['name'] ?? ''));
-                if ($name !== '') {
-                    $activeNames[$name] = true;
-                }
-            }
-        } catch (\Throwable $e) {
-            report($e);
-        }
-
-        $disconnects = PppEvent::query()
+        $gangguan = PppEvent::query()
             ->where('router_id', $router->id)
             ->where('event_type', 'disconnect')
             ->where('event_at', '>=', $today)
-            ->orderBy('event_at')
-            ->get(['username'])
-            ->unique('username')
-            ->values()
-            ->reject(fn (PppEvent $item) => isset($activeNames[$item->username]))
-            ->values();
+            ->count();
 
-        $disconnectedUsers = $disconnects->map(
-            fn (PppEvent $item) => '- ' . $item->username
-        )->implode("\n");
-
-        if ($disconnectedUsers === '') {
-            $disconnectedUsers = '-';
-        }
-
-        $gangguan = $disconnects->count();
+        $disconnectedUsers = $this->getCurrentOfflineUsers($router);
 
         return
             'OFFLINE ' . $router->nama_router . "\n" .
@@ -191,7 +174,7 @@ class PppEventService
             "====================\n" .
             'Total Secrets: ' . $totalSecrets . "\n" .
             'Total Active: ' . $totalActive . "\n" .
-            'Offline Saat Ini (' . $gangguan . "):\n" .
+            'Offline Saat Ini (' . $this->countCurrentOfflineUsers($router) . "):\n" .
             $disconnectedUsers;
     }
 
