@@ -258,6 +258,8 @@ class OltService
             'cookies' => $jar,
         ]);
 
+        $this->mergeResponseCookies($response, $jar, $url);
+
         $html = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
 
         $sessionKey = $this->sessionKey($html);
@@ -276,7 +278,39 @@ class OltService
             'cookies' => $jar,
         ]);
 
+        $this->mergeResponseCookies($response, $jar, $url);
+
         return mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
+    }
+
+    protected function mergeResponseCookies($response, CookieJar $jar, string $baseUrl): void
+    {
+        $host = parse_url($baseUrl, PHP_URL_HOST) ?: '';
+
+        foreach ($response->getHeader('Set-Cookie') as $header) {
+            try {
+                $cookie = SetCookie::fromString($header);
+
+                if ($cookie->getName() === '') {
+                    continue;
+                }
+
+                if ($cookie->getDomain() === '' && $host !== '') {
+                    $cookie->setDomain($host);
+                }
+
+                if ($cookie->getPath() === '') {
+                    $cookie->setPath('/');
+                }
+
+                $jar->setCookie($cookie);
+            } catch (Throwable $e) {
+                Log::warning('OLT cookie response tidak bisa diproses.', [
+                    'cookie_name' => preg_match('/^\s*([^=;\s]+)\s*=/', $header, $match) ? $match[1] : null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     protected function sessionKey(string $html): string
