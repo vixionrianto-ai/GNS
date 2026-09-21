@@ -272,8 +272,8 @@ class PppEventService
 
             return empty($offline)
                 ? '-'
-                : collect($offline)->map(fn ($name) => '- ' . $name)->implode("\\n");
-        } catch (\\Throwable $e) {
+                : collect($offline)->map(fn ($name) => '- ' . $name)->implode("\n");
+        } catch (\Throwable $e) {
             report($e);
             return '-';
         }
