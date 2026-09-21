@@ -112,6 +112,27 @@ class OltService
                 'base_url' => $base,
             ]);
 
+            if (count($jar->toArray()) === 0) {
+                Log::warning('OLT PHP session tidak terbentuk, memakai fallback Python.', [
+                    'username' => $username,
+                    'base_url' => $base,
+                ]);
+
+                $pythonResult = $this->lookupWithPython($oltConfig, $username, $callerId);
+
+                if ($pythonResult) {
+                    Log::info('OLT ONU cocok melalui Python fallback.', [
+                        'onu' => $pythonResult['onu'] ?? null,
+                        'description' => $pythonResult['description'] ?? null,
+                        'rx_power' => $pythonResult['rx_power'] ?? null,
+                        'tx_power' => $pythonResult['tx_power'] ?? null,
+                        'distance' => $pythonResult['distance'] ?? null,
+                    ]);
+
+                    return $pythonResult;
+                }
+            }
+
             for ($pon = 1; $pon <= 4; $pon++) {
                 $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
                     'select' => (string) $pon,
@@ -274,6 +295,62 @@ class OltService
                 ]);
             }
         }
+    }
+
+    protected function lookupWithPython(array $oltConfig, string $username, ?string $callerId): ?array
+    {
+        $script = base_path('scripts/olt_lookup.py');
+
+        if (!is_file($script)) {
+            return null;
+        }
+
+        $python = (string) env('OLT_PYTHON', 'python');
+        $command = escapeshellarg($python) . ' ' . escapeshellarg($script);
+
+        $process = proc_open($command, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes);
+
+        if (!is_resource($process)) {
+            return null;
+        }
+
+        $payload = json_encode([
+            'base_url' => $oltConfig['base_url'] ?? '',
+            'username' => $oltConfig['username'] ?? '',
+            'password' => $oltConfig['password'] ?? '',
+            'target' => $username,
+            'caller_id' => $callerId,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        fwrite($pipes[0], $payload);
+        fclose($pipes[0]);
+
+        stream_set_timeout($pipes[1], 15);
+        stream_set_timeout($pipes[2], 15);
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $exitCode = proc_close($process);
+
+        $result = json_decode(trim($stdout), true);
+
+        if ($exitCode !== 0 || !is_array($result) || !($result['ok'] ?? false)) {
+            Log::warning('OLT Python fallback gagal.', [
+                'username' => $username,
+                'exit_code' => $exitCode,
+                'stderr' => trim($stderr),
+            ]);
+            return null;
+        }
+
+        return is_array($result['data'] ?? null) ? $result['data'] : null;
     }
 
     protected function cookieNamesFromResponse($response): array
