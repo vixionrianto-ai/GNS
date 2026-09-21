@@ -72,6 +72,8 @@ class OltService
 
             Log::info('OLT login page response.', [
                 'status' => $loginResponse->getStatusCode(),
+                'set_cookie_names' => $this->cookieNamesFromResponse($loginResponse),
+                'cookie_count_after_get' => count($jar->toArray()),
             ]);
 
             $loginResponse = $client->post($loginUrl, [
@@ -92,11 +94,13 @@ class OltService
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
                 'html_length' => strlen((string) $loginResponse->getBody()),
+                'set_cookie_names' => $this->cookieNamesFromResponse($loginResponse),
                 'cookie_count' => count($jar->toArray()),
                 'cookie_names' => array_values(array_map(
                     fn ($cookie) => $cookie['Name'] ?? '',
                     $jar->toArray()
                 )),
+                'location' => $loginResponse->getHeaderLine('Location'),
             ]);
 
             Log::info('OLT login selesai, mulai baca PON 1-4.', [
@@ -235,6 +239,20 @@ class OltService
             'username' => $global['username'] ?? null,
             'password' => $global['password'] ?? null,
         ], $specific);
+    }
+
+    protected function cookieNamesFromResponse($response): array
+    {
+        return array_values(array_filter(array_map(
+            function ($header) {
+                if (preg_match('/^\\s*([^=;\\s]+)\\s*=/', $header, $match)) {
+                    return $match[1];
+                }
+
+                return null;
+            },
+            $response->getHeader('Set-Cookie')
+        )));
     }
 
     protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
