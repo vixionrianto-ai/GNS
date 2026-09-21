@@ -144,7 +144,69 @@ class PppEventService
             'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
             'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
             'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
-            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n";
+            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
+            "====================\n" .
+            $this->formatCurrentPppSummary($router);
+    }
+
+    protected function formatCurrentPppSummary(Router $router): string
+    {
+        $today = now()->startOfDay();
+
+        try {
+            $totalSecrets = $this->mikrotik->getSecretCount($router);
+            $totalActive = $this->mikrotik->getActiveCount($router);
+        } catch (\Throwable $e) {
+            report($e);
+            $totalSecrets = Pelanggan::query()
+                ->where('router_id', $router->id)
+                ->whereNotNull('username_pppoe')
+                ->where('username_pppoe', '!=', '')
+                ->count();
+
+            $totalActive = Pelanggan::query()
+                ->where('router_id', $router->id)
+                ->where('ppp_status', 'online')
+                ->count();
+        }
+
+        $activeNames = [];
+        try {
+            foreach ($this->mikrotik->getActiveSessions($router) as $active) {
+                $name = trim((string) ($active['name'] ?? ''));
+                if ($name !== '') {
+                    $activeNames[$name] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $disconnects = PppEvent::query()
+            ->where('router_id', $router->id)
+            ->where('event_type', 'disconnect')
+            ->where('event_at', '>=', $today)
+            ->orderBy('event_at')
+            ->get(['username'])
+            ->unique('username')
+            ->values()
+            ->reject(fn (PppEvent $item) => isset($activeNames[$item->username]))
+            ->values();
+
+        $disconnectedUsers = $disconnects->map(
+            fn (PppEvent $item) => '- ' . $item->username
+        )->implode("\n");
+
+        if ($disconnectedUsers === '') {
+            $disconnectedUsers = '-';
+        }
+
+        return
+            'Jumlah Gangguan : ' . $disconnects->count() . 'x Terputus hari ini' . "\n" .
+            'Total Secrets: ' . $totalSecrets . "\n" .
+            'Total Active: ' . $totalActive . "\n" .
+            'Offline Saat Ini (' . $disconnects->count() . "):\n" .
+            $disconnectedUsers;
     }
 
     protected function formatDisconnectMessage(
