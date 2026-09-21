@@ -283,6 +283,18 @@ class MikroTikService
         return $this->connect($router)->query($query)->read();
     }
 
+    public function getActiveCount(Router $router): int
+    {
+        return count($this->getActiveSessions($router));
+    }
+
+    public function getSecretCount(Router $router): int
+    {
+        $query = new Query('/ppp/secret/print');
+        $query->equal('.proplist', '.id,name');
+        return count($this->connect($router)->query($query)->read());
+    }
+
     public function getSecretStatusMap(Router $router): array
     {
         $query = new Query('/ppp/secret/print');
