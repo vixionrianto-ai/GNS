@@ -114,7 +114,7 @@ class PppEventService
         // ONLINE: kirim hanya saat pelanggan yang sebelumnya offline kembali online.
         // Event CONNECT/UPDATE yang terjadi saat pelanggan sudah online tidak dikirim.
         if ($eventType === 'connect' && $record->wasRecentlyCreated && $wasOffline) {
-            $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
+            $oltData = $this->olt->findByUsername($router, $username, $event['caller-id'] ?? null);
 
             $this->telegram->send(
                 $this->formatConnectMessage($router, $event, $pelanggan, $oltData)
