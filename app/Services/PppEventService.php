@@ -11,7 +11,8 @@ class PppEventService
 {
     public function __construct(
         protected TelegramService $telegram,
-        protected OltService $olt
+        protected OltService $olt,
+        protected MikroTikService $mikrotik
     ) {
     }
 
@@ -118,16 +119,24 @@ class PppEventService
     {
         $today = now()->startOfDay();
 
-        $totalSecrets = Pelanggan::query()
-            ->where('router_id', $router->id)
-            ->whereNotNull('username_pppoe')
-            ->where('username_pppoe', '!=', '')
-            ->count();
+        // Ambil angka langsung dari MikroTik agar Telegram mencerminkan kondisi
+        // PPP Secret dan PPP Active yang sebenarnya saat notifikasi dibuat.
+        try {
+            $totalSecrets = $this->mikrotik->getSecretCount($router);
+            $totalActive = $this->mikrotik->getActiveCount($router);
+        } catch (\Throwable $e) {
+            report($e);
+            $totalSecrets = Pelanggan::query()
+                ->where('router_id', $router->id)
+                ->whereNotNull('username_pppoe')
+                ->where('username_pppoe', '!=', '')
+                ->count();
 
-        $totalActive = Pelanggan::query()
-            ->where('router_id', $router->id)
-            ->where('ppp_status', 'online')
-            ->count();
+            $totalActive = Pelanggan::query()
+                ->where('router_id', $router->id)
+                ->where('ppp_status', 'online')
+                ->count();
+        }
 
         $disconnects = PppEvent::query()
             ->where('router_id', $router->id)
@@ -159,6 +168,8 @@ class PppEventService
             'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
             'ONU: ' . ($oltData['onu'] ?? '-') . "\n" .
             'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
+            'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
+            'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
             'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             'Jumlah Gangguan : ' . $gangguan . 'x Terputus hari ini' . "\n" .
             "====================\n" .
