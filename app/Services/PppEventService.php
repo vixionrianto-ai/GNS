@@ -146,30 +146,43 @@ class PppEventService
             'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
             'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             "====================\n" .
-            $this->formatCurrentPppSummary($router);
+            $this->formatCurrentPppSummary($router, 'connect', trim((string) ($event['name'] ?? '')));
     }
 
-    protected function formatCurrentPppSummary(Router $router): string
+    protected function formatCurrentPppSummary(
+        Router $router,
+        string $eventType = '',
+        string $eventUsername = ''
+    ): string
     {
         try {
-            $totalSecrets = $this->mikrotik->getSecretCount($router);
-            $totalActive = $this->mikrotik->getActiveCount($router);
+            $activeSessions = $this->mikrotik->getActiveSessions($router);
 
             $activeNames = [];
-            foreach ($this->mikrotik->getActiveSessions($router) as $active) {
+            foreach ($activeSessions as $active) {
                 $name = trim((string) ($active['name'] ?? ''));
                 if ($name !== '') {
                     $activeNames[$name] = true;
                 }
             }
 
+            // RouterOS /ppp/active/listen dapat mengirim .dead sedikit lebih
+            // cepat daripada /ppp/active/print memperlihatkan perubahan.
+            // Pakai event yang sedang diproses sebagai koreksi kondisi saat ini.
+            if ($eventUsername !== '') {
+                if ($eventType === 'disconnect') {
+                    unset($activeNames[$eventUsername]);
+                } elseif ($eventType === 'connect') {
+                    $activeNames[$eventUsername] = true;
+                }
+            }
+
+            $totalSecrets = $this->mikrotik->getSecretCount($router);
+            $totalActive = count($activeNames);
+
             $secretMap = $this->mikrotik->getSecretStatusMap($router);
 
-            // Kondisi OFFLINE SAAT INI = PPP Secret yang ada tetapi tidak
-            // sedang muncul di PPP Active. Ini mencerminkan kondisi router
-            // saat notifikasi dibuat, bukan hanya event disconnect hari ini.
             $offlineNames = [];
-
             foreach ($secretMap as $name => $secret) {
                 if (!isset($activeNames[$name])) {
                     $offlineNames[] = $name;
@@ -200,7 +213,7 @@ class PppEventService
                 'Total Active: ' . $totalActive . "\n" .
                 'Offline Saat Ini (' . count($offlineNames) . "):\n" .
                 $disconnectedUsers;
-        } catch (\Throwable $e) {
+        } catch (\\Throwable $e) {
             report($e);
 
             return
@@ -233,7 +246,7 @@ class PppEventService
             'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
             'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             "====================\n" .
-            $this->formatCurrentPppSummary($router);
+            $this->formatCurrentPppSummary($router, 'disconnect', trim((string) ($event['name'] ?? '')));
     }
 
     public function disconnectCount(Pelanggan $pelanggan, ?string $from = null, ?string $to = null): int
