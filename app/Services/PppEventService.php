@@ -160,7 +160,7 @@ class PppEventService
 
             $activeNames = [];
             foreach ($activeSessions as $active) {
-                $name = trim((string) ($active['name'] ?? ''));
+                $name = $this->normalizeUsername($active['name'] ?? '');
                 if ($name !== '') {
                     $activeNames[$name] = true;
                 }
@@ -169,11 +169,12 @@ class PppEventService
             // RouterOS /ppp/active/listen dapat mengirim .dead sedikit lebih
             // cepat daripada /ppp/active/print memperlihatkan perubahan.
             // Pakai event yang sedang diproses sebagai koreksi kondisi saat ini.
-            if ($eventUsername !== '') {
+            $eventKey = $this->normalizeUsername($eventUsername);
+            if ($eventKey !== '') {
                 if ($eventType === 'disconnect') {
-                    unset($activeNames[$eventUsername]);
+                    unset($activeNames[$eventKey]);
                 } elseif ($eventType === 'connect') {
-                    $activeNames[$eventUsername] = true;
+                    $activeNames[$eventKey] = true;
                 }
             }
 
@@ -184,8 +185,11 @@ class PppEventService
 
             $offlineNames = [];
             foreach ($secretMap as $name => $secret) {
-                if (!isset($activeNames[$name])) {
-                    $offlineNames[] = $name;
+                $displayName = trim((string) $name);
+                $secretKey = $this->normalizeUsername($displayName);
+
+                if ($secretKey !== '' && !isset($activeNames[$secretKey])) {
+                    $offlineNames[] = $displayName;
                 }
             }
 
@@ -247,6 +251,11 @@ class PppEventService
             'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             "====================\n" .
             $this->formatCurrentPppSummary($router, 'disconnect', trim((string) ($event['name'] ?? '')));
+    }
+
+    protected function normalizeUsername(mixed $username): string
+    {
+        return mb_strtolower(trim((string) $username));
     }
 
     public function disconnectCount(Pelanggan $pelanggan, ?string $from = null, ?string $to = null): int
