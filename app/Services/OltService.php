@@ -40,6 +40,7 @@ class OltService
                 'timeout' => (float) config('services.olt.timeout', 10),
                 'connect_timeout' => (float) config('services.olt.timeout', 10),
                 'http_errors' => false,
+                'verify' => false,
                 'cookies' => $jar,
             ]);
 
@@ -161,7 +162,7 @@ class OltService
                     ]);
                 }
 
-                $opm = collect($opmRows)->firstWhere('onu', $matchedRow['onu']);
+                $opm = $this->findOpmRow($opmRows, $matchedRow, $callerId);
 
                 Log::info('OLT ONU cocok.', [
                     'pon' => $pon,
@@ -338,6 +339,36 @@ class OltService
         }
 
         return $rows;
+    }
+
+    protected function findOpmRow(array $rows, array $matchedRow, ?string $callerId): ?array
+    {
+        $targetOnu = strtoupper(trim((string) ($matchedRow['onu'] ?? '')));
+        $targetMac = $this->normalizeMac($callerId ?: ($matchedRow['mac'] ?? ''));
+        $targetDescription = trim((string) ($matchedRow['description'] ?? ''));
+
+        foreach ($rows as $row) {
+            $rowOnu = strtoupper(trim((string) ($row['onu'] ?? '')));
+            if ($targetOnu !== '' && $rowOnu === $targetOnu) {
+                return $row;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $rowMac = $this->normalizeMac($row['mac'] ?? '');
+            if ($targetMac !== '' && $rowMac !== '' && $targetMac === $rowMac) {
+                return $row;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $description = trim((string) ($row['description'] ?? ''));
+            if ($targetDescription !== '' && strcasecmp($description, $targetDescription) === 0) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     protected function matchOnuRow(array $rows, string $username, ?string $callerId): ?array
