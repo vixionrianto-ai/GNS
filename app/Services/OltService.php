@@ -13,15 +13,17 @@ class OltService
      * Cari data ONU berdasarkan username PPP yang tersimpan
      * pada kolom Description di OLT.
      */
-    public function findByUsername(string $username, ?string $callerId = null): ?array
+    public function findByUsername(Router $router, string $username, ?string $callerId = null): ?array
     {
-        if (!$this->enabled()) {
+        $oltConfig = $this->configForRouter($router);
+
+        if (!$this->enabled($router)) {
             Log::warning('OLT lookup dilewati: konfigurasi OLT belum aktif.', [
                 'username' => $username,
                 'enabled' => (bool) config('services.olt.enabled', false),
-                'base_url_filled' => filled(config('services.olt.base_url')),
-                'username_filled' => filled(config('services.olt.username')),
-                'password_filled' => filled(config('services.olt.password')),
+                'base_url_filled' => filled($oltConfig['base_url'] ?? null),
+                'username_filled' => filled($oltConfig['username'] ?? null),
+                'password_filled' => filled($oltConfig['password'] ?? null),
             ]);
             return null;
         }
@@ -42,13 +44,15 @@ class OltService
 
             Log::info('OLT lookup mulai.', [
                 'username' => $username,
-                'enabled' => $this->enabled(),
-                'base_url_filled' => filled(config('services.olt.base_url')),
-                'username_filled' => filled(config('services.olt.username')),
-                'password_filled' => filled(config('services.olt.password')),
+                'enabled' => $this->enabled($router),
+                'router' => $router->nama_router,
+                'base_url' => $oltConfig['base_url'] ?? null,
+                'base_url_filled' => filled($oltConfig['base_url'] ?? null),
+                'username_filled' => filled($oltConfig['username'] ?? null),
+                'password_filled' => filled($oltConfig['password'] ?? null),
             ]);
 
-            $base = rtrim((string) config('services.olt.base_url'), '/');
+            $base = rtrim((string) ($oltConfig['base_url'] ?? ''), '/');
             $loginPage = $base . '/action/login.html';
             $loginUrl = $base . '/action/main.html';
             $statusUrl = $base . '/action/onustatusinfo.html';
@@ -72,8 +76,8 @@ class OltService
                     'Referer' => $loginPage,
                 ],
                 'form_params' => [
-                    'user' => (string) config('services.olt.username'),
-                    'pass' => (string) config('services.olt.password'),
+                    'user' => (string) ($oltConfig['username'] ?? ''),
+                    'pass' => (string) ($oltConfig['password'] ?? ''),
                     'button' => 'login',
                     'who' => '100',
                 ],
@@ -196,12 +200,29 @@ class OltService
         return null;
     }
 
-    public function enabled(): bool
+    public function enabled(?Router $router = null): bool
     {
+        $config = $router ? $this->configForRouter($router) : config('services.olt');
+
         return (bool) config('services.olt.enabled', false)
-            && filled(config('services.olt.base_url'))
-            && filled(config('services.olt.username'))
-            && filled(config('services.olt.password'));
+            && filled($config['base_url'] ?? null)
+            && filled($config['username'] ?? null)
+            && filled($config['password'] ?? null);
+    }
+
+    protected function configForRouter(Router $router): array
+    {
+        $global = config('services.olt', []);
+        $routers = config('services.olt.routers', []);
+
+        $key = strtoupper(trim((string) $router->nama_router));
+        $specific = is_array($routers[$key] ?? null) ? $routers[$key] : [];
+
+        return array_merge([
+            'base_url' => $global['base_url'] ?? null,
+            'username' => $global['username'] ?? null,
+            'password' => $global['password'] ?? null,
+        ], $specific);
     }
 
     protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
