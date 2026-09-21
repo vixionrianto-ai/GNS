@@ -49,6 +49,10 @@ class PppEventService
             ->where('username_pppoe', $username)
             ->first();
 
+        // ONLINE hanya dikirim ketika pelanggan memang sebelumnya tercatat offline.
+        // Ini mencegah CONNECT/UPDATE biasa menjadi spam Telegram.
+        $wasOffline = $pelanggan?->ppp_status === 'offline';
+
         $record = DB::transaction(function () use (
             $router,
             $pelanggan,
@@ -98,7 +102,7 @@ class PppEventService
             return $record;
         });
 
-        // Telegram hanya sekali untuk event disconnect yang benar-benar baru.
+        // OFFLINE: kirim hanya sekali untuk event disconnect yang benar-benar baru.
         if ($eventType === 'disconnect' && $record->wasRecentlyCreated) {
             $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
 
@@ -107,7 +111,40 @@ class PppEventService
             );
         }
 
+        // ONLINE: kirim hanya saat pelanggan yang sebelumnya offline kembali online.
+        // Event CONNECT/UPDATE yang terjadi saat pelanggan sudah online tidak dikirim.
+        if ($eventType === 'connect' && $record->wasRecentlyCreated && $wasOffline) {
+            $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
+
+            $this->telegram->send(
+                $this->formatConnectMessage($router, $event, $pelanggan, $oltData)
+            );
+        }
+
         return $record;
+    }
+
+    protected function formatConnectMessage(
+        Router $router,
+        array $event,
+        ?Pelanggan $pelanggan = null,
+        ?array $oltData = null
+    ): string
+    {
+        return
+            'ONLINE ' . $router->nama_router . "\n" .
+            "====================\n" .
+            'Time: ' . now()->format('Y-m-d H:i:s') . "\n" .
+            "====================\n" .
+            'User: ' . ($event['name'] ?? '-') . "\n" .
+            'IP Client: ' . ($event['address'] ?? '-') . "\n" .
+            'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
+            'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
+            'ONU: ' . ($oltData['onu'] ?? '-') . "\n" .
+            'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
+            'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
+            'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
+            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n";
     }
 
     protected function formatDisconnectMessage(
