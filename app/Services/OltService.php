@@ -68,7 +68,19 @@ class OltService
                 $statusRows = $this->parseStatus($statusHtml);
 
                 foreach ($statusRows as $row) {
-                    if (strcasecmp(trim($row['description']), trim($username)) === 0) {
+                    $description = trim($row['description']);
+                    $target = trim($username);
+
+                    // OLT kadang menyimpan username dengan tambahan keterangan.
+                    // Cocokkan exact dahulu, lalu gunakan pencocokan case-insensitive
+                    // yang aman bila username berada di dalam Description.
+                    $matched = strcasecmp($description, $target) === 0;
+
+                    if (!$matched && $target !== '') {
+                        $matched = stripos($description, $target) !== false;
+                    }
+
+                    if ($matched) {
                         $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
                             'select' => (string) $pon,
                             'searchMac' => '',
@@ -78,6 +90,20 @@ class OltService
 
                         $opmRows = $this->parseOpm($opmHtml);
                         $opm = collect($opmRows)->firstWhere('onu', $row['onu']);
+
+                        // Beberapa halaman OLT mengembalikan OPM dengan
+                        // format ONU yang sedikit berbeda. Jika exact ID
+                        // belum ketemu, cocokkan nomor ONU di bagian akhir.
+                        if (!$opm) {
+                            $rowOnu = trim((string) $row['onu']);
+                            foreach ($opmRows as $candidate) {
+                                $candidateOnu = trim((string) ($candidate['onu'] ?? ''));
+                                if ($candidateOnu !== '' && $candidateOnu === $rowOnu) {
+                                    $opm = $candidate;
+                                    break;
+                                }
+                            }
+                        }
 
                         return [
                             'onu' => $row['onu'],
