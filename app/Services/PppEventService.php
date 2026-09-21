@@ -236,35 +236,47 @@ class PppEventService
 
     protected function getCurrentOfflineUsers(Router $router): string
     {
-        $activeNames = [];
-
+        // Offline saat ini dihitung langsung dari MikroTik:
+        // PPP Secret yang tidak mempunyai session PPP Active.
+        // Jadi tidak tergantung apakah user pernah disconnect hari ini.
         try {
+            $secrets = $this->mikrotik->getSecretStatusMap($router);
+            $activeNames = [];
+
             foreach ($this->mikrotik->getActiveSessions($router) as $active) {
                 $name = trim((string) ($active['name'] ?? ''));
                 if ($name !== '') {
                     $activeNames[strtolower($name)] = true;
                 }
             }
-        } catch (\Throwable $e) {
+
+            $offline = [];
+
+            foreach ($secrets as $name => $secret) {
+                $username = trim((string) $name);
+                if ($username === '') {
+                    continue;
+                }
+
+                // Secret disabled bukan pelanggan aktif yang sedang offline.
+                if (($secret['disabled'] ?? '') === 'true' || ($secret['disabled'] ?? '') === 'yes') {
+                    continue;
+                }
+
+                if (!isset($activeNames[strtolower($username)])) {
+                    $offline[] = $username;
+                }
+            }
+
+            sort($offline, SORT_NATURAL | SORT_FLAG_CASE);
+
+            return empty($offline)
+                ? '-'
+                : collect($offline)->map(fn ($name) => '- ' . $name)->implode("\\n");
+        } catch (\\Throwable $e) {
             report($e);
+            return '-';
         }
-
-        $disconnects = PppEvent::query()
-            ->where('router_id', $router->id)
-            ->where('event_type', 'disconnect')
-            ->where('event_at', '>=', now()->startOfDay())
-            ->orderByDesc('event_at')
-            ->get(['username'])
-            ->unique('username')
-            ->values()
-            ->reject(fn (PppEvent $item) => isset($activeNames[strtolower(trim($item->username))]))
-            ->values();
-
-        $result = $disconnects->map(
-            fn (PppEvent $item) => '- ' . $item->username
-        )->implode("\n");
-
-        return $result !== '' ? $result : '-';
     }
 
     protected function countCurrentOfflineUsers(Router $router): int
