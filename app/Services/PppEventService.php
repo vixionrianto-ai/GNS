@@ -50,6 +50,10 @@ class PppEventService
             ->where('username_pppoe', $username)
             ->first();
 
+        // Simpan status sebelum event. Ini dipakai untuk mendeteksi
+        // perubahan nyata OFFLINE -> ONLINE atau ONLINE -> OFFLINE.
+        $previousPppStatus = $pelanggan?->ppp_status;
+
         $record = DB::transaction(function () use (
             $router,
             $pelanggan,
@@ -99,11 +103,14 @@ class PppEventService
             return $record;
         });
 
-        // Telegram dikirim sekali untuk setiap perubahan session:
-        // - disconnect: OFFLINE
-        // - connect: ONLINE
-        // Update dari session yang sama tidak mengirim Telegram ulang.
-        if ($record->wasRecentlyCreated) {
+        // Telegram hanya dikirim saat status pelanggan benar-benar berubah.
+        // Tidak bergantung pada wasRecentlyCreated karena event RouterOS
+        // dapat memiliki event_key yang sudah pernah tersimpan.
+        $statusChanged = $eventType === 'disconnect'
+            ? $previousPppStatus !== 'offline'
+            : $previousPppStatus !== 'online';
+
+        if ($statusChanged) {
             if ($eventType === 'disconnect') {
                 $oltData = $this->olt->findByUsername($username, $event['caller-id'] ?? null);
 
