@@ -20,13 +20,22 @@ class OltService
         }
 
         try {
+            $jar = new CookieJar();
+
             $client = new Client([
                 'timeout' => (float) config('services.olt.timeout', 10),
+                'connect_timeout' => (float) config('services.olt.timeout', 10),
                 'http_errors' => false,
-                'cookies' => true,
+                'cookies' => $jar,
             ]);
 
-            $jar = new CookieJar();
+            Log::info('OLT lookup mulai.', [
+                'username' => $username,
+                'enabled' => $this->enabled(),
+                'base_url_filled' => filled(config('services.olt.base_url')),
+                'username_filled' => filled(config('services.olt.username')),
+                'password_filled' => filled(config('services.olt.password')),
+            ]);
 
             $base = rtrim((string) config('services.olt.base_url'), '/');
             $loginPage = $base . '/action/login.html';
@@ -38,12 +47,15 @@ class OltService
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
             ];
 
-            $client->get($loginPage, [
+            $loginResponse = $client->get($loginPage, [
                 'headers' => $headers,
-                'cookies' => $jar,
             ]);
 
-            $client->post($loginUrl, [
+            Log::info('OLT login page response.', [
+                'status' => $loginResponse->getStatusCode(),
+            ]);
+
+            $loginResponse = $client->post($loginUrl, [
                 'headers' => $headers + [
                     'Content-Type' => 'application/x-www-form-urlencoded',
                     'Referer' => $loginPage,
@@ -54,7 +66,10 @@ class OltService
                     'button' => 'login',
                     'who' => '100',
                 ],
-                'cookies' => $jar,
+            ]);
+
+            Log::info('OLT login response.', [
+                'status' => $loginResponse->getStatusCode(),
             ]);
 
             for ($pon = 1; $pon <= 4; $pon++) {
@@ -66,6 +81,12 @@ class OltService
                 ], $statusUrl);
 
                 $statusRows = $this->parseStatus($statusHtml);
+
+                Log::info('OLT status dibaca.', [
+                    'pon' => $pon,
+                    'rows' => count($statusRows),
+                    'target' => $username,
+                ]);
 
                 // Jika halaman status berhasil dibaca, cocokkan langsung.
                 $matchedRow = $this->matchOnuRow($statusRows, $username, $callerId);
@@ -82,6 +103,13 @@ class OltService
                     ], $opmUrl);
 
                     $opmRows = $this->parseOpm($opmHtml);
+
+                    Log::info('OLT OPM fallback dibaca.', [
+                        'pon' => $pon,
+                        'rows' => count($opmRows),
+                        'target' => $username,
+                    ]);
+
                     $matchedOpm = $this->matchOnuRow($opmRows, $username, $callerId);
 
                     if ($matchedOpm) {
@@ -105,9 +133,24 @@ class OltService
                     ], $opmUrl);
 
                     $opmRows = $this->parseOpm($opmHtml);
+
+                    Log::info('OLT OPM dibaca.', [
+                        'pon' => $pon,
+                        'rows' => count($opmRows),
+                        'target' => $username,
+                    ]);
                 }
 
                 $opm = collect($opmRows)->firstWhere('onu', $matchedRow['onu']);
+
+                Log::info('OLT ONU cocok.', [
+                    'pon' => $pon,
+                    'onu' => $matchedRow['onu'],
+                    'description' => $matchedRow['description'],
+                    'rx_power' => $opm['rx_power'] ?? null,
+                    'tx_power' => $opm['tx_power'] ?? null,
+                    'distance' => $matchedRow['distance'] ?? null,
+                ]);
 
                 return [
                     'onu' => $matchedRow['onu'],
@@ -124,7 +167,7 @@ class OltService
                 ];
             }
         } catch (Throwable $e) {
-            Log::warning('Gagal mengambil data ONU dari OLT.', [
+            Log::error('Gagal mengambil data ONU dari OLT.', [
                 'username' => $username,
                 'error' => $e->getMessage(),
             ]);
