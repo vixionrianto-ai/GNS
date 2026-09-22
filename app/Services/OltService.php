@@ -251,7 +251,7 @@ class OltService
                 'Referer' => $referer,
                 'Content-Type' => 'application/x-www-form-urlencoded',
             ],
-            'form_params' => $data,
+            'body' => http_build_query($data, '', '&'),
             'cookies' => $jar,
         ]);
 
@@ -263,6 +263,7 @@ class OltService
         $patterns = [
             '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
             '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
+            '/SessionKey\\.value\\s*=\\s*[\'\"]([^\'\"]+)[\'\"]/i',
         ];
 
         foreach ($patterns as $pattern) {
