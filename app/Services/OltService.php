@@ -6,7 +6,6 @@ use App\Models\Router;
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
-use GuzzleHttp\Cookie\SetCookie;
 use Throwable;
 
 class OltService
@@ -67,66 +66,32 @@ class OltService
 
             $loginResponse = $client->get($loginPage, [
                 'headers' => $headers,
-                'cookies' => $jar,
             ]);
-
-            $this->mergeResponseCookies($loginResponse, $jar, $base);
-
-            $loginPageHtml = mb_convert_encoding((string) $loginResponse->getBody(), 'UTF-8', 'GB2312');
-            $loginSessionKey = $this->sessionKey($loginPageHtml);
 
             Log::info('OLT login page response.', [
                 'status' => $loginResponse->getStatusCode(),
-                'session_key_found' => $loginSessionKey !== '',
-                'cookie_count_after_get' => count($jar->toArray()),
             ]);
-
-            $loginForm = [
-                'user' => (string) ($oltConfig['username'] ?? ''),
-                'pass' => (string) ($oltConfig['password'] ?? ''),
-                'button' => 'login',
-                'who' => '100',
-            ];
-
-            if ($loginSessionKey !== '') {
-                $loginForm['SessionKey'] = $loginSessionKey;
-            }
 
             $loginResponse = $client->post($loginUrl, [
                 'headers' => $headers + [
                     'Content-Type' => 'application/x-www-form-urlencoded',
                     'Referer' => $loginPage,
                 ],
-                'form_params' => $loginForm,
-                'cookies' => $jar,
+                'form_params' => [
+                    'user' => (string) ($oltConfig['username'] ?? ''),
+                    'pass' => (string) ($oltConfig['password'] ?? ''),
+                    'button' => 'login',
+                    'who' => '100',
+                ],
             ]);
-
-            $this->mergeResponseCookies($loginResponse, $jar, $base);
 
             Log::info('OLT login response.', [
                 'status' => $loginResponse->getStatusCode(),
-                'html_length' => strlen((string) $loginResponse->getBody()),
-                'cookie_count' => count($jar->toArray()),
-                'location' => $loginResponse->getHeaderLine('Location'),
             ]);
 
             Log::info('OLT login selesai, mulai baca PON 1-4.', [
                 'base_url' => $base,
             ]);
-
-            $pythonResult = $this->lookupWithPython($oltConfig, $username, $callerId);
-
-            if ($pythonResult) {
-                Log::info('OLT ONU cocok melalui Python.', [
-                    'onu' => $pythonResult['onu'] ?? null,
-                    'description' => $pythonResult['description'] ?? null,
-                    'rx_power' => $pythonResult['rx_power'] ?? null,
-                    'tx_power' => $pythonResult['tx_power'] ?? null,
-                    'distance' => $pythonResult['distance'] ?? null,
-                ]);
-
-                return $pythonResult;
-            }
 
             for ($pon = 1; $pon <= 4; $pon++) {
                 $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
@@ -262,65 +227,6 @@ class OltService
         ], $specific);
     }
 
-    protected function lookupWithPython(array $oltConfig, string $username, ?string $callerId): ?array
-    {
-        $script = base_path('scripts/olt_lookup.py');
-
-        if (!is_file($script)) {
-            return null;
-        }
-
-        $command = PHP_OS_FAMILY === 'Windows'
-            ? ['py', '-3', $script]
-            : ['python3', $script];
-
-        $process = proc_open($command, [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ], $pipes);
-
-        if (!is_resource($process)) {
-            Log::warning('OLT Python fallback tidak dapat dijalankan.', [
-                'username' => $username,
-            ]);
-            return null;
-        }
-
-        $payload = json_encode([
-            'base_url' => $oltConfig['base_url'] ?? '',
-            'username' => $oltConfig['username'] ?? '',
-            'password' => $oltConfig['password'] ?? '',
-            'target' => $username,
-            'caller_id' => $callerId,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        fwrite($pipes[0], $payload);
-        fclose($pipes[0]);
-
-        stream_set_timeout($pipes[1], 20);
-        stream_set_timeout($pipes[2], 20);
-
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        $exitCode = proc_close($process);
-        $result = json_decode(trim($stdout), true);
-
-        if ($exitCode !== 0 || !is_array($result) || !($result['ok'] ?? false)) {
-            Log::warning('OLT Python fallback gagal.', [
-                'username' => $username,
-                'exit_code' => $exitCode,
-                'stderr' => trim($stderr),
-            ]);
-            return null;
-        }
-
-        return is_array($result['data'] ?? null) ? $result['data'] : null;
-    }
-
     protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
     {
         $response = $client->get($url, [
@@ -330,8 +236,6 @@ class OltService
             ],
             'cookies' => $jar,
         ]);
-
-        $this->mergeResponseCookies($response, $jar, $url);
 
         $html = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
 
@@ -351,39 +255,7 @@ class OltService
             'cookies' => $jar,
         ]);
 
-        $this->mergeResponseCookies($response, $jar, $url);
-
         return mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
-    }
-
-    protected function mergeResponseCookies($response, CookieJar $jar, string $baseUrl): void
-    {
-        $host = parse_url($baseUrl, PHP_URL_HOST) ?: '';
-
-        foreach ($response->getHeader('Set-Cookie') as $header) {
-            try {
-                $cookie = SetCookie::fromString($header);
-
-                if ($cookie->getName() === '') {
-                    continue;
-                }
-
-                if ($cookie->getDomain() === '' && $host !== '') {
-                    $cookie->setDomain($host);
-                }
-
-                if ($cookie->getPath() === '') {
-                    $cookie->setPath('/');
-                }
-
-                $jar->setCookie($cookie);
-            } catch (Throwable $e) {
-                Log::warning('OLT cookie response tidak bisa diproses.', [
-                    'cookie_name' => preg_match('/^\s*([^=;\s]+)\s*=/', $header, $match) ? $match[1] : null,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
     }
 
     protected function sessionKey(string $html): string
@@ -391,8 +263,6 @@ class OltService
         $patterns = [
             '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
             '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
-            '/SessionKey\s*\.\s*name\s*=\s*[\'\"]SessionKey[\'\"][\s\S]*?SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
-            '/SessionKey\s*\.\s*value\s*=\s*[\'\"]([^\'\"]*)[\'\"]/i',
         ];
 
         foreach ($patterns as $pattern) {
