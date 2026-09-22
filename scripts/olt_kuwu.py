@@ -12,14 +12,14 @@ from html import unescape
 def clean(cell):
     cell = re.sub(r"<[^>]+>", " ", cell)
     cell = unescape(cell)
-    cell = re.sub(r"\\s+", " ", cell)
+    cell = re.sub(r"\s+", " ", cell)
     return cell.strip()
 
 
 def session_key(html):
     patterns = [
         r"name=['\\\"]SessionKey['\\\"][^>]*value=['\\\"]([^'\\\"]*)['\\\"]",
-        r"SessionKey\\.value\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]",
+        r"SessionKey\.value\s*=\s*['\"]([^'\"]+)['\"]",
     ]
     for pattern in patterns:
         match = re.search(pattern, html, re.I)
