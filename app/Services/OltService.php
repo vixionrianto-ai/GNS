@@ -60,33 +60,6 @@ class OltService
             $statusUrl = $base . '/action/onustatusinfo.html';
             $opmUrl = $base . '/action/onuopmdiag.html';
 
-            // KUWU memakai alur web OLT yang sama dengan client Python yang
-            // sebelumnya terbukti mempertahankan CookieJar dari login sampai OPM.
-            // RUMAH tetap memakai jalur PHP yang ada.
-            if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
-                $kuwuResult = $this->lookupKuwuWithPython($oltConfig, $username, $callerId);
-
-                if ($kuwuResult) {
-                    Log::info('OLT KUWU ONU cocok.', [
-                        'username' => $username,
-                        'onu' => $kuwuResult['onu'] ?? null,
-                        'description' => $kuwuResult['description'] ?? null,
-                        'rx_power' => $kuwuResult['rx_power'] ?? null,
-                        'tx_power' => $kuwuResult['tx_power'] ?? null,
-                        'distance' => $kuwuResult['distance'] ?? null,
-                    ]);
-
-                    return $kuwuResult;
-                }
-
-                Log::warning('OLT KUWU ONU tidak ditemukan.', [
-                    'username' => $username,
-                    'caller_id' => $callerId,
-                ]);
-
-                return null;
-            }
-
             $headers = [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
             ];
@@ -252,69 +225,6 @@ class OltService
             'username' => $global['username'] ?? null,
             'password' => $global['password'] ?? null,
         ], $specific);
-    }
-
-
-    protected function lookupKuwuWithPython(array $oltConfig, string $username, ?string $callerId): ?array
-    {
-        $script = base_path('scripts/olt_kuwu.py');
-
-        if (!is_file($script)) {
-            Log::error('Script OLT KUWU tidak ditemukan.', ['script' => $script]);
-            return null;
-        }
-
-        $command = PHP_OS_FAMILY === 'Windows'
-            ? ['py', '-3', $script]
-            : ['python3', $script];
-
-        $process = proc_open($command, [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ], $pipes);
-
-        if (!is_resource($process)) {
-            Log::error('Python OLT KUWU tidak dapat dijalankan.', [
-                'username' => $username,
-            ]);
-            return null;
-        }
-
-        $payload = json_encode([
-            'base_url' => $oltConfig['base_url'] ?? '',
-            'username' => $oltConfig['username'] ?? '',
-            'password' => $oltConfig['password'] ?? '',
-            'target' => $username,
-            'caller_id' => $callerId,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        fwrite($pipes[0], $payload);
-        fclose($pipes[0]);
-
-        stream_set_timeout($pipes[1], 30);
-        stream_set_timeout($pipes[2], 30);
-
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        $exitCode = proc_close($process);
-        $result = json_decode(trim($stdout), true);
-
-        if ($exitCode !== 0 || !is_array($result) || !($result['ok'] ?? false)) {
-            Log::error('Python OLT KUWU gagal.', [
-                'username' => $username,
-                'exit_code' => $exitCode,
-                'stderr' => trim($stderr),
-                'stdout' => trim($stdout),
-            ]);
-            return null;
-        }
-
-        return is_array($result['data'] ?? null) ? $result['data'] : null;
     }
 
     protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
