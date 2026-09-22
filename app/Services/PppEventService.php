@@ -214,7 +214,7 @@ class PppEventService
                 'Total Active: ' . $totalActive . "\n" .
                 'Offline Saat Ini (' . count($offlineNames) . "):\n" .
                 $disconnectedUsers;
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             report($e);
 
             return
