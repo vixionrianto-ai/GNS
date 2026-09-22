@@ -218,7 +218,17 @@ def main():
     if matched:
         print(json.dumps(matched, ensure_ascii=False))
     else:
-        print(json.dumps(None))
+        pon_counts = {str(pon): 0 for pon in range(1, 5)}
+        for row in semua:
+            key = str(row.get("pon"))
+            pon_counts[key] = pon_counts.get(key, 0) + 1
+        print(json.dumps({
+            "not_found": True,
+            "total_rows": len(semua),
+            "pon_counts": pon_counts,
+            "target_username": target_username,
+            "caller_id": caller_id,
+        }, ensure_ascii=False))
 
 if __name__ == "__main__":
     try:
