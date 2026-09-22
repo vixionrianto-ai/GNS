@@ -155,91 +155,118 @@ class PppEventService
         string $eventUsername = ''
     ): string
     {
+        /*
+         * Setiap bagian summary dibaca terpisah.
+         * Sebelumnya satu exception dari salah satu query membuat seluruh
+         * summary berubah menjadi "-". OLT/PPP realtime tidak disentuh.
+         */
+        $activeSessions = [];
+        $secretMap = [];
+        $summaryErrors = [];
+
         try {
             $activeSessions = $this->mikrotik->getActiveSessions($router);
+        } catch (\Throwable $e) {
+            report($e);
+            $summaryErrors[] = 'active';
+        }
 
-            // Ambil Secret terlebih dahulu. Status offline dihitung dari
-            // Secret yang tidak mempunyai session PPPoE aktif.
+        try {
             $secretMap = $this->mikrotik->getSecretStatusMap($router);
+        } catch (\Throwable $e) {
+            report($e);
+            $summaryErrors[] = 'secret';
 
-            $activeCounts = [];
-            $activeLocalCounts = [];
+            // Fallback hanya untuk angka Total Secrets.
+            try {
+                $totalSecretsFallback = $this->mikrotik->getSecretCount($router);
+            } catch (\Throwable $fallbackError) {
+                report($fallbackError);
+                $totalSecretsFallback = null;
+            }
+        }
 
-            foreach ($activeSessions as $active) {
-                if (isset($active['service']) && strtolower((string) $active['service']) !== 'pppoe') {
-                    continue;
-                }
+        $activeCounts = [];
+        $activeLocalCounts = [];
 
-                $name = $this->normalizeUsername($active['name'] ?? '');
-                if ($name === '') {
-                    continue;
-                }
-
-                $activeCounts[$name] = ($activeCounts[$name] ?? 0) + 1;
-
-                $local = $this->usernameLocalPart($name);
-                if ($local !== '') {
-                    $activeLocalCounts[$local] = ($activeLocalCounts[$local] ?? 0) + 1;
-                }
+        foreach ($activeSessions as $active) {
+            if (isset($active['service']) && strtolower((string) $active['service']) !== 'pppoe') {
+                continue;
             }
 
-            // RouterOS /ppp/active/listen dapat mengirim .dead sedikit lebih
-            // cepat daripada /ppp/active/print. Koreksi session yang sedang
-            // diproses agar ringkasan tidak tertinggal satu event.
-            $eventKey = $this->normalizeUsername($eventUsername);
-            if ($eventKey !== '') {
-                $eventLocal = $this->usernameLocalPart($eventKey);
-
-                if ($eventType === 'disconnect') {
-                    if (($activeCounts[$eventKey] ?? 0) > 0) {
-                        $activeCounts[$eventKey]--;
-                    }
-                    if ($eventLocal !== '' && ($activeLocalCounts[$eventLocal] ?? 0) > 0) {
-                        $activeLocalCounts[$eventLocal]--;
-                    }
-                } elseif ($eventType === 'connect') {
-                    $activeCounts[$eventKey] = ($activeCounts[$eventKey] ?? 0) + 1;
-                    if ($eventLocal !== '') {
-                        $activeLocalCounts[$eventLocal] = ($activeLocalCounts[$eventLocal] ?? 0) + 1;
-                    }
-                }
+            $name = $this->normalizeUsername($active['name'] ?? '');
+            if ($name === '') {
+                continue;
             }
 
-            $totalSecrets = count($secretMap);
-            $totalActive = array_sum($activeCounts);
+            $activeCounts[$name] = ($activeCounts[$name] ?? 0) + 1;
 
-            // Hanya Secret aktif yang dipakai sebagai daftar pelanggan offline.
-            // Secret yang disabled memang tidak sedang diharapkan online.
-            $enabledSecrets = [];
-            foreach ($secretMap as $name => $secret) {
-                if (strtolower((string) ($secret['disabled'] ?? 'no')) === 'yes') {
-                    continue;
+            $local = $this->usernameLocalPart($name);
+            if ($local !== '') {
+                $activeLocalCounts[$local] = ($activeLocalCounts[$local] ?? 0) + 1;
+            }
+        }
+
+        // Koreksi session yang sedang diproses agar ringkasan tidak tertinggal
+        // satu event dari /ppp/active/print.
+        $eventKey = $this->normalizeUsername($eventUsername);
+        if ($eventKey !== '') {
+            $eventLocal = $this->usernameLocalPart($eventKey);
+
+            if ($eventType === 'disconnect') {
+                if (($activeCounts[$eventKey] ?? 0) > 0) {
+                    $activeCounts[$eventKey]--;
                 }
-
-                $displayName = trim((string) $name);
-                $secretKey = $this->normalizeUsername($displayName);
-                if ($secretKey !== '') {
-                    $enabledSecrets[$secretKey] = $displayName;
+                if ($eventLocal !== '' && ($activeLocalCounts[$eventLocal] ?? 0) > 0) {
+                    $activeLocalCounts[$eventLocal]--;
+                }
+            } elseif ($eventType === 'connect') {
+                $activeCounts[$eventKey] = ($activeCounts[$eventKey] ?? 0) + 1;
+                if ($eventLocal !== '') {
+                    $activeLocalCounts[$eventLocal] = ($activeLocalCounts[$eventLocal] ?? 0) + 1;
                 }
             }
+        }
 
-            // Untuk instalasi yang menyimpan realm seperti @kuwu atau
-            // @ngasemboto pada Secret tetapi RouterOS active mengembalikan
-            // username tanpa realm, cocokkan local-part hanya jika unik.
-            $secretLocalCounts = [];
-            foreach ($enabledSecrets as $secretKey => $displayName) {
-                $local = $this->usernameLocalPart($secretKey);
-                if ($local !== '') {
-                    $secretLocalCounts[$local] = ($secretLocalCounts[$local] ?? 0) + 1;
-                }
+        $totalSecrets = $summaryErrors && in_array('secret', $summaryErrors, true)
+            ? ($totalSecretsFallback ?? null)
+            : count($secretMap);
+
+        $totalActive = array_sum($activeCounts);
+
+        // Hanya Secret aktif yang dipakai sebagai daftar pelanggan offline.
+        $enabledSecrets = [];
+        foreach ($secretMap as $name => $secret) {
+            if (strtolower((string) ($secret['disabled'] ?? 'no')) === 'yes') {
+                continue;
             }
 
-            $offlineNames = [];
+            $displayName = trim((string) $name);
+            $secretKey = $this->normalizeUsername($displayName);
+
+            if ($secretKey !== '') {
+                $enabledSecrets[$secretKey] = $displayName;
+            }
+        }
+
+        // Cocokkan local-part (@kuwu/@ngasemboto) hanya jika unik.
+        $secretLocalCounts = [];
+        foreach ($enabledSecrets as $secretKey => $displayName) {
+            $local = $this->usernameLocalPart($secretKey);
+            if ($local !== '') {
+                $secretLocalCounts[$local] = ($secretLocalCounts[$local] ?? 0) + 1;
+            }
+        }
+
+        $offlineNames = [];
+
+        if (!in_array('secret', $summaryErrors, true)) {
             foreach ($enabledSecrets as $secretKey => $displayName) {
                 $online = (($activeCounts[$secretKey] ?? 0) > 0);
 
                 if (!$online) {
                     $local = $this->usernameLocalPart($secretKey);
+
                     if (
                         $local !== '' &&
                         ($secretLocalCounts[$local] ?? 0) === 1 &&
@@ -255,38 +282,43 @@ class PppEventService
             }
 
             sort($offlineNames, SORT_NATURAL | SORT_FLAG_CASE);
+        }
 
-            $disconnectedUsers = collect($offlineNames)
-                ->map(fn (string $name) => '- ' . $name)
-                ->implode("\n");
+        $disconnectedUsers = collect($offlineNames)
+            ->map(fn (string $name) => '- ' . $name)
+            ->implode("\n");
 
-            if ($disconnectedUsers === '') {
-                $disconnectedUsers = '-';
-            }
+        if ($disconnectedUsers === '') {
+            $disconnectedUsers = in_array('secret', $summaryErrors, true)
+                ? '- Data Secret tidak terbaca'
+                : '-';
+        }
 
+        // Hitung pelanggan yang mengalami disconnect unik hari ini.
+        // Bentuk query dibuat eksplisit agar tidak bergantung pada variasi
+        // distinct()->count() antar versi database/driver.
+        try {
             $today = now()->startOfDay();
+
             $gangguan = PppEvent::query()
                 ->where('router_id', $router->id)
                 ->where('event_type', 'disconnect')
                 ->where('event_at', '>=', $today)
-                ->distinct('username')
-                ->count('username');
-
-            return
-                'Jumlah Gangguan : ' . $gangguan . 'x Terputus hari ini' . "\n" .
-                'Total Secrets: ' . $totalSecrets . "\n" .
-                'Total Active: ' . $totalActive . "\n" .
-                'Offline Saat Ini (' . count($offlineNames) . "):\n" .
-                $disconnectedUsers;
+                ->select('username')
+                ->distinct()
+                ->get()
+                ->count();
         } catch (\Throwable $e) {
             report($e);
-
-            return
-                'Jumlah Gangguan : -' . "\n" .
-                'Total Secrets: -' . "\n" .
-                'Total Active: -' . "\n" .
-                'Offline Saat Ini (-):\n-';
+            $gangguan = null;
         }
+
+        return
+            'Jumlah Gangguan : ' . ($gangguan ?? '-') . 'x Terputus hari ini' . "\n" .
+            'Total Secrets: ' . ($totalSecrets ?? '-') . "\n" .
+            'Total Active: ' . $totalActive . "\n" .
+            'Offline Saat Ini (' . (in_array('secret', $summaryErrors, true) ? '-' : count($offlineNames)) . "):\n" .
+            $disconnectedUsers;
     }
 
     protected function usernameLocalPart(string $username): string
