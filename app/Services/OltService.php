@@ -34,6 +34,17 @@ class OltService
         }
 
         try {
+            // OLT KUWU terbukti bekerja dengan client Python/urllib + CookieJar.
+            // Gunakan client tersebut untuk KUWU agar alur HTTP sama dengan
+            // script yang sudah terbukti membaca ONU + OPM dari OLT KUWU.
+            if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
+                $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
+
+                if (is_array($pythonResult) && empty($pythonResult['error'])) {
+                    return $pythonResult;
+                }
+            }
+
             $jar = new CookieJar();
 
             $client = new Client([
@@ -200,6 +211,66 @@ class OltService
         }
 
         return null;
+    }
+
+    protected function findViaPython(array $config, string $username, ?string $callerId): ?array
+    {
+        $script = base_path('scripts/olt_kuwu.py');
+
+        if (!is_file($script)) {
+            Log::warning('Script OLT KUWU tidak ditemukan.', ['script' => $script]);
+            return null;
+        }
+
+        $payload = base64_encode(json_encode([
+            'base_url' => rtrim((string) ($config['base_url'] ?? ''), '/'),
+            'username' => (string) ($config['username'] ?? ''),
+            'password' => (string) ($config['password'] ?? ''),
+            'target_username' => $username,
+            'caller_id' => $callerId,
+        ], JSON_UNESCAPED_SLASHES));
+
+        $python = trim((string) env('OLT_PYTHON', 'python'));
+        $command = $python . ' ' . escapeshellarg($script) . ' ' . escapeshellarg($payload);
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = proc_open($command, $descriptor, $pipes, base_path());
+        if (!is_resource($process)) {
+            Log::warning('Python OLT KUWU tidak dapat dijalankan.');
+            return null;
+        }
+
+        fclose($pipes[0]);
+        $stdout = trim(stream_get_contents($pipes[1]));
+        $stderr = trim(stream_get_contents($pipes[2]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+
+        $result = json_decode($stdout, true);
+
+        if ($exitCode !== 0 || !is_array($result) || isset($result['error'])) {
+            Log::warning('Client Python OLT KUWU gagal.', [
+                'exit_code' => $exitCode,
+                'stderr' => $stderr,
+                'stdout' => $stdout,
+            ]);
+            return null;
+        }
+
+        Log::info('OLT KUWU terbaca melalui client Python.', [
+            'username' => $username,
+            'onu' => $result['onu'] ?? null,
+            'rx_power' => $result['rx_power'] ?? null,
+            'tx_power' => $result['tx_power'] ?? null,
+            'distance' => $result['distance'] ?? null,
+        ]);
+
+        return $result;
     }
 
     public function enabled(?Router $router = null): bool
