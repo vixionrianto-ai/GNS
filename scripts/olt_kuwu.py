@@ -1,5 +1,4 @@
 import base64
-import getpass
 import http.cookiejar
 import json
 import re
@@ -8,58 +7,50 @@ import urllib.parse
 import urllib.request
 from html import unescape
 
-
 def clean(cell):
     cell = re.sub(r"<[^>]+>", " ", cell)
     cell = unescape(cell)
     cell = re.sub(r"\s+", " ", cell)
     return cell.strip()
 
-
-def session_key(html):
-    patterns = [
+def ambil_session_key(html):
+    match = re.search(
         r"name=['\\\"]SessionKey['\\\"][^>]*value=['\\\"]([^'\\\"]*)['\\\"]",
-        r"SessionKey\.value\s*=\s*['\"]([^'\"]+)['\"]",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, html, re.I)
-        if match:
-            return match.group(1).strip()
-    return ""
+        html,
+        re.I
+    )
+    return match.group(1) if match else ""
 
-
-def rows(html):
-    result = []
-    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S):
-        cells = [clean(x) for x in re.findall(r"<td[^>]*>(.*?)</td>", row, re.I | re.S)]
-        if len(cells) < 5 or not re.match(r"^EPON", cells[0], re.I):
-            continue
-        result.append(cells)
-    return result
-
-
-def status_rows(html):
-    result = []
-    for cells in rows(html):
+def parse_status(html):
+    hasil = []
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+    for row in rows:
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.I | re.S)
         if len(cells) < 5:
             continue
-        result.append({
+        cells = [clean(x) for x in cells]
+        if not cells[0].startswith("EPON"):
+            continue
+        hasil.append({
             "onu": cells[0],
             "status": cells[1],
             "mac": cells[2],
             "description": cells[3],
             "distance": cells[4],
-            "last_deregister_reason": cells[8] if len(cells) > 8 else "-",
         })
-    return result
+    return hasil
 
-
-def opm_rows(html):
-    result = []
-    for cells in rows(html):
+def parse_opm(html):
+    hasil = []
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+    for row in rows:
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.I | re.S)
         if len(cells) < 9:
             continue
-        result.append({
+        cells = [clean(x) for x in cells]
+        if not cells[0].startswith("EPON"):
+            continue
+        hasil.append({
             "onu": cells[0],
             "mac": cells[1],
             "description": cells[2],
@@ -70,19 +61,17 @@ def opm_rows(html):
             "tx_power": cells[7],
             "rx_power": cells[8],
         })
-    return result
-
+    return hasil
 
 def normalize_mac(value):
     return re.sub(r"[^A-Fa-f0-9]", "", value or "").upper()
 
-
-def match(rows_data, target, caller):
+def match_target(rows, target, caller):
     target = (target or "").strip()
     caller = normalize_mac(caller)
-    for row in rows_data:
-        desc = row.get("description", "").strip()
-        mac = normalize_mac(row.get("mac", ""))
+    for row in rows:
+        desc = (row.get("description") or "").strip()
+        mac = normalize_mac(row.get("mac"))
         if target and desc.lower() == target.lower():
             return row
         if target and target.lower() in desc.lower():
@@ -91,67 +80,145 @@ def match(rows_data, target, caller):
             return row
     return None
 
-
 def main():
     payload = json.loads(base64.b64decode(sys.argv[1]).decode("utf-8"))
-    base = payload["base_url"].rstrip("/")
-    target = payload.get("target_username", "")
-    caller = payload.get("caller_id", "")
+
+    BASE = payload["base_url"].rstrip("/")
     username = payload["username"]
     password = payload["password"]
+    target_username = payload.get("target_username", "")
+    caller_id = payload.get("caller_id", "")
 
-    login_page = base + "/action/login.html"
-    login_url = base + "/action/main.html"
-    status_url = base + "/action/onustatusinfo.html"
-    opm_url = base + "/action/onuopmdiag.html"
+    LOGIN_URL = BASE + "/action/main.html"
+    STATUS_URL = BASE + "/action/onustatusinfo.html"
+    OPM_URL = BASE + "/action/onuopmdiag.html"
 
     cookies = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152"}
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(cookies)
+    )
 
-    def request(url, data=None, referer=None):
-        h = {**headers, "Referer": referer or login_url}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152"
+    }
+
+    def ambil_html(url, data=None, referer=None):
+        h = {
+            **headers,
+            "Referer": referer or LOGIN_URL,
+        }
+
         if data is not None:
             h["Content-Type"] = "application/x-www-form-urlencoded"
-        req = urllib.request.Request(url, data=data, headers=h, method="POST" if data is not None else "GET")
-        return opener.open(req, timeout=10).read().decode("gb2312", errors="replace")
 
-    request(login_page)
-    login_data = urllib.parse.urlencode({"user": username, "pass": password, "button": "login", "who": "100"}).encode()
-    request(login_url, login_data, login_page)
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers=h,
+            method="POST" if data is not None else "GET"
+        )
 
+        response = opener.open(req, timeout=10)
+
+        return response.read().decode(
+            "gb2312",
+            errors="replace"
+        )
+
+    # LOGIN — persis alur contoh
+    ambil_html(BASE + "/action/login.html")
+
+    login_data = urllib.parse.urlencode({
+        "user": username,
+        "pass": password,
+        "button": "login",
+        "who": "100",
+    }).encode()
+
+    ambil_html(
+        LOGIN_URL,
+        data=login_data,
+        referer=BASE + "/action/login.html"
+    )
+
+    semua = []
+
+    # PON 1-4 — persis alur contoh:
+    # status GET -> SessionKey -> status POST -> OPM GET ->
+    # SessionKey -> OPM POST -> gabungkan berdasarkan ONU ID.
     for pon in range(1, 5):
-        html = request(status_url)
-        key = session_key(html)
-        data = {"select": str(pon), "searchMac": "", "searchDescription": "", "who": "100"}
-        if key:
-            data["SessionKey"] = key
-        status = status_rows(request(status_url, urllib.parse.urlencode(data).encode(), status_url))
-        matched = match(status, target, caller)
-        if not matched:
-            continue
+        html_status = ambil_html(STATUS_URL)
 
-        html = request(opm_url)
-        key = session_key(html)
-        data = {"select": str(pon), "searchMac": "", "searchDescription": "", "who": "100"}
-        if key:
-            data["SessionKey"] = key
-        opm = opm_rows(request(opm_url, urllib.parse.urlencode(data).encode(), opm_url))
-        opm_index = {row["onu"]: row for row in opm}
-        optical = opm_index.get(matched["onu"], {})
-        result = {
-            **matched,
-            "temperature": optical.get("temperature"),
-            "voltage": optical.get("voltage"),
-            "tx_bias": optical.get("tx_bias"),
-            "tx_power": optical.get("tx_power"),
-            "rx_power": optical.get("rx_power"),
+        session_key = ambil_session_key(html_status)
+
+        data_status = {
+            "select": str(pon),
+            "searchMac": "",
+            "searchDescription": "",
+            "who": "100",
         }
-        print(json.dumps(result, ensure_ascii=False))
-        return
 
-    print(json.dumps(None))
+        if session_key:
+            data_status["SessionKey"] = session_key
 
+        html_status = ambil_html(
+            STATUS_URL,
+            data=urllib.parse.urlencode(data_status).encode(),
+            referer=STATUS_URL
+        )
+
+        status_data = parse_status(html_status)
+
+        html_opm = ambil_html(OPM_URL)
+
+        session_key = ambil_session_key(html_opm)
+
+        data_opm = {
+            "select": str(pon),
+            "searchMac": "",
+            "searchDescription": "",
+            "who": "100",
+        }
+
+        if session_key:
+            data_opm["SessionKey"] = session_key
+
+        html_opm = ambil_html(
+            OPM_URL,
+            data=urllib.parse.urlencode(data_opm).encode(),
+            referer=OPM_URL
+        )
+
+        opm_data = parse_opm(html_opm)
+
+        opm_index = {
+            x["onu"]: x
+            for x in opm_data
+        }
+
+        for s in status_data:
+            o = opm_index.get(s["onu"])
+
+            semua.append({
+                "pon": pon,
+                "onu": s["onu"],
+                "status": s["status"],
+                "mac": s["mac"],
+                "description": s["description"],
+                "distance": s["distance"],
+                "temperature": o["temperature"] if o else "-",
+                "voltage": o["voltage"] if o else "-",
+                "tx_bias": o["tx_bias"] if o else "-",
+                "tx_power": o["tx_power"] if o else "-",
+                "rx_power": o["rx_power"] if o else "-",
+            })
+
+    matched = match_target(semua, target_username, caller_id)
+
+    if matched:
+        print(json.dumps(matched, ensure_ascii=False))
+    else:
+        print(json.dumps(None))
 
 if __name__ == "__main__":
     try:
