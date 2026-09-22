@@ -34,15 +34,10 @@ class OltService
         }
 
         try {
-            // OLT KUWU terbukti bekerja dengan client Python/urllib + CookieJar.
-            // Gunakan client tersebut untuk KUWU agar alur HTTP sama dengan
-            // script yang sudah terbukti membaca ONU + OPM dari OLT KUWU.
+            // KUWU memakai alur client Python yang sama dengan contoh yang sudah terbukti:
+            // CookieJar -> login GET -> login POST -> status PON 1-4 -> OPM.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
-                $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
-
-                if (is_array($pythonResult) && empty($pythonResult['error'])) {
-                    return $pythonResult;
-                }
+                return $this->findViaPython($oltConfig, $username, $callerId);
             }
 
             $jar = new CookieJar();
