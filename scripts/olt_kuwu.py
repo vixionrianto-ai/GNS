@@ -120,6 +120,15 @@ for pon in range(1, 5):
 
     status_data = parse_status(html_status)
 
+    if pon == 1:
+        print("DEBUG PON1 STATUS HTML")
+        print("HTML length:", len(html_status))
+        print("SessionKey:", "ADA" if session_key else "KOSONG")
+        print("EPON ditemukan:", "EPON" in html_status.upper())
+        print("login ditemukan:", bool(re.search(r"login|password|name=['\\\"]user['\\\"]", html_status, re.I)))
+        print("TR:", len(re.findall(r"<tr[^>]*>.*?</tr>", html_status, re.I | re.S)))
+        print("TD:", len(re.findall(r"<td[^>]*>.*?</td>", html_status, re.I | re.S)))
+
     html_opm = ambil_html(OPM_URL)
 
     session_key = ambil_session_key(html_opm)
