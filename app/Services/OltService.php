@@ -225,7 +225,7 @@ class OltService
             'caller_id' => $callerId,
         ], JSON_UNESCAPED_SLASHES));
 
-        $python = trim((string) env('OLT_PYTHON', 'python'));
+        $python = trim((string) env('OLT_PYTHON', 'py'));
         $command = $python . ' ' . escapeshellarg($script) . ' ' . escapeshellarg($payload);
         $descriptor = [
             0 => ['pipe', 'r'],
