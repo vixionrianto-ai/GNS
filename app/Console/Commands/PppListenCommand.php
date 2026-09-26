@@ -12,9 +12,7 @@ use Symfony\Component\Process\Process;
 use Throwable;
 
 #[Signature('ppp:listen {--router= : ID router yang dipantau} {--worker : Jalankan satu listener router sebagai worker internal} {--interval=5 : Interval polling PPP Active dalam detik}')]
-
 #[Description('Memantau perubahan PPP Active dari seluruh MikroTik aktif menggunakan snapshot polling')]
-
 class PppListenCommand extends Command
 {
     /** @var array<int, Process> */
@@ -24,38 +22,31 @@ class PppListenCommand extends Command
     {
         if ($this->option('worker')) {
             $router = $this->resolveRouter();
-
             if (!$router) {
                 $this->error('Router tidak ditemukan atau tidak aktif.');
                 return self::FAILURE;
             }
-
             return $this->listenRouter($router, $eventService);
         }
 
         $this->info('PPP monitoring GNS aktif.');
         $this->line('Semua router MikroTik dengan status Aktif akan dipantau otomatis.');
         $this->line('Monitoring menggunakan snapshot /ppp/active/print, tanpa /ppp/active/listen.');
+        $this->line('Setiap polling membuat koneksi API baru agar tidak mempertahankan stream API terbuka.');
         $this->line('Event PPP disimpan ke database dan disconnect baru dikirim ke Telegram.');
         $this->line('Tekan Ctrl+C untuk berhenti.');
         $this->newLine();
 
         try {
             while (true) {
-                $activeRouters = Router::query()
-                    ->where('status', 'Aktif')
-                    ->orderBy('id')
-                    ->get();
-
+                $activeRouters = Router::query()->where('status', 'Aktif')->orderBy('id')->get();
                 $activeIds = $activeRouters->pluck('id')->map(fn ($id) => (int) $id)->all();
 
                 foreach ($activeRouters as $router) {
                     $id = (int) $router->id;
-
                     if (isset($this->workers[$id]) && $this->workers[$id]->isRunning()) {
                         continue;
                     }
-
                     $this->startWorker($router);
                 }
 
@@ -64,7 +55,6 @@ class PppListenCommand extends Command
                         $this->warn("Menghentikan monitoring router ID {$id} karena status router tidak Aktif.");
                         $worker->stop(3);
                     }
-
                     if (!$worker->isRunning()) {
                         unset($this->workers[$id]);
                     }
@@ -148,57 +138,37 @@ class PppListenCommand extends Command
 
         $this->info("Monitoring aktif: {$router->nama_router} ({$router->ip_router})");
         $this->line("Metode: /ppp/active/print setiap {$interval} detik.");
+        $this->line('Koneksi API dibuat ulang pada setiap polling.');
 
         while (true) {
             try {
                 $client = $this->createClient($router);
+                $snapshot = $this->readActiveSnapshot($client);
+                unset($client);
 
-                while (true) {
-                    $snapshot = $this->readActiveSnapshot($client);
-
-                    // Snapshot pertama hanya menjadi baseline. Jangan menghasilkan
-                    // event disconnect untuk user yang sudah online sebelum monitor mulai.
-                    if ($previousItems === null) {
-                        $previousItems = $snapshot;
-                        $this->info(sprintf(
-                            'Baseline PPP Active: %d user.',
-                            count($snapshot)
-                        ));
-                    } else {
-                        $this->processSnapshotChanges(
-                            $router,
-                            $eventService,
-                            $previousItems,
-                            $snapshot
-                        );
-
-                        $previousItems = $snapshot;
-                    }
-
-                    sleep($interval);
+                if ($previousItems === null) {
+                    $previousItems = $snapshot;
+                    $this->info(sprintf('Baseline PPP Active: %d user.', count($snapshot)));
+                } else {
+                    $this->processSnapshotChanges($router, $eventService, $previousItems, $snapshot);
+                    $previousItems = $snapshot;
                 }
+
+                sleep($interval);
             } catch (Throwable $e) {
-                $this->warn('Monitoring terputus: ' . $e->getMessage());
-                $this->line('Mencoba reconnect dalam 3 detik...');
-
-                // Jangan menganggap semua user offline setelah koneksi API
-                // gagal. Baseline di-reset setelah reconnect agar hanya perubahan
-                // yang benar-benar terlihat oleh polling berikutnya yang diproses.
+                $this->warn('Polling terputus: ' . $e->getMessage());
+                $this->line('Mencoba polling ulang dalam 3 detik...');
                 $previousItems = null;
-
                 sleep(3);
             }
         }
     }
 
-    /**
-     * @return array<string, array<string, mixed>>
-     */
+    /** @return array<string, array<string, mixed>> */
     private function readActiveSnapshot(\RouterOS\Client $client): array
     {
         $query = new Query('/ppp/active/print');
         $query->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id');
-
         $rows = $client->query($query)->read();
         $snapshot = [];
 
@@ -206,37 +176,28 @@ class PppListenCommand extends Command
             if (!is_array($item)) {
                 continue;
             }
-
             $itemId = trim((string) ($item['.id'] ?? ''));
             $itemName = trim((string) ($item['name'] ?? ''));
-
-            if ($itemId === '' || $itemName === '') {
-                continue;
+            if ($itemId !== '' && $itemName !== '') {
+                $snapshot[$itemId] = $item;
             }
-
-            $snapshot[$itemId] = $item;
         }
 
         return $snapshot;
     }
 
-    /**
-     * @param array<string, array<string, mixed>> $previousItems
-     * @param array<string, array<string, mixed>> $currentItems
-     */
+    /** @param array<string, array<string, mixed>> $previousItems
+     * @param array<string, array<string, mixed>> $currentItems */
     private function processSnapshotChanges(
         Router $router,
         PppEventService $eventService,
         array $previousItems,
         array $currentItems
     ): void {
-        // User baru / session yang berubah.
         foreach ($currentItems as $itemId => $item) {
             if (!isset($previousItems[$itemId])) {
                 $name = trim((string) ($item['name'] ?? ''));
-
                 $record = $eventService->handle($router, $item);
-
                 $this->line(sprintf(
                     'CONNECT/UPDATE | user=%s | ip=%s | caller=%s | uptime=%s | event_id=%s',
                     $name !== '' ? $name : '-',
@@ -248,19 +209,14 @@ class PppListenCommand extends Command
             }
         }
 
-        // Session yang hilang dari snapshot = disconnect.
         foreach ($previousItems as $itemId => $item) {
             if (isset($currentItems[$itemId])) {
                 continue;
             }
-
             $event = $item;
             $event['.dead'] = 'yes';
-
             $name = trim((string) ($event['name'] ?? ''));
-
             $record = $eventService->handle($router, $event);
-
             $this->warn(sprintf(
                 'DISCONNECT | user=%s | event_id=%s',
                 $name !== '' ? $name : '-',
@@ -272,18 +228,10 @@ class PppListenCommand extends Command
     private function resolveRouter(): ?Router
     {
         $id = $this->option('router');
-
         if ($id !== null && $id !== '') {
-            return Router::query()
-                ->whereKey((int) $id)
-                ->where('status', 'Aktif')
-                ->first();
+            return Router::query()->whereKey((int) $id)->where('status', 'Aktif')->first();
         }
-
-        return Router::query()
-            ->where('status', 'Aktif')
-            ->orderBy('id')
-            ->first();
+        return Router::query()->where('status', 'Aktif')->orderBy('id')->first();
     }
 
     private function createClient(Router $router): \RouterOS\Client
@@ -295,7 +243,7 @@ class PppListenCommand extends Command
             'port' => (int) $router->api_port,
             'ssl' => (bool) $router->ssl,
             'timeout' => 10,
-            'socket_timeout' => 30,
+            'socket_timeout' => 10,
             'attempts' => 2,
             'delay' => 1,
         ]));
