@@ -139,13 +139,34 @@ class PppEventService
             'IP Client: ' . ($event['address'] ?? '-') . "\n" .
             'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
             'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
-            'ONU: ' . ($oltData['onu'] ?? '-') . "\n" .
-            'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
-            'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
-            'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
-            'Last Deregister Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
+            $this->formatOltTelegramBlock($router, $oltData) .
             "====================\n" .
             $this->formatCurrentPppSummary($router, 'connect', trim((string) ($event['name'] ?? '')));
+    }
+
+    protected function formatOltTelegramBlock(Router $router, ?array $oltData): string
+    {
+        $data = $oltData ?? [];
+        $isRumah = strtoupper(trim((string) $router->nama_router)) === 'RUMAH';
+
+        $message =
+            'ONU: ' . ($data['onu'] ?? '-') . "\n";
+
+        if ($isRumah) {
+            $message .=
+                'Status: ' . ($data['status'] ?? '-') . "\n" .
+                'RX Power: ' . ($data['rx_power'] ?? '-') . ' dBm' . "\n" .
+                'TX Power: ' . ($data['tx_power'] ?? '-') . ' dBm' . "\n" .
+                'Last Deregister Reason: ' . ($data['last_deregister_reason'] ?? '-') . "\n\n";
+
+            return $message;
+        }
+
+        return $message .
+            'RX Power: ' . ($data['rx_power'] ?? '-') . ' dBm' . "\n" .
+            'TX Power: ' . ($data['tx_power'] ?? '-') . ' dBm' . "\n" .
+            'Distance: ' . ($data['distance'] ?? '-') . ' m' . "\n" .
+            'Last Deregister Reason: ' . ($data['last_deregister_reason'] ?? '-') . "\n\n";
     }
 
     protected function formatCurrentPppSummary(
@@ -252,11 +273,7 @@ class PppEventService
             'IP Client: ' . ($event['address'] ?? '-') . "\n" .
             'Caller ID: ' . ($event['caller-id'] ?? '-') . "\n" .
             'Profile: ' . ($pelanggan?->paket?->profile_mikrotik ?? $event['profile'] ?? '-') . "\n\n" .
-            'ONU: ' . ($oltData['onu'] ?? '-') . "\n" .
-            'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
-            'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
-            'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
-            'Last Deregister Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
+            $this->formatOltTelegramBlock($router, $oltData) .
             "====================\n" .
             $this->formatCurrentPppSummary($router, 'disconnect', trim((string) ($event['name'] ?? '')));
     }
