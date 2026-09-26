@@ -11,17 +11,14 @@ use RouterOS\Query;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-#[Signature('ppp:listen {--router= : ID router yang dipantau} {--worker : Jalankan satu listener router sebagai worker internal}')]
+#[Signature('ppp:listen {--router= : ID router yang dipantau} {--worker : Jalankan satu listener router sebagai worker internal} {--interval=5 : Interval polling PPP Active dalam detik}')]
 
-#[Description('Mendengarkan event realtime PPP Active dari seluruh MikroTik aktif')]
+#[Description('Memantau perubahan PPP Active dari seluruh MikroTik aktif menggunakan snapshot polling')]
 
 class PppListenCommand extends Command
 {
     /** @var array<int, Process> */
     private array $workers = [];
-
-    /** @var array<string, array<string, mixed>> */
-    private array $knownPppItems = [];
 
     public function handle(PppEventService $eventService): int
     {
@@ -36,8 +33,9 @@ class PppListenCommand extends Command
             return $this->listenRouter($router, $eventService);
         }
 
-        $this->info('PPP realtime listener GNS aktif.');
+        $this->info('PPP monitoring GNS aktif.');
         $this->line('Semua router MikroTik dengan status Aktif akan dipantau otomatis.');
+        $this->line('Monitoring menggunakan snapshot /ppp/active/print, tanpa /ppp/active/listen.');
         $this->line('Event PPP disimpan ke database dan disconnect baru dikirim ke Telegram.');
         $this->line('Tekan Ctrl+C untuk berhenti.');
         $this->newLine();
@@ -91,6 +89,7 @@ class PppListenCommand extends Command
     private function startWorker(Router $router): void
     {
         $id = (int) $router->id;
+        $interval = max(1, (int) ($this->option('interval') ?: 5));
 
         $worker = new Process([
             PHP_BINARY,
@@ -98,6 +97,7 @@ class PppListenCommand extends Command
             'ppp:listen',
             '--router=' . $id,
             '--worker',
+            '--interval=' . $interval,
         ], base_path());
 
         $worker->setTimeout(null);
@@ -111,7 +111,7 @@ class PppListenCommand extends Command
         });
 
         $this->workers[$id] = $worker;
-        $this->info("Listener dimulai: {$router->nama_router} (ID {$id})");
+        $this->info("Monitoring dimulai: {$router->nama_router} (ID {$id})");
     }
 
     private function drainWorkerOutput(): void
@@ -121,7 +121,7 @@ class PppListenCommand extends Command
             if ($output !== '') {
                 $router = Router::find($id);
                 $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
-                foreach (preg_split('/\\r\\n|\\r|\\n/', $output) as $line) {
+                foreach (preg_split('/\r\n|\r|\n/', $output) as $line) {
                     if ($line !== '') {
                         $this->output->writeln($prefix . $line);
                     }
@@ -132,7 +132,7 @@ class PppListenCommand extends Command
             if ($error !== '') {
                 $router = Router::find($id);
                 $prefix = '[' . ($router?->nama_router ?? "Router {$id}") . '] ';
-                foreach (preg_split('/\\r\\n|\\r|\\n/', $error) as $line) {
+                foreach (preg_split('/\r\n|\r|\n/', $error) as $line) {
                     if ($line !== '') {
                         $this->output->writeln($prefix . $line);
                     }
@@ -143,112 +143,129 @@ class PppListenCommand extends Command
 
     private function listenRouter(Router $router, PppEventService $eventService): int
     {
-        $this->info("Listener aktif: {$router->nama_router} ({$router->ip_router})");
+        $interval = max(1, (int) ($this->option('interval') ?: 5));
+        $previousItems = null;
+
+        $this->info("Monitoring aktif: {$router->nama_router} ({$router->ip_router})");
+        $this->line("Metode: /ppp/active/print setiap {$interval} detik.");
 
         while (true) {
             try {
                 $client = $this->createClient($router);
 
-                // Ambil snapshot PPP Active yang sudah terhubung.
-                // Event .dead dari RouterOS hanya membawa .id, sehingga
-                // snapshot diperlukan untuk mengetahui username saat disconnect.
-                $snapshotQuery = new Query('/ppp/active/print');
-                $snapshotQuery->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id');
+                $snapshot = $this->readActiveSnapshot($client);
 
-                $snapshot = $client->query($snapshotQuery)->read();
-
-                foreach ($snapshot as $item) {
-                    if (!is_array($item)) {
-                        continue;
-                    }
-
-                    $itemId = trim((string) ($item['.id'] ?? ''));
-                    $itemName = trim((string) ($item['name'] ?? ''));
-
-                    if ($itemId !== '' && $itemName !== '') {
-                        $this->knownPppItems[$itemId] = $item;
-                    }
+                // Snapshot pertama hanya menjadi baseline. Jangan menghasilkan
+                // event disconnect untuk user yang sudah online sebelum monitor mulai.
+                if ($previousItems === null) {
+                    $previousItems = $snapshot;
+                    $this->info(sprintf(
+                        'Baseline PPP Active: %d user.',
+                        count($snapshot)
+                    ));
+                    sleep($interval);
+                    continue;
                 }
 
-                $query = new Query('/ppp/active/listen');
-                $query->equal('.proplist', '.id,.dead,name,address,caller-id,uptime,service,session-id');
+                $this->processSnapshotChanges(
+                    $router,
+                    $eventService,
+                    $previousItems,
+                    $snapshot
+                );
 
-                // Setelah snapshot tersimpan, baru pasang listener realtime.
-                $client->query($query);
+                $previousItems = $snapshot;
 
-                $this->info('Terhubung ke RouterOS API, menunggu event...');
-
-                while (true) {
-                    $raw = $client->readRAW(['count' => 1]);
-
-                    if (empty($raw)) {
-                        continue;
-                    }
-
-                    // RouterOS dapat mengirim event item yang hilang sebagai
-                    // =.dead=yes atau =.dead=true. Deteksi langsung dari RAW.
-                    $dead = false;
-                    foreach ($raw as $word) {
-                        if ($word === '=.dead=yes' || $word === '=.dead=true') {
-                            $dead = true;
-                            break;
-                        }
-                    }
-
-                    $parsed = $client->parseResponse($raw);
-                    $event = $parsed[0] ?? $parsed['after'] ?? [];
-
-                    if (!is_array($event)) {
-                        $event = [];
-                    }
-
-                    $itemId = trim((string) ($event['.id'] ?? ''));
-
-                    if ($dead) {
-                        // Normalisasi agar PppEventService memakai satu format.
-                        $event['.dead'] = 'yes';
-
-                        // Event delete RouterOS biasanya hanya membawa .id + .dead.
-                        // Gabungkan dengan data item yang disimpan dari snapshot / update.
-                        if ($itemId !== '' && isset($this->knownPppItems[$itemId])) {
-                            $event = array_merge($this->knownPppItems[$itemId], $event);
-                        }
-                    } elseif ($itemId !== '' && !empty($event['name'])) {
-                        $this->knownPppItems[$itemId] = $event;
-                    }
-
-                    $name = trim((string) ($event['name'] ?? ''));
-
-                    $record = $eventService->handle($router, $event);
-
-                    if ($dead && $itemId !== '') {
-                        unset($this->knownPppItems[$itemId]);
-                    }
-
-                    if ($dead) {
-                        $this->warn(sprintf(
-                            '[%s] DISCONNECT | user=%s | event_id=%s',
-                            now()->format('Y-m-d H:i:s'),
-                            $name !== '' ? $name : '-',
-                            $record?->id ?? '-'
-                        ));
-                    } else {
-                        $this->line(sprintf(
-                            '[%s] CONNECT/UPDATE | user=%s | ip=%s | caller=%s | uptime=%s | event_id=%s',
-                            now()->format('Y-m-d H:i:s'),
-                            $name !== '' ? $name : '-',
-                            $event['address'] ?? '-',
-                            $event['caller-id'] ?? '-',
-                            $event['uptime'] ?? '-',
-                            $record?->id ?? '-'
-                        ));
-                    }
-                }
+                sleep($interval);
             } catch (Throwable $e) {
-                $this->warn('Listener terputus: ' . $e->getMessage());
+                $this->warn('Monitoring terputus: ' . $e->getMessage());
                 $this->line('Mencoba reconnect dalam 3 detik...');
+
+                // Jangan menganggap semua user offline setelah koneksi API
+                // gagal. Baseline di-reset setelah reconnect agar hanya perubahan
+                // yang benar-benar terlihat oleh polling berikutnya yang diproses.
+                $previousItems = null;
+
                 sleep(3);
             }
+        }
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function readActiveSnapshot(\RouterOS\Client $client): array
+    {
+        $query = new Query('/ppp/active/print');
+        $query->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id,profile');
+
+        $rows = $client->query($query)->read();
+        $snapshot = [];
+
+        foreach ($rows as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $itemId = trim((string) ($item['.id'] ?? ''));
+            $itemName = trim((string) ($item['name'] ?? ''));
+
+            if ($itemId === '' || $itemName === '') {
+                continue;
+            }
+
+            $snapshot[$itemId] = $item;
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $previousItems
+     * @param array<string, array<string, mixed>> $currentItems
+     */
+    private function processSnapshotChanges(
+        Router $router,
+        PppEventService $eventService,
+        array $previousItems,
+        array $currentItems
+    ): void {
+        // User baru / session yang berubah.
+        foreach ($currentItems as $itemId => $item) {
+            if (!isset($previousItems[$itemId])) {
+                $name = trim((string) ($item['name'] ?? ''));
+
+                $record = $eventService->handle($router, $item);
+
+                $this->line(sprintf(
+                    'CONNECT/UPDATE | user=%s | ip=%s | caller=%s | uptime=%s | event_id=%s',
+                    $name !== '' ? $name : '-',
+                    $item['address'] ?? '-',
+                    $item['caller-id'] ?? '-',
+                    $item['uptime'] ?? '-',
+                    $record?->id ?? '-'
+                ));
+            }
+        }
+
+        // Session yang hilang dari snapshot = disconnect.
+        foreach ($previousItems as $itemId => $item) {
+            if (isset($currentItems[$itemId])) {
+                continue;
+            }
+
+            $event = $item;
+            $event['.dead'] = 'yes';
+
+            $name = trim((string) ($event['name'] ?? ''));
+
+            $record = $eventService->handle($router, $event);
+
+            $this->warn(sprintf(
+                'DISCONNECT | user=%s | event_id=%s',
+                $name !== '' ? $name : '-',
+                $record?->id ?? '-'
+            ));
         }
     }
 
@@ -278,7 +295,7 @@ class PppListenCommand extends Command
             'port' => (int) $router->api_port,
             'ssl' => (bool) $router->ssl,
             'timeout' => 10,
-            'socket_timeout' => 86400,
+            'socket_timeout' => 30,
             'attempts' => 2,
             'delay' => 1,
         ]));
