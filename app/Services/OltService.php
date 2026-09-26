@@ -39,11 +39,7 @@ class OltService
                 return $this->findViaPython($oltConfig, $username, $callerId);
             }
 
-            // RUMAH memakai OLT GPON V1600GS-F. Struktur tabelnya berbeda:
-            // ONU Status = ONU ID, Admin State, OMCC State, Phase State,
-            // Description, Last Register, Last Deregister Time, Reason, Alive Time.
-            // Optical Information = ONU ID, Description, RX Power(ONU),
-            // TX Power(ONU), RX Power(OLT).
+            // RUMAH memakai OLT GPON V1600GS-F.
             if (strtoupper(trim((string) $router->nama_router)) === 'RUMAH') {
                 return $this->findRumahGpon($oltConfig, $username, $callerId);
             }
@@ -123,12 +119,8 @@ class OltService
                     'target' => $username,
                 ]);
 
-                // Jika halaman status berhasil dibaca, cocokkan langsung.
                 $matchedRow = $this->matchOnuRow($statusRows, $username, $callerId);
 
-                // Fallback: cocokkan dari halaman OPM juga. Ini penting karena
-                // data OLT yang kita miliki terbukti memuat MAC + Description
-                // yang sama dengan PPP Caller-ID/username.
                 if (!$matchedRow) {
                     $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
                         'select' => (string) $pon,
@@ -232,7 +224,9 @@ class OltService
         $loginPage = $base . '/action/login.html';
         $loginUrl = $base . '/action/main.html';
         $statusUrl = $base . '/action/onustatusinfo.html';
-        $opticalUrl = $base . '/action/onuopmdiag.html';
+        // RUMAH V1600GS-F uses a different optical page than KUWU.
+        // The page source confirms: <form method=post action="pononuopticalinfo.html">
+        $opticalUrl = $base . '/action/pononuopticalinfo.html';
 
         $headers = [
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
@@ -273,11 +267,14 @@ class OltService
                 continue;
             }
 
+            // The optical page is a normal form at /action/pononuopticalinfo.html.
+            // It uses "pon" and "onu_group" instead of the KUWU parameters.
+            // GET already renders the current optical table, then POST selects the PON/group.
             $opticalHtml = $this->requestPage($client, $jar, $opticalUrl, [
-                'select' => (string) $pon,
-                'searchMac' => '',
-                'searchDescription' => '',
+                'pon' => (string) $pon,
+                'onu_group' => '0',
                 'who' => '100',
+                'onuid' => '0',
             ], $opticalUrl);
 
             $opticalRows = $this->parseRumahOptical($opticalHtml);
@@ -288,6 +285,7 @@ class OltService
                 'onu' => $matched['onu'],
                 'description' => $matched['description'],
                 'status' => $matched['status'],
+                'optical_rows' => count($opticalRows),
                 'rx_power' => $optical['rx_power'] ?? null,
                 'tx_power' => $optical['tx_power'] ?? null,
                 'last_deregister_reason' => $matched['last_deregister_reason'] ?? null,
