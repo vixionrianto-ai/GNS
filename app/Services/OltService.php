@@ -34,10 +34,18 @@ class OltService
         }
 
         try {
-            // KUWU memakai alur client Python yang sama dengan contoh yang sudah terbukti:
-            // CookieJar -> login GET -> login POST -> status PON 1-4 -> OPM.
+            // KUWU memakai client Python yang sudah terbukti.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
                 return $this->findViaPython($oltConfig, $username, $callerId);
+            }
+
+            // RUMAH memakai OLT GPON V1600GS-F. Struktur tabelnya berbeda:
+            // ONU Status = ONU ID, Admin State, OMCC State, Phase State,
+            // Description, Last Register, Last Deregister Time, Reason, Alive Time.
+            // Optical Information = ONU ID, Description, RX Power(ONU),
+            // TX Power(ONU), RX Power(OLT).
+            if (strtoupper(trim((string) $router->nama_router)) === 'RUMAH') {
+                return $this->findRumahGpon($oltConfig, $username, $callerId);
             }
 
             $jar = new CookieJar();
@@ -206,6 +214,174 @@ class OltService
         }
 
         return null;
+    }
+
+    protected function findRumahGpon(array $config, string $username, ?string $callerId): ?array
+    {
+        $jar = new CookieJar();
+
+        $client = new Client([
+            'timeout' => (float) config('services.olt.timeout', 10),
+            'connect_timeout' => (float) config('services.olt.timeout', 10),
+            'http_errors' => false,
+            'verify' => false,
+            'cookies' => $jar,
+        ]);
+
+        $base = rtrim((string) ($config['base_url'] ?? ''), '/');
+        $loginPage = $base . '/action/login.html';
+        $loginUrl = $base . '/action/main.html';
+        $statusUrl = $base . '/action/onustatusinfo.html';
+        $opticalUrl = $base . '/action/onuopmdiag.html';
+
+        $headers = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+        ];
+
+        Log::info('OLT RUMAH lookup mulai.', [
+            'username' => $username,
+            'base_url' => $base,
+        ]);
+
+        $client->get($loginPage, ['headers' => $headers]);
+
+        $client->post($loginUrl, [
+            'headers' => $headers + [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+                'Referer' => $loginPage,
+            ],
+            'form_params' => [
+                'user' => (string) ($config['username'] ?? ''),
+                'pass' => (string) ($config['password'] ?? ''),
+                'button' => 'login',
+                'who' => '100',
+            ],
+        ]);
+
+        for ($pon = 1; $pon <= 4; $pon++) {
+            $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
+                'select' => (string) $pon,
+                'searchMac' => '',
+                'searchDescription' => '',
+                'who' => '100',
+            ], $statusUrl);
+
+            $statusRows = $this->parseRumahStatus($statusHtml);
+            $matched = $this->matchOnuRow($statusRows, $username, $callerId);
+
+            if (!$matched) {
+                continue;
+            }
+
+            $opticalHtml = $this->requestPage($client, $jar, $opticalUrl, [
+                'select' => (string) $pon,
+                'searchMac' => '',
+                'searchDescription' => '',
+                'who' => '100',
+            ], $opticalUrl);
+
+            $opticalRows = $this->parseRumahOptical($opticalHtml);
+            $optical = $this->findOpmRow($opticalRows, $matched, $callerId);
+
+            Log::info('OLT RUMAH ONU cocok.', [
+                'pon' => $pon,
+                'onu' => $matched['onu'],
+                'description' => $matched['description'],
+                'status' => $matched['status'],
+                'rx_power' => $optical['rx_power'] ?? null,
+                'tx_power' => $optical['tx_power'] ?? null,
+                'last_deregister_reason' => $matched['last_deregister_reason'] ?? null,
+            ]);
+
+            return [
+                'pon' => $pon,
+                'onu' => $matched['onu'],
+                'status' => $matched['status'],
+                'mac' => null,
+                'description' => $matched['description'],
+                'distance' => null,
+                'last_deregister_reason' => $matched['last_deregister_reason'],
+                'temperature' => null,
+                'voltage' => null,
+                'tx_bias' => null,
+                'tx_power' => $optical['tx_power'] ?? null,
+                'rx_power' => $optical['rx_power'] ?? null,
+            ];
+        }
+
+        Log::warning('OLT RUMAH ONU tidak ditemukan.', [
+            'username' => $username,
+            'caller_id' => $callerId,
+        ]);
+
+        return null;
+    }
+
+    protected function parseRumahStatus(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 9) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'status' => $cells[3] ?? '-',
+                'mac' => '',
+                'description' => $cells[4] ?? '',
+                'distance' => null,
+                'last_deregister_reason' => $cells[7] ?? '-',
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function parseRumahOptical(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 5) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'mac' => '',
+                'description' => $cells[1] ?? '',
+                'distance' => null,
+                'temperature' => null,
+                'voltage' => null,
+                'tx_bias' => null,
+                'tx_power' => $cells[3] ?? null,
+                'rx_power' => $cells[2] ?? null,
+            ];
+        }
+
+        return $rows;
     }
 
     protected function findViaPython(array $config, string $username, ?string $callerId): ?array
