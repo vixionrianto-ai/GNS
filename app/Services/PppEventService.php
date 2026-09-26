@@ -143,7 +143,7 @@ class PppEventService
             'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
             'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
             'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
-            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
+            'Last Deregister Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             "====================\n" .
             $this->formatCurrentPppSummary($router, 'connect', trim((string) ($event['name'] ?? '')));
     }
@@ -256,7 +256,7 @@ class PppEventService
             'RX Power: ' . ($oltData['rx_power'] ?? '-') . ' dBm' . "\n" .
             'TX Power: ' . ($oltData['tx_power'] ?? '-') . ' dBm' . "\n" .
             'Distance: ' . ($oltData['distance'] ?? '-') . ' m' . "\n" .
-            'Last Degerasi Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
+            'Last Deregister Reason: ' . ($oltData['last_deregister_reason'] ?? '-') . "\n\n" .
             "====================\n" .
             $this->formatCurrentPppSummary($router, 'disconnect', trim((string) ($event['name'] ?? '')));
     }
