@@ -61,7 +61,7 @@ class PppListenCommand extends Command
 
                 foreach ($this->workers as $id => $worker) {
                     if (!in_array($id, $activeIds, true) && $worker->isRunning()) {
-                        $this->warn("Menghentikan listener router ID {$id} karena status router tidak Aktif.");
+                        $this->warn("Menghentikan monitoring router ID {$id} karena status router tidak Aktif.");
                         $worker->stop(3);
                     }
 
@@ -153,30 +153,30 @@ class PppListenCommand extends Command
             try {
                 $client = $this->createClient($router);
 
-                $snapshot = $this->readActiveSnapshot($client);
+                while (true) {
+                    $snapshot = $this->readActiveSnapshot($client);
 
-                // Snapshot pertama hanya menjadi baseline. Jangan menghasilkan
-                // event disconnect untuk user yang sudah online sebelum monitor mulai.
-                if ($previousItems === null) {
-                    $previousItems = $snapshot;
-                    $this->info(sprintf(
-                        'Baseline PPP Active: %d user.',
-                        count($snapshot)
-                    ));
+                    // Snapshot pertama hanya menjadi baseline. Jangan menghasilkan
+                    // event disconnect untuk user yang sudah online sebelum monitor mulai.
+                    if ($previousItems === null) {
+                        $previousItems = $snapshot;
+                        $this->info(sprintf(
+                            'Baseline PPP Active: %d user.',
+                            count($snapshot)
+                        ));
+                    } else {
+                        $this->processSnapshotChanges(
+                            $router,
+                            $eventService,
+                            $previousItems,
+                            $snapshot
+                        );
+
+                        $previousItems = $snapshot;
+                    }
+
                     sleep($interval);
-                    continue;
                 }
-
-                $this->processSnapshotChanges(
-                    $router,
-                    $eventService,
-                    $previousItems,
-                    $snapshot
-                );
-
-                $previousItems = $snapshot;
-
-                sleep($interval);
             } catch (Throwable $e) {
                 $this->warn('Monitoring terputus: ' . $e->getMessage());
                 $this->line('Mencoba reconnect dalam 3 detik...');
@@ -197,7 +197,7 @@ class PppListenCommand extends Command
     private function readActiveSnapshot(\RouterOS\Client $client): array
     {
         $query = new Query('/ppp/active/print');
-        $query->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id,profile');
+        $query->equal('.proplist', '.id,name,address,caller-id,uptime,service,session-id');
 
         $rows = $client->query($query)->read();
         $snapshot = [];
