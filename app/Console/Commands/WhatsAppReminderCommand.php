@@ -45,6 +45,7 @@ class WhatsAppReminderCommand extends Command
         $this->table(
             ['Reminder', 'Hari Setelah Jatuh Tempo', 'Jumlah'],
             [
+                ['Jatuh Tempo', 'H', $hasil['tagihan']],
                 ['Pertama', 'H+' . $firstDays, $hasil['reminder_first']],
                 ['Kedua', 'H+' . $secondDays, $hasil['reminder_second']],
             ]
