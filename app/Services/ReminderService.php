@@ -20,9 +20,55 @@ class ReminderService
         $secondDays = max(0, (int) Setting::value('whatsapp.reminder_second_days', 14));
 
         return [
+            // Pesan utama dikirim tepat pada tanggal jatuh tempo (H).
+            'tagihan' => $this->sendDueToday(),
+            // Reminder tetap mengikuti pengaturan H+5 dan H+14.
             'reminder_first' => $this->sendConfiguredReminder('reminder_first', $firstDays, 'whatsapp.template_reminder_first'),
             'reminder_second' => $this->sendConfiguredReminder('reminder_second', $secondDays, 'whatsapp.template_reminder_second'),
         ];
+    }
+
+    protected function sendDueToday(): int
+    {
+        $jumlah = 0;
+
+        $tagihans = Tagihan::with('pelanggan')
+            ->whereIn('status', [
+                Tagihan::STATUS_BELUM_BAYAR,
+                Tagihan::STATUS_JATUH_TEMPO,
+                Tagihan::STATUS_SEBAGIAN,
+            ])
+            ->whereDate('tanggal_jatuh_tempo', Carbon::today())
+            ->whereHas('pelanggan', function ($query) {
+                $query->whereNotNull('no_hp')
+                    ->where('no_hp', '!=', '')
+                    ->where('no_hp', '!=', '-')
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(no_hp, ' ', ''), '-', ''), '+', ''), '(', '') REGEXP '[0-9]{8,}'");
+            })
+            ->get();
+
+        foreach ($tagihans as $tagihan) {
+            try {
+                // Hanya status success yang dianggap sudah terkirim.
+                // Karena query hanya mengambil tanggal H, kegagalan tidak akan
+                // menyebabkan pesan dikirim ulang setiap hari.
+                if ($this->whatsAppService->sudahPernahKirim($tagihan, 'tagihan')) {
+                    continue;
+                }
+
+                if ($this->whatsAppService->sendTagihan($tagihan)) {
+                    $jumlah++;
+                }
+            } catch (\\Throwable $e) {
+                Log::error('WhatsApp Tagihan Jatuh Tempo Error', [
+                    'tagihan_id' => $tagihan->id ?? null,
+                    'pelanggan_id' => $tagihan->pelanggan_id ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $jumlah;
     }
 
     protected function sendConfiguredReminder(string $jenis, int $days, string $templateKey): int
@@ -36,7 +82,7 @@ class ReminderService
                 Tagihan::STATUS_JATUH_TEMPO,
                 Tagihan::STATUS_SEBAGIAN,
             ])
-            ->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
+            ->whereDate('tanggal_jatuh_tempo', '=', $tanggalBatas)
             ->whereHas('pelanggan', function ($query) {
                 $query->whereNotNull('no_hp')
                     ->where('no_hp', '!=', '')
@@ -100,7 +146,7 @@ class ReminderService
                 Tagihan::STATUS_JATUH_TEMPO,
                 Tagihan::STATUS_SEBAGIAN,
             ])
-            ->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
+            ->whereDate('tanggal_jatuh_tempo', '=', $tanggalBatas)
             ->whereHas('pelanggan', function ($query) {
                 $query->whereNotNull('no_hp')
                     ->where('no_hp', '!=', '')
