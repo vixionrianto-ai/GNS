@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\Tagihan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ReminderService
 {
@@ -59,7 +60,7 @@ class ReminderService
                 if ($this->whatsAppService->sendTagihan($tagihan)) {
                     $jumlah++;
                 }
-            } catch (\\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('WhatsApp Tagihan Jatuh Tempo Error', [
                     'tagihan_id' => $tagihan->id ?? null,
                     'pelanggan_id' => $tagihan->pelanggan_id ?? null,
