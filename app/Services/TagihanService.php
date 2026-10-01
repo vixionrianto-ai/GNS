@@ -78,7 +78,7 @@ class TagihanService
         };
     }
 
-    public function generate(Pelanggan $pelanggan, bool $sendWhatsApp = true): Tagihan
+    public function generate(Pelanggan $pelanggan, bool $sendWhatsApp = false): Tagihan
     {
         return $this->generateUntukPeriode($pelanggan, Carbon::today(), $sendWhatsApp);
     }
@@ -86,7 +86,7 @@ class TagihanService
     public function generateUntukPeriode(
         Pelanggan $pelanggan,
         Carbon $tanggal,
-        bool $sendWhatsApp = true
+        bool $sendWhatsApp = false
     ): Tagihan {
         if (empty($pelanggan->tanggal_aktif)) {
             throw new \Exception("Pelanggan {$pelanggan->nama} belum memiliki tanggal aktif.");
@@ -156,17 +156,8 @@ class TagihanService
                 $tagihan->refresh();
             }
 
-            if ($sendWhatsApp) {
-                try {
-                    $this->whatsAppService->sendTagihan($tagihan);
-                } catch (\Throwable $e) {
-                    Log::error('Gagal mengirim WhatsApp invoice.', [
-                        'invoice' => $tagihan->invoice_no,
-                        'pelanggan_id' => $pelanggan->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+            // WhatsApp tagihan TIDAK dikirim saat invoice dibuat.
+            // Pengiriman otomatis dilakukan oleh wa:reminder pada tanggal jatuh tempo.
 
             return $tagihan;
         });
@@ -190,7 +181,7 @@ class TagihanService
 
         foreach ($pelanggans as $pelanggan) {
             try {
-                $this->generateUntukPeriode($pelanggan, $periode ?? Carbon::today(), true);
+                $this->generateUntukPeriode($pelanggan, $periode ?? Carbon::today(), false);
                 $berhasil++;
             } catch (\Throwable $e) {
                 if (str_contains(strtolower($e->getMessage()), 'sudah ada')) {
@@ -238,7 +229,7 @@ class TagihanService
             $pelanggan = $tagihan->pelanggan()->with('paket')->first();
             $invoiceLama = $tagihan->invoice_no;
             $tagihan->delete();
-            $baru = $this->generate($pelanggan, true);
+            $baru = $this->generate($pelanggan, false);
 
             $this->auditTrail->tagihan('regenerate', 'Regenerate invoice ' . $invoiceLama, [
                 'invoice_lama' => $invoiceLama,
