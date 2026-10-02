@@ -191,3 +191,24 @@
     });
 </script>
 @endsection
+
+@section('css')
+<style>
+.main-header.navbar {
+    background-color: #fff !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+.main-header.navbar .nav-link {
+    color: #343a40 !important;
+}
+
+.card {
+    border-radius: 12px;
+}
+
+.btn {
+    border-radius: 6px;
+}
+</style>
+@stop
