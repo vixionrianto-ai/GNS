@@ -11,13 +11,13 @@
                     <span class="badge bg-white bg-opacity-25 text-white px-2.5 py-1 rounded-pill fw-semibold mb-1"><i class="fas fa-shield-alt me-1"></i> GNS Billing System</span>
                     <h5 class="fw-bold mb-0 text-white"><i class="fas fa-money-bill-wave me-2"></i> Invoice Pembayaran</h5>
                 </div>
-                <div class="col-md-5 text-md-end">
+                <div class="col-md-5 d-flex justify-content-md-end align-items-center">
                     @if($pembayaran->tagihan->isLunas())
-                        <span class="badge bg-success text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm"><i class="fas fa-check-circle me-1"></i> LUNAS</span>
+                        <span class="badge bg-success text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm page-status-badge"><i class="fas fa-check-circle me-1"></i> LUNAS</span>
                     @elseif($pembayaran->tagihan->isSebagian())
                         <span class="badge bg-warning text-dark rounded-pill fw-bold shadow-sm page-status-badge"><i class="fas fa-coins mr-1"></i> SEBAGIAN</span>
                     @else
-                        <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm"><i class="fas fa-exclamation-circle me-1"></i> BELUM LUNAS</span>
+                        <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm page-status-badge"><i class="fas fa-exclamation-circle me-1"></i> BELUM LUNAS</span>
                     @endif
                 </div>
             </div>
