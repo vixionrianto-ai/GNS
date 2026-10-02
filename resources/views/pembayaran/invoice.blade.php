@@ -15,7 +15,7 @@
                     @if($pembayaran->tagihan->isLunas())
                         <span class="badge bg-success text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm"><i class="fas fa-check-circle me-1"></i> LUNAS</span>
                     @elseif($pembayaran->tagihan->isSebagian())
-                        <span class="badge bg-warning text-dark rounded-pill fw-bold shadow-sm d-inline-flex align-items-center" style="font-size:11px; line-height:1; padding:5px 10px;"><i class="fas fa-coins mr-1"></i> SEBAGIAN</span>
+                        <span class="badge bg-warning text-dark rounded-pill fw-bold shadow-sm page-status-badge"><i class="fas fa-coins mr-1"></i> SEBAGIAN</span>
                     @else
                         <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm"><i class="fas fa-exclamation-circle me-1"></i> BELUM LUNAS</span>
                     @endif
@@ -78,3 +78,30 @@
     </div></div>
 </div>
 @endsection
+
+@section('css')
+<style>
+.main-header.navbar {
+    background-color: #fff !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+.main-header.navbar .nav-link {
+    color: #343a40 !important;
+}
+
+.badge {
+    vertical-align: middle;
+}
+
+.page-status-badge {
+    font-size: 11px;
+    line-height: 1;
+    padding: 5px 10px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+</style>
+@stop
