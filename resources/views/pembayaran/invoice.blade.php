@@ -1,4 +1,6 @@
-@extends('layouts.app')
+@extends('adminlte::page')
+
+@section('title', 'Invoice Pembayaran')
 
 @section('content')
 <div class="container-fluid px-3 py-2">
