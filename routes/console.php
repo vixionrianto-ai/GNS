@@ -19,8 +19,4 @@ Schedule::command('isolation:check --run')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('wa:reminder')
-    ->everyMinute()
-    ->when(fn () => now()->format('H:i') === (string) Setting::value('whatsapp.send_time', '08:00'))
-    ->withoutOverlapping()
-    ->runInBackground();
+Schedule::command('wa:reminder')    ->dailyAt((string) Setting::value('whatsapp.send_time', '08:00'))    ->withoutOverlapping()    ->runInBackground();
