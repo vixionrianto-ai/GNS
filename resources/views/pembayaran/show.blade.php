@@ -13,9 +13,9 @@
                     </span>
                     <h5 class="fw-bold mb-0 text-white"><i class="fas fa-info-circle me-2"></i> Detail Pembayaran</h5>
                 </div>
-                <div class="col-md-5 text-md-end">
+                <div class="col-md-5 d-flex justify-content-md-end align-items-center">
                     @if($pembayaran->tagihan->isLunas())
-                        <span class="badge bg-success text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm">
+                        <span class="badge bg-success text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm page-status-badge">
                             <i class="fas fa-check-circle me-1"></i> LUNAS
                         </span>
                     @elseif($pembayaran->tagihan->isSebagian())
@@ -23,7 +23,7 @@
                             <i class="fas fa-coins mr-1"></i> SEBAGIAN
                         </span>
                     @else
-                        <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm">
+                        <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm page-status-badge">
                             <i class="fas fa-exclamation-circle me-1"></i> BELUM LUNAS
                         </span>
                     @endif
