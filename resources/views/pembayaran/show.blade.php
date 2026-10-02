@@ -19,8 +19,8 @@
                             <i class="fas fa-check-circle me-1"></i> LUNAS
                         </span>
                     @elseif($pembayaran->tagihan->isSebagian())
-                        <span class="badge bg-warning text-dark px-3 py-1.5 rounded-pill fw-bold shadow-sm">
-                            <i class="fas fa-coins me-1"></i> SEBAGIAN
+                        <span class="badge bg-warning text-dark rounded-pill fw-bold shadow-sm d-inline-flex align-items-center" style="font-size:11px; line-height:1; padding:5px 10px;">
+                            <i class="fas fa-coins mr-1"></i> SEBAGIAN
                         </span>
                     @else
                         <span class="badge bg-danger text-white px-3 py-1.5 rounded-pill fw-bold shadow-sm">
