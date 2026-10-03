@@ -34,7 +34,7 @@ class LaporanController extends Controller
         $pdf = Pdf::loadView('laporan.exports.pdf', [
             'laporan' => $laporan,
             'filters' => $request->only([
-                'tanggal_awal', 'tanggal_akhir', 'bulan', 'tahun', 'status', 'search'
+                'tanggal_awal', 'tanggal_akhir', 'bulan', 'tahun', 'status', 'router_id', 'search'
             ]),
         ])->setPaper('a4', 'landscape');
 
