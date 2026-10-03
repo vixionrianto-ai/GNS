@@ -3,7 +3,7 @@
 @section('title', 'Detail Pembayaran')
 
 @section('content')
-<div class="container-fluid px-3 py-2">
+<div class="container-fluid px-3 py-2 payment-page">
     <div class="card border-0 shadow-sm rounded-3 mb-2 text-white overflow-hidden" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
         <div class="card-body px-3 py-2">
             <div class="row align-items-center g-2">
@@ -200,6 +200,61 @@
 
 @section('css')
 <style>
+.payment-page {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #343a40;
+}
+
+.payment-page .small {
+    font-size: 13px !important;
+}
+
+.payment-page .text-muted {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.payment-page .card-header h6,
+.payment-page .card-header .h6 {
+    font-size: 15px !important;
+    line-height: 1.3;
+}
+
+.payment-page .card-body {
+    font-size: 13px;
+}
+
+.payment-page .fw-bold,
+.payment-page .fw-semibold {
+    line-height: 1.4;
+}
+
+.payment-page .page-status-badge,
+.payment-page .page-action-btn {
+    font-size: 12px !important;
+}
+
+.payment-page .table {
+    font-size: 13px;
+}
+
+.payment-page .table th {
+    font-size: 13px;
+}
+
+.payment-page .table td {
+    font-size: 13px;
+}
+
+.payment-page .btn {
+    font-size: 13px;
+}
+
+.payment-page .badge {
+    font-size: 12px;
+}
+
 .main-header.navbar {
     background-color: #fff !important;
     border-bottom: 1px solid #dee2e6 !important;
