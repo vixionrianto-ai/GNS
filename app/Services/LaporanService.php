@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AlokasiPembayaran;
 use App\Models\Pelanggan;
 use App\Models\Pembayaran;
+use App\Models\Router;
 use App\Models\Tagihan;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -20,12 +21,16 @@ class LaporanService
         $bulan        = $request->bulan;
         $tahun        = $request->tahun;
         $status       = $request->status;
+        $routerId     = $request->router_id;
 
-        $query = Tagihan::with(['pelanggan.paket'])
+        $query = Tagihan::with(['pelanggan.paket', 'pelanggan.router'])
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
             ->when($bulan, fn($q) => $q->where('bulan', $bulan))
             ->when($tahun, fn($q) => $q->where('tahun', $tahun))
             ->when($status, fn($q) => $q->where('status', $status))
+            ->when($routerId, function ($q) use ($routerId) {
+                $q->whereHas('pelanggan', fn($pelanggan) => $pelanggan->where('router_id', $routerId));
+            })
             ->when($request->filled('search'), function ($q) use ($request) {
                 $search = trim($request->search);
 
@@ -72,12 +77,16 @@ class LaporanService
         $bulan        = $request->bulan;
         $tahun        = $request->tahun;
         $status       = $request->status;
+        $routerId     = $request->router_id;
 
-        $filterTagihan = function ($q) use ($tanggalAwal, $tanggalAkhir, $bulan, $tahun, $status) {
+        $filterTagihan = function ($q) use ($tanggalAwal, $tanggalAkhir, $bulan, $tahun, $status, $routerId) {
             $q->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
                 ->when($bulan, fn($q) => $q->where('bulan', $bulan))
                 ->when($tahun, fn($q) => $q->where('tahun', $tahun))
-                ->when($status, fn($q) => $q->where('status', $status));
+                ->when($status, fn($q) => $q->where('status', $status))
+                ->when($routerId, function ($q) use ($routerId) {
+                    $q->whereHas('pelanggan', fn($pelanggan) => $pelanggan->where('router_id', $routerId));
+                });
 
             if ($tanggalAwal || $tanggalAkhir) {
                 if (in_array($status, [Tagihan::STATUS_LUNAS, Tagihan::STATUS_SEBAGIAN], true)) {
@@ -104,7 +113,8 @@ class LaporanService
         $tagihan = Tagihan::query();
         $filterTagihan($tagihan);
 
-        $pelanggan = Pelanggan::query();
+        $pelanggan = Pelanggan::query()
+            ->when($routerId, fn($q) => $q->where('router_id', $routerId));
 
         $kpiTagihan = Tagihan::query();
         $filterTagihan($kpiTagihan);
@@ -117,7 +127,10 @@ class LaporanService
         // pada bulan pembayaran tersebut.
         $pembayaranMasuk = Pembayaran::query()
             ->where('status', Pembayaran::STATUS_BERHASIL)
-            ->where('metode', '!=', 'Saldo');
+            ->where('metode', '!=', 'Saldo')
+            ->when($routerId, function ($q) use ($routerId) {
+                $q->whereHas('tagihan.pelanggan', fn($pelanggan) => $pelanggan->where('router_id', $routerId));
+            });
 
         if ($tanggalAwal || $tanggalAkhir) {
             $pembayaranMasuk
@@ -174,6 +187,9 @@ class LaporanService
                 ->where('metode', '!=', 'Saldo')
                 ->whereYear('tanggal_bayar', $chartYear)
                 ->whereMonth('tanggal_bayar', $i)
+                ->when($routerId, function ($q) use ($routerId) {
+                    $q->whereHas('tagihan.pelanggan', fn($pelanggan) => $pelanggan->where('router_id', $routerId));
+                })
                 ->sum('total_bayar');
         }
 
@@ -219,6 +235,7 @@ class LaporanService
             'chartData' => $dataChart,
             'statusChart' => $statusChart,
             'topPiutang' => $topPiutang,
+            'routers' => Router::query()->orderBy('nama_router')->get(['id', 'nama_router']),
         ];
     }
 }
