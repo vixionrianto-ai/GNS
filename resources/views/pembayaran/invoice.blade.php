@@ -68,7 +68,7 @@
         <tbody>@if($alokasiTagihan->isNotEmpty()) @foreach($alokasiTagihan as $index => $alokasi)<tr><td>{{ $index + 1 }}</td><td>{{ optional($alokasi->tagihan)->periode ?? '-' }}</td><td>{{ optional($alokasi->tagihan)->invoice_no ?? '-' }}</td><td>{{ optional(optional(optional($alokasi->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td><td class="text-end fw-semibold">Rp {{ number_format((float) $alokasi->nominal, 0, ',', '.') }}</td></tr>@endforeach @else<tr><td>1</td><td>{{ optional($pembayaran->tagihan)->periode ?? '-' }}</td><td>{{ optional($pembayaran->tagihan)->invoice_no ?? '-' }}</td><td>{{ optional(optional(optional($pembayaran->tagihan)->pelanggan)->paket)->nama_paket ?? '-' }}</td><td class="text-end fw-semibold">Rp {{ number_format((float) ($pembayaran->nominal ?? 0), 0, ',', '.') }}</td></tr>@endif</tbody>
     </table></div></div></div>
 
-    <div class="card border-0 shadow-sm rounded-3"><div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="card border-0 shadow-sm rounded-3"><div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2">
         <a href="{{ route('pembayaran.show', $pembayaran) }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fas fa-arrow-left me-1"></i> Kembali</a>
         <div class="d-flex flex-wrap gap-2 justify-content-end page-action-group">
             <a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="btn btn-danger btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fas fa-file-pdf me-1"></i> PDF</a>
@@ -150,6 +150,12 @@
 }
 
 .page-action-group {
+    margin-left: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+
     margin-left: auto !important;
     justify-content: flex-end !important;
     width: 100%;
