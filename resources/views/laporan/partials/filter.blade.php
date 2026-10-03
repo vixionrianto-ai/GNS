@@ -57,6 +57,18 @@
                     </select>
                 </div>
 
+                <div class="col-xl-2 col-lg-2 col-md-4 mb-3 mb-xl-0">
+                    <label class="small font-weight-bold text-muted">Router</label>
+                    <select class="form-control form-control-sm" name="router_id">
+                        <option value="">Semua Router</option>
+                        @foreach($routers as $router)
+                            <option value="{{ $router->id }}" @selected(request('router_id') == $router->id)>
+                                {{ $router->nama_router }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="col-xl-2 col-lg-4 col-md-8 mb-3 mb-xl-0">
                     <label class="small font-weight-bold text-muted">Cari Pelanggan / Invoice</label>
                     <div class="input-group input-group-sm">
