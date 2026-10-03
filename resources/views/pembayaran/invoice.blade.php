@@ -70,10 +70,10 @@
 
     <div class="card border-0 shadow-sm rounded-3"><div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <a href="{{ route('pembayaran.show', $pembayaran) }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fas fa-arrow-left me-1"></i> Kembali</a>
-        <div class="d-flex flex-wrap gap-2">
-            <a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="btn btn-danger btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fas fa-file-pdf me-1"></i> PDF</a>
-            <a href="{{ route('pembayaran.print', $pembayaran) }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fas fa-print me-1"></i> Cetak</a>
-            @if(isset($waUrl) && $waUrl)<a href="{{ $waUrl }}" target="_blank" class="btn btn-success btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fab fa-whatsapp me-1"></i> WhatsApp</a>@endif
+        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+            <a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="btn btn-danger btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fas fa-file-pdf me-1"></i> PDF</a>
+            <a href="{{ route('pembayaran.print', $pembayaran) }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fas fa-print me-1"></i> Cetak</a>
+            @if(isset($waUrl) && $waUrl)<a href="{{ $waUrl }}" target="_blank" class="btn btn-success btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fab fa-whatsapp me-1"></i> WhatsApp</a>@endif
         </div>
     </div></div>
 </div>
@@ -92,6 +92,17 @@
 
 .badge {
     vertical-align: middle;
+}
+
+.page-action-btn {
+    font-size: 11px;
+    line-height: 1;
+    padding: 5px 10px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
 .page-status-badge {
