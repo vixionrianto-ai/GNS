@@ -182,7 +182,7 @@
                         <i class="fab fa-whatsapp me-1"></i> WhatsApp
                     </a>
                 @endif
-                @if($pembayaran->status === AppModelsPembayaran::STATUS_BERHASIL)
+                @if($pembayaran->status === \App\Models\Pembayaran::STATUS_BERHASIL)
                     <form action="{{ route('pembayaran.destroy', $pembayaran) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin membatalkan pembayaran ini? Seluruh alokasi FIFO dan penggunaan saldo akan dikembalikan.');">
                         @csrf
                         @method('DELETE')
