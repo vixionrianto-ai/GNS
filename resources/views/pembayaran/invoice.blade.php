@@ -70,7 +70,7 @@
 
     <div class="card border-0 shadow-sm rounded-3"><div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <a href="{{ route('pembayaran.show', $pembayaran) }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm"><i class="fas fa-arrow-left me-1"></i> Kembali</a>
-        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+        <div class="d-flex flex-wrap gap-2 justify-content-end page-action-group">
             <a href="{{ route('pembayaran.pdf', $pembayaran) }}" class="btn btn-danger btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fas fa-file-pdf me-1"></i> PDF</a>
             <a href="{{ route('pembayaran.print', $pembayaran) }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fas fa-print me-1"></i> Cetak</a>
             @if(isset($waUrl) && $waUrl)<a href="{{ $waUrl }}" target="_blank" class="btn btn-success btn-sm rounded-pill fw-bold shadow-sm page-action-btn"><i class="fab fa-whatsapp me-1"></i> WhatsApp</a>@endif
@@ -92,6 +92,12 @@
 
 .badge {
     vertical-align: middle;
+}
+
+.page-action-group {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+    width: 100%;
 }
 
 .page-action-btn {
