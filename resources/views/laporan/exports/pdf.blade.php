@@ -27,6 +27,7 @@
             'Bulan' => $filters['bulan'] ?? null,
             'Tahun' => $filters['tahun'] ?? null,
             'Status' => $filters['status'] ?? null,
+            'Router' => $filters['router_id'] ?? null,
             'Cari' => $filters['search'] ?? null,
         ])->filter(fn($value) => filled($value));
     @endphp
