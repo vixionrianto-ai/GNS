@@ -163,7 +163,7 @@
     </div>
 
     <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2">
             <a href="{{ route('pembayaran.index') }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm">
                 <i class="fas fa-arrow-left me-1"></i> Kembali ke Riwayat
             </a>
@@ -269,6 +269,12 @@
 }
 
 .page-action-group {
+    margin-left: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+
     margin-left: auto !important;
     justify-content: flex-end !important;
     width: 100%;
