@@ -163,11 +163,11 @@
     </div>
 
     <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2">
-            <a href="{{ route('pembayaran.index') }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm">
-                <i class="fas fa-arrow-left me-1"></i> Kembali ke Riwayat
-            </a>
-            <div class="d-flex flex-wrap gap-2 justify-content-end page-action-group">
+        <div class="card-body py-2 px-3 d-flex justify-content-end align-items-center gap-2">
+            <div class="page-action-group d-flex flex-wrap justify-content-end align-items-center gap-2">
+                <a href="{{ route('pembayaran.index') }}" class="btn btn-secondary btn-sm rounded-pill fw-bold shadow-sm page-action-btn">
+                    <i class="fas fa-arrow-left me-1"></i> Kembali ke Riwayat
+                </a>
                 <a href="{{ route('pembayaran.invoice', $pembayaran) }}" class="btn btn-info btn-sm text-white rounded-pill fw-bold shadow-sm page-action-btn">
                     <i class="fas fa-receipt me-1"></i> Lihat Invoice
                 </a>
@@ -182,12 +182,11 @@
                         <i class="fab fa-whatsapp me-1"></i> WhatsApp
                     </a>
                 @endif
-
-                @if($pembayaran->status === \App\Models\Pembayaran::STATUS_BERHASIL)
+                @if($pembayaran->status === AppModelsPembayaran::STATUS_BERHASIL)
                     <form action="{{ route('pembayaran.destroy', $pembayaran) }}" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin membatalkan pembayaran ini? Seluruh alokasi FIFO dan penggunaan saldo akan dikembalikan.');">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger btn-sm px-3 rounded-pill fw-bold shadow-sm">
+                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold shadow-sm page-action-btn">
                             <i class="fas fa-undo me-1"></i> Batalkan Pembayaran
                         </button>
                     </form>
