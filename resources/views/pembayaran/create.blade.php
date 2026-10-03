@@ -14,7 +14,7 @@
                     </span>
                     <h5 class="fw-bold mb-0 text-white"><i class="fas fa-money-bill-wave me-2"></i> Pembayaran Tagihan</h5>
                 </div>
-                <div class="col-md-5 text-md-end">
+                <div class="col-md-5 d-flex justify-content-md-end align-items-center">
                     <a href="{{ route('tagihan.index') }}" class="btn btn-light text-primary px-3 py-1.5 rounded-pill fw-bold shadow-sm">
                         <i class="fas fa-arrow-left me-1"></i> Kembali
                     </a>
@@ -96,7 +96,7 @@
                                 <label class="form-label small fw-bold text-secondary mb-1">Keterangan</label>
                                 <input type="text" name="keterangan" class="form-control form-control-sm rounded-2 shadow-none py-1.5" placeholder="Opsional">
                             </div>
-                            <div class="col-12 mt-2 text-end">
+                            <div class="col-12 mt-2 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-success btn-sm px-4 py-1.5 rounded-pill fw-bold shadow-sm">
                                     <i class="fas fa-check-circle me-1"></i> Simpan Pembayaran
                                 </button>
