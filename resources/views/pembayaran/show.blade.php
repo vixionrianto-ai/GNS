@@ -167,7 +167,7 @@
             <a href="{{ route('pembayaran.index') }}" class="btn btn-secondary btn-sm px-3 rounded-pill fw-bold shadow-sm">
                 <i class="fas fa-arrow-left me-1"></i> Kembali ke Riwayat
             </a>
-            <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+            <div class="d-flex flex-wrap gap-2 justify-content-end page-action-group">
                 <a href="{{ route('pembayaran.invoice', $pembayaran) }}" class="btn btn-info btn-sm text-white rounded-pill fw-bold shadow-sm page-action-btn">
                     <i class="fas fa-receipt me-1"></i> Lihat Invoice
                 </a>
@@ -211,6 +211,12 @@
 
 .badge {
     vertical-align: middle;
+}
+
+.page-action-group {
+    margin-left: auto !important;
+    justify-content: flex-end !important;
+    width: 100%;
 }
 
 .page-action-btn {
