@@ -191,19 +191,69 @@ class WhatsAppService
     }
 
     /**
+     * Placeholder untuk pesan satu tagihan.
+     * Tidak memasukkan tagihan pelanggan lain ke rincian maupun total.
+     */
+    protected function singleTagihanPlaceholder(Tagihan $tagihan): array
+    {
+        $sisa = (float) $tagihan->getSisaTagihan();
+        $total = (float) $tagihan->getTotalTagihan();
+
+        $statusIcon = match ($tagihan->status) {
+            Tagihan::STATUS_SEBAGIAN => '🟡',
+            Tagihan::STATUS_JATUH_TEMPO => '⏰',
+            Tagihan::STATUS_BELUM_BAYAR => '🔴',
+            default => '⚪',
+        };
+
+        $jatuhTempo = optional($tagihan->tanggal_jatuh_tempo)->format('d-m-Y') ?: '-';
+
+        $rincian = "1.\n" .
+            "📅 Periode : " . $this->periodeIndonesia($tagihan) . "\n" .
+            "📄 Invoice : {$tagihan->invoice_no}\n" .
+            "⏰ Jatuh Tempo : {$jatuhTempo}\n" .
+            "{$statusIcon} Status : {$tagihan->status}\n" .
+            "❗ Sisa yang harus dibayar : Rp " . $this->rupiah($sisa);
+
+        return [
+            'nama' => $tagihan->pelanggan?->nama,
+            'invoice' => $tagihan->invoice_no,
+            'periode' => $this->periodeIndonesia($tagihan),
+            'bulan' => $tagihan->bulan,
+            'tahun' => $tagihan->tahun,
+            'nominal' => 'Rp ' . $this->rupiah($tagihan->nominal),
+            'denda' => 'Rp ' . $this->rupiah($tagihan->denda),
+            'total' => 'Rp ' . $this->rupiah($total),
+            'jatuh_tempo' => optional($tagihan->tanggal_jatuh_tempo)->format('d-m-Y'),
+            'isp' => config('app.name'),
+            'rincian_tagihan' => $rincian,
+            'jumlah_tagihan' => 1,
+            'total_tagihan' => 'Rp ' . $this->rupiah($total),
+            'total_dibayar' => 'Rp ' . $this->rupiah($total - $sisa),
+            'total_sisa' => 'Rp ' . $this->rupiah($sisa),
+            'total_harus_dibayar' => 'Rp ' . $this->rupiah($sisa),
+            'status' => $tagihan->status,
+        ];
+    }
+
+    /**
      * Render template WhatsApp tagihan berdasarkan data seluruh tagihan pelanggan yang masih memiliki sisa.
      * Digunakan oleh reminder otomatis agar isi pesan mengikuti template pada halaman Pengaturan WhatsApp.
      */
     public function renderConfiguredTagihanTemplate(Tagihan $tagihan, string $settingKey): string
     {
-        $data = $this->tagihanPlaceholder($tagihan);
+        $data = $this->singleTagihanPlaceholder($tagihan);
         $template = Setting::value($settingKey, '');
 
         if (!$template) {
             return '';
         }
 
-        return $this->template($settingKey, $data);
+        foreach ($data as $key => $value) {
+            $template = str_replace('{' . $key . '}', (string) $value, $template);
+        }
+
+        return trim($template);
     }
 
     public function pesanTagihanBaru(Tagihan $tagihan): string
