@@ -66,6 +66,9 @@
                 <strong>{jatuh_tempo}</strong>,
                 <strong>{total}</strong>,
                 <strong>{total_sisa}</strong>,
+                <strong>{total_harus_dibayar}</strong>,
+                <strong>{rincian_tagihan}</strong>,
+                <strong>{status}</strong>,
                 <strong>{isp}</strong>
             </small>
         @endif
