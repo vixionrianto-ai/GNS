@@ -95,8 +95,17 @@ class WhatsAppService
     protected function tagihanPlaceholder(Tagihan $tagihan): array
     {
         $pelanggan = $tagihan->pelanggan;
+        $tanggalBatas = $tagihan->tanggal_jatuh_tempo;
+
         $tagihans = Tagihan::where('pelanggan_id', $pelanggan->id)
             ->where('status', '!=', Tagihan::STATUS_DIBATALKAN)
+            // Ambil tagihan yang sudah jatuh tempo pada tagihan yang dipilih
+            // beserta tunggakan sebelumnya. Tagihan yang jatuh temponya
+            // masih di masa depan tidak boleh ikut.
+            ->when(
+                $tanggalBatas,
+                fn ($query) => $query->whereDate('tanggal_jatuh_tempo', '<=', $tanggalBatas)
+            )
             ->orderBy('tahun')->orderBy('bulan')->orderBy('id')->get();
 
         $rincian = [];
@@ -106,13 +115,16 @@ class WhatsAppService
         $nomorRincian = 0;
 
         foreach ($tagihans as $item) {
+            $sisa = (float) $item->getSisaTagihan();
+            if ($sisa <= 0) {
+                continue;
+            }
+
             $tagihanTotal = (float) $item->getTotalTagihan();
             $dibayar = (float) $item->getTotalDibayar();
-            $sisa = (float) $item->getSisaTagihan();
             $totalTagihan += $tagihanTotal;
             $totalDibayar += $dibayar;
             $totalSisa += $sisa;
-            if ($sisa <= 0) continue;
 
             $nomorRincian++;
             $statusIcon = match ($item->status) {
