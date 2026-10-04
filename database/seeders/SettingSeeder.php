@@ -50,14 +50,14 @@ class SettingSeeder extends Seeder
             ],
             [
                 'group' => 'whatsapp',
-                'key' => 'whatsapp.reminder_h3',
+                'key' => 'whatsapp.reminder_first_days',
                 'value' => '5',
                 'description' => 'Reminder pertama (hari setelah jatuh tempo)',
                 'type' => 'integer',
             ],
             [
                 'group' => 'whatsapp',
-                'key' => 'whatsapp.reminder_h7',
+                'key' => 'whatsapp.reminder_second_days',
                 'value' => '14',
                 'description' => 'Reminder kedua (hari setelah jatuh tempo)',
                 'type' => 'integer',
@@ -78,15 +78,28 @@ class SettingSeeder extends Seeder
             ],
             [
                 'group' => 'whatsapp',
-                'key' => 'whatsapp.template_h3',
-                'value' => 'Halo {nama},\n\nTagihan internet Anda telah melewati jatuh tempo.\n\nInvoice : {invoice}\nTotal : {total}\n\nTerima kasih.\n{isp}',
+                'key' => 'whatsapp.template_reminder_first',
+                'value' => "Halo Bapak/Ibu, {nama},\n\n" .
+    "Berikut rincian tagihan internet yang masih harus dibayar:\n\n" .
+    "━━━━━━━━━━━━━━━━━━\n📄 RINCIAN TAGIHAN\n━━━━━━━━━━━━━━━━━━\n\n" .
+    "{rincian_tagihan}\n\n━━━━━━━━━━━━━━━━━━\n💰 TOTAL HARUS DIBAYAR\n" .
+    "{total_harus_dibayar}\n━━━━━━━━━━━━━━━━━━\n\n" .
+    "Mohon melakukan pembayaran untuk melunasi seluruh tagihan.\n\n" .
+    "Terima kasih.\n{isp}",
                 'description' => 'Template Reminder Pertama',
                 'type' => 'textarea',
             ],
             [
                 'group' => 'whatsapp',
-                'key' => 'whatsapp.template_h7',
-                'value' => 'Halo {nama},\n\nSampai hari ini pembayaran belum kami terima.\n\nInvoice : {invoice}\nTotal : {total}\n\nMohon segera melakukan pembayaran.\n\n{isp}',
+                'key' => 'whatsapp.template_reminder_second',
+                'value' => "Halo Bapak/Ibu, {nama},\n\n" .
+    "Sampai hari ini pembayaran belum kami terima.\n\n" .
+    "Berikut rincian tagihan internet yang masih harus dibayar:\n\n" .
+    "━━━━━━━━━━━━━━━━━━\n📄 RINCIAN TAGIHAN\n━━━━━━━━━━━━━━━━━━\n\n" .
+    "{rincian_tagihan}\n\n━━━━━━━━━━━━━━━━━━\n💰 TOTAL HARUS DIBAYAR\n" .
+    "{total_harus_dibayar}\n━━━━━━━━━━━━━━━━━━\n\n" .
+    "Mohon segera melakukan pembayaran untuk melunasi seluruh tagihan.\n\n" .
+    "Terima kasih.\n{isp}",
                 'description' => 'Template Reminder Kedua',
                 'type' => 'textarea',
             ],
