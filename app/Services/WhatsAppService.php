@@ -149,6 +149,7 @@ class WhatsAppService
             'total_dibayar' => 'Rp ' . $this->rupiah($totalDibayar),
             'total_sisa' => 'Rp ' . $this->rupiah($totalSisa),
             'total_harus_dibayar' => 'Rp ' . $this->rupiah($totalSisa),
+            'status' => $tagihan->status,
         ];
     }
 
@@ -187,6 +188,22 @@ class WhatsAppService
     protected function pelangganPlaceholder(Pelanggan $pelanggan): array
     {
         return ['nama' => $pelanggan->nama, 'isp' => config('app.name')];
+    }
+
+    /**
+     * Render template WhatsApp tagihan berdasarkan data seluruh tagihan pelanggan yang masih memiliki sisa.
+     * Digunakan oleh reminder otomatis agar isi pesan mengikuti template pada halaman Pengaturan WhatsApp.
+     */
+    public function renderConfiguredTagihanTemplate(Tagihan $tagihan, string $settingKey): string
+    {
+        $data = $this->tagihanPlaceholder($tagihan);
+        $template = Setting::value($settingKey, '');
+
+        if (!$template) {
+            return '';
+        }
+
+        return $this->template($settingKey, $data);
     }
 
     public function pesanTagihanBaru(Tagihan $tagihan): string
