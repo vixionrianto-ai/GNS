@@ -52,13 +52,43 @@ class ReminderService
         foreach ($tagihans as $tagihan) {
             try {
                 // Hanya status success yang dianggap sudah terkirim.
-                // Query tanggal dibuat tepat H+N, sehingga tanggal invoice dibuat
-                // (misalnya tanggal 1) tidak memicu pengiriman.
-                if ($this->whatsAppService->sudahPernahKirim($tagihan, 'tagihan')) {
+                // Log lama jenis "tagihan" juga diperiksa agar pengiriman manual
+                // yang sudah berhasil tidak langsung diduplikasi pada H+N.
+                if (
+                    $this->whatsAppService->sudahPernahKirim($tagihan, 'reminder_first') ||
+                    $this->whatsAppService->sudahPernahKirim($tagihan, 'tagihan')
+                ) {
                     continue;
                 }
 
-                if ($this->whatsAppService->sendTagihan($tagihan)) {
+                $pesan = $this->whatsAppService->renderConfiguredTagihanTemplate(
+                    $tagihan,
+                    'whatsapp.template_reminder_first'
+                );
+
+                if ($pesan === '') {
+                    continue;
+                }
+
+                $nomor = $tagihan->pelanggan?->no_hp;
+                if (!$this->validNomor($nomor)) {
+                    continue;
+                }
+
+                $berhasil = $this->whatsAppService->kirim($nomor, $pesan);
+                $response = $this->whatsAppService->lastResponse();
+
+                $this->whatsAppService->simpanLog(
+                    $tagihan->pelanggan,
+                    $tagihan,
+                    'reminder_first',
+                    $nomor,
+                    $pesan,
+                    $berhasil,
+                    $response
+                );
+
+                if ($berhasil) {
                     $jumlah++;
                 }
             } catch (Throwable $e) {
@@ -174,38 +204,7 @@ class ReminderService
 
     protected function renderTemplate(string $templateKey, Tagihan $tagihan): string
     {
-        $pelanggan = $tagihan->pelanggan;
-        if (!$pelanggan) {
-            return '';
-        }
-
-        $template = Setting::value($templateKey, '');
-        if (!$template) {
-            return '';
-        }
-
-        $sisa = (float) $tagihan->getSisaTagihan();
-
-        $data = [
-            'nama' => $pelanggan->nama,
-            'invoice' => $tagihan->invoice_no,
-            'periode' => $this->periodeIndonesia($tagihan),
-            'bulan' => $tagihan->bulan,
-            'tahun' => $tagihan->tahun,
-            'nominal' => 'Rp ' . $this->rupiah($tagihan->nominal),
-            'denda' => 'Rp ' . $this->rupiah($tagihan->denda),
-            'total' => 'Rp ' . $this->rupiah($tagihan->getTotalTagihan()),
-            'jatuh_tempo' => optional($tagihan->tanggal_jatuh_tempo)->format('d-m-Y'),
-            'total_sisa' => 'Rp ' . $this->rupiah($sisa),
-            'total_harus_dibayar' => 'Rp ' . $this->rupiah($sisa),
-            'isp' => config('app.name'),
-        ];
-
-        foreach ($data as $key => $value) {
-            $template = str_replace('{' . $key . '}', (string) $value, $template);
-        }
-
-        return trim($template);
+        return trim($this->whatsAppService->renderConfiguredTagihanTemplate($tagihan, $templateKey));
     }
 
     protected function rupiah($nilai): string
