@@ -208,14 +208,13 @@ class WhatsAppService
 
     public function pesanTagihanBaru(Tagihan $tagihan): string
     {
-        $data = $this->tagihanPlaceholder($tagihan);
-        return "Halo Bapak/Ibu, {$data['nama']},\n\n" .
-            "Berikut rincian tagihan internet yang masih harus dibayar:\n\n" .
-            "━━━━━━━━━━━━━━━━━━\n📄 RINCIAN TAGIHAN\n━━━━━━━━━━━━━━━━━━\n\n" .
-            $data['rincian_tagihan'] . "\n\n━━━━━━━━━━━━━━━━━━\n💰 TOTAL HARUS DIBAYAR\n" .
-            "{$data['total_harus_dibayar']}\n━━━━━━━━━━━━━━━━━━\n\n" .
-            "Mohon melakukan pembayaran untuk melunasi seluruh tagihan.\n\nTerima kasih.\n" .
-            config('app.name');
+        // Sumber format pesan manual adalah Template Reminder Pertama
+        // pada Pengaturan WhatsApp. Dengan demikian tombol manual dan
+        // reminder otomatis H+5 selalu menghasilkan pesan yang sama.
+        return $this->renderConfiguredTagihanTemplate(
+            $tagihan,
+            'whatsapp.template_reminder_first'
+        );
     }
 
     public function pesanPembayaran(Pembayaran $pembayaran): string
