@@ -121,12 +121,12 @@ class ReminderService
                     continue;
                 }
 
-                // Reminder kedua juga menggunakan pesan manual yang sama persis.
-                // Parameter $templateKey tetap dipertahankan agar kompatibel dengan
-                // pemanggil yang sudah ada, tetapi tidak mengubah isi pesan.
-                $pesan = $this->whatsAppService->pesanTagihanBaru($tagihan);
-                $nomor = $tagihan->pelanggan?->no_hp;
+                $pesan = $this->renderTemplate($templateKey, $tagihan);
+                if ($pesan === '') {
+                    continue;
+                }
 
+                $nomor = $tagihan->pelanggan?->no_hp;
                 if (!$this->validNomor($nomor)) {
                     continue;
                 }
@@ -147,7 +147,7 @@ class ReminderService
                 if ($berhasil) {
                     $jumlah++;
                 }
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 Log::error('WhatsApp Reminder Error', [
                     'jenis' => $jenis,
                     'tagihan_id' => $tagihan->id ?? null,
