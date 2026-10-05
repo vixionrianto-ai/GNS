@@ -170,7 +170,7 @@ class WhatsAppService
         $tagihan = $pembayaran->tagihan;
         $pelanggan = $tagihan->pelanggan;
         $tagihanData = $this->tagihanPlaceholder($tagihan);
-        $pdfUrl = 'https://billing.syauqi.net/public-invoice/' . $pembayaran->public_token . '/pdf';
+        $pdfUrl = 'http://billing.syauqi.net:10017/public-invoice/' . $pembayaran->public_token . '/pdf';
 
         return array_merge([
             'nama' => $pelanggan->nama,
