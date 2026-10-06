@@ -116,8 +116,30 @@ class LaporanService
         $pelanggan = Pelanggan::query()
             ->when($routerId, fn($q) => $q->where('router_id', $routerId));
 
-        $kpiTagihan = Tagihan::query();
-        $filterTagihan($kpiTagihan);
+        /*
+         * KPI default = bulan berjalan.
+         *
+         * Jika user tidak memilih periode apa pun, KPI menggunakan
+         * bulan + tahun sekarang. Jika user memilih bulan tanpa tahun,
+         * otomatis menggunakan tahun sekarang.
+         *
+         * Tabel laporan tetap menggunakan filter asli user.
+         */
+        $kpiRequest = clone $request;
+
+        if (!$tanggalAwal && !$tanggalAkhir && !$bulan && !$tahun) {
+            $kpiRequest->merge([
+                'bulan' => now()->month,
+                'tahun' => now()->year,
+            ]);
+        } elseif ($bulan && !$tahun) {
+            $kpiRequest->merge([
+                'tahun' => now()->year,
+            ]);
+        }
+
+        $tagihanKpi = $this->laporanQuery($kpiRequest);
+        $kpiTagihan = clone $tagihanKpi;
 
         $laporan = $this->laporanQuery($request)->paginate(15)->withQueryString();
 
@@ -193,9 +215,9 @@ class LaporanService
                 ->sum('total_bayar');
         }
 
-        $totalTagihan = (clone $tagihan)->sum('total');
-        $totalDibayar = (clone $tagihan)->sum('dibayar');
-        $piutang = (clone $tagihan)->sum('sisa');
+        $totalTagihan = (clone $tagihanKpi)->sum('total');
+        $totalDibayar = (clone $tagihanKpi)->sum('dibayar');
+        $piutang = (clone $tagihanKpi)->sum('sisa');
 
         $statusChart = [
             (clone $kpiTagihan)->where('status', Tagihan::STATUS_LUNAS)->count(),
@@ -204,9 +226,8 @@ class LaporanService
             (clone $kpiTagihan)->where('status', Tagihan::STATUS_JATUH_TEMPO)->count(),
         ];
 
-        $topPiutang = Tagihan::with('pelanggan');
-        $filterTagihan($topPiutang);
-        $topPiutang = $topPiutang
+        $topPiutang = (clone $tagihanKpi)
+            ->with('pelanggan')
             ->where('sisa', '>', 0)
             ->orderByDesc('sisa')
             ->limit(10)
