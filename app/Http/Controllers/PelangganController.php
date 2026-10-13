@@ -104,6 +104,8 @@ class PelangganController extends Controller
         $request->validate([
             'nama' => 'required',
             'alamat' => 'required',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'no_hp' => 'required',
             'router_id' => 'required|exists:routers,id',
             'paket_id' => 'required|exists:pakets,id',
@@ -159,6 +161,8 @@ class PelangganController extends Controller
                 'kode_pelanggan'         => $kode,
                 'nama'                   => $request->nama,
                 'alamat'                 => $request->alamat,
+                'latitude'               => $request->filled('latitude') ? $request->input('latitude') : null,
+                'longitude'              => $request->filled('longitude') ? $request->input('longitude') : null,
                 'no_hp'                  => $request->no_hp,
                 'router_id'              => $request->router_id,
                 'paket_id'               => $request->paket_id,
@@ -299,6 +303,8 @@ class PelangganController extends Controller
         $request->validate([
             'nama' => 'required',
             'alamat' => 'required',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'no_hp' => 'required',
             'router_id' => 'required|exists:routers,id',
             'paket_id' => 'required|exists:pakets,id',
@@ -357,6 +363,8 @@ class PelangganController extends Controller
             $pelanggan->update([
                 'nama'                   => $request->nama,
                 'alamat'                 => $request->alamat,
+                'latitude'               => $request->filled('latitude') ? $request->input('latitude') : null,
+                'longitude'              => $request->filled('longitude') ? $request->input('longitude') : null,
                 'no_hp'                  => $request->no_hp,
                 'router_id'              => $request->router_id,
                 'paket_id'               => $request->paket_id,
