@@ -17,6 +17,8 @@ class Pelanggan extends Model
         'kode_pelanggan',
         'nama',
         'alamat',
+        'latitude',
+        'longitude',
         'no_hp',
         'paket_id',
         'router_id',
