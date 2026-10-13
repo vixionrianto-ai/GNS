@@ -203,6 +203,30 @@
             </div>
         </div>
 
+
+        <div class="card card-outline card-info shadow-sm rounded-4 border-0 mb-2">
+            <div class="card-header bg-white py-2">
+                <h3 class="card-title font-weight-bold"><i class="fas fa-map-marker-alt text-info mr-1"></i> Lokasi Pelanggan (Opsional)</h3>
+            </div>
+            <div class="card-body">
+                <small class="text-muted d-block mb-2">Klik titik pada peta untuk menyimpan koordinat pelanggan. Geser penanda untuk menyesuaikan posisi.</small>
+                <div id="customer-location-map" style="height:300px;border-radius:8px;z-index:1"></div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label for="latitude">Latitude</label>
+                        <input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" class="form-control form-control-sm" value="{{ old('latitude', $pelanggan->latitude) }}" placeholder="-7.545123">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="longitude">Longitude</label>
+                        <input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" class="form-control form-control-sm" value="{{ old('longitude', $pelanggan->longitude) }}" placeholder="112.234567">
+                    </div>
+                </div>
+                <a id="open-customer-map" class="btn btn-sm btn-outline-primary mt-2" href="https://www.google.com/maps" target="_blank" rel="noopener">
+                    <i class="fas fa-map-marked-alt mr-1"></i> Buka Google Maps
+                </a>
+            </div>
+        </div>
+
         <div class="card-footer bg-white py-2 border-0 text-right">
             <button type="submit" class="btn btn-sm btn-warning px-4 font-weight-bold text-dark shadow-sm">
                 <i class="fas fa-save mr-1"></i> Update Pelanggan
@@ -214,6 +238,7 @@
 @stop
 
 @section('css')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <style>
 .card { border-radius: 12px; }
 .form-control { border-radius: 6px; transition: all .2s ease-in-out; }
@@ -224,6 +249,49 @@ label { font-weight: 600; color: #495057; }
 @stop
 
 @section('js')
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+$(function () {
+    const latInput = document.getElementById('latitude');
+    const lngInput = document.getElementById('longitude');
+    const mapElement = document.getElementById('customer-location-map');
+    const googleLink = document.getElementById('open-customer-map');
+    if (!latInput || !lngInput || !mapElement || !window.L) return;
+    const defaultCenter = [-7.545123, 112.234567];
+    const hasCoordinates = latInput.value !== '' && lngInput.value !== '';
+    const initialCenter = hasCoordinates ? [parseFloat(latInput.value), parseFloat(lngInput.value)] : defaultCenter;
+    const map = L.map(mapElement).setView(initialCenter, hasCoordinates ? 17 : 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    let marker = null;
+    function syncCoordinates(lat, lng) {
+        latInput.value = Number(lat).toFixed(7);
+        lngInput.value = Number(lng).toFixed(7);
+        googleLink.href = 'https://www.google.com/maps?q=' + latInput.value + ',' + lngInput.value;
+    }
+    function placeMarker(lat, lng) {
+        if (marker) marker.setLatLng([lat, lng]);
+        else marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+        marker.off('dragend').on('dragend', function (event) {
+            const point = event.target.getLatLng();
+            syncCoordinates(point.lat, point.lng);
+        });
+        syncCoordinates(lat, lng);
+    }
+    if (hasCoordinates) placeMarker(initialCenter[0], initialCenter[1]);
+    map.on('click', event => placeMarker(event.latlng.lat, event.latlng.lng));
+    function updateFromInputs() {
+        const lat = parseFloat(latInput.value), lng = parseFloat(lngInput.value);
+        if (Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            placeMarker(lat, lng); map.panTo([lat, lng]);
+        } else if (latInput.value === '' || lngInput.value === '') googleLink.href = 'https://www.google.com/maps';
+    }
+    latInput.addEventListener('change', updateFromInputs);
+    lngInput.addEventListener('change', updateFromInputs);
+    if (hasCoordinates) syncCoordinates(initialCenter[0], initialCenter[1]);
+});
+</script>
 <script>
 $(function(){
     $('form').on('submit', function(){
