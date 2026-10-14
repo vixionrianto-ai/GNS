@@ -460,6 +460,12 @@ class OltService
         $key = strtoupper(trim((string) $router->nama_router));
         $specific = is_array($routers[$key] ?? null) ? $routers[$key] : [];
 
+        // An unset per-router value must fall back to the global OLT settings.
+        $specific = array_filter(
+            $specific,
+            static fn ($value) => filled($value)
+        );
+
         return array_merge([
             'base_url' => $global['base_url'] ?? null,
             'username' => $global['username'] ?? null,
