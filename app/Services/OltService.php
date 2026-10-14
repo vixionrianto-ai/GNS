@@ -34,9 +34,17 @@ class OltService
         }
 
         try {
-            // KUWU memakai client Python yang sudah terbukti.
+            // Coba client Python KUWU jika tersedia. Bila script/runtime tidak tersedia,
+            // lanjutkan ke implementasi HTTP PHP di bawah, bukan langsung menggagalkan lookup.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
-                return $this->findViaPython($oltConfig, $username, $callerId);
+                $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
+                if ($pythonResult !== null) {
+                    return $pythonResult;
+                }
+
+                Log::warning('Client Python OLT KUWU tidak menghasilkan data; mencoba HTTP PHP fallback.', [
+                    'username' => $username,
+                ]);
             }
 
             // RUMAH memakai OLT GPON V1600GS-F.
