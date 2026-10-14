@@ -1,0 +1,653 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Router;
+use Illuminate\Support\Facades\Log;
+use GuzzleHttp\Client;
+use GuzzleHttp\Cookie\CookieJar;
+use Throwable;
+
+class OltService
+{
+    /**
+     * Cari data ONU berdasarkan username PPP yang tersimpan
+     * pada kolom Description di OLT.
+     */
+    public function findByUsername(Router $router, string $username, ?string $callerId = null): ?array
+    {
+        $oltConfig = $this->configForRouter($router);
+
+        if (!$this->enabled($router)) {
+            Log::warning('OLT lookup dilewati: konfigurasi OLT belum aktif.', [
+                'username' => $username,
+                'enabled' => (bool) config('services.olt.enabled', false),
+                'base_url_filled' => filled($oltConfig['base_url'] ?? null),
+                'username_filled' => filled($oltConfig['username'] ?? null),
+                'password_filled' => filled($oltConfig['password'] ?? null),
+            ]);
+            return null;
+        }
+
+        if (trim($username) === '' && trim((string) $callerId) === '') {
+            return null;
+        }
+
+        try {
+            // KUWU memakai client Python yang sudah terbukti.
+            if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
+                return $this->findViaPython($oltConfig, $username, $callerId);
+            }
+
+            // RUMAH memakai OLT GPON V1600GS-F.
+            if (strtoupper(trim((string) $router->nama_router)) === 'RUMAH') {
+                return $this->findRumahGpon($oltConfig, $username, $callerId);
+            }
+
+            $jar = new CookieJar();
+
+            $client = new Client([
+                'timeout' => (float) config('services.olt.timeout', 10),
+                'connect_timeout' => (float) config('services.olt.timeout', 10),
+                'http_errors' => false,
+                'verify' => false,
+                'cookies' => $jar,
+            ]);
+
+            Log::info('OLT lookup mulai.', [
+                'username' => $username,
+                'enabled' => $this->enabled($router),
+                'router' => $router->nama_router,
+                'base_url' => $oltConfig['base_url'] ?? null,
+                'base_url_filled' => filled($oltConfig['base_url'] ?? null),
+                'username_filled' => filled($oltConfig['username'] ?? null),
+                'password_filled' => filled($oltConfig['password'] ?? null),
+            ]);
+
+            $base = rtrim((string) ($oltConfig['base_url'] ?? ''), '/');
+            $loginPage = $base . '/action/login.html';
+            $loginUrl = $base . '/action/main.html';
+            $statusUrl = $base . '/action/onustatusinfo.html';
+            $opmUrl = $base . '/action/onuopmdiag.html';
+
+            $headers = [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+            ];
+
+            $loginResponse = $client->get($loginPage, [
+                'headers' => $headers,
+            ]);
+
+            Log::info('OLT login page response.', [
+                'status' => $loginResponse->getStatusCode(),
+            ]);
+
+            $loginResponse = $client->post($loginUrl, [
+                'headers' => $headers + [
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                    'Referer' => $loginPage,
+                ],
+                'form_params' => [
+                    'user' => (string) ($oltConfig['username'] ?? ''),
+                    'pass' => (string) ($oltConfig['password'] ?? ''),
+                    'button' => 'login',
+                    'who' => '100',
+                ],
+            ]);
+
+            Log::info('OLT login response.', [
+                'status' => $loginResponse->getStatusCode(),
+            ]);
+
+            Log::info('OLT login selesai, mulai baca PON 1-4.', [
+                'base_url' => $base,
+            ]);
+
+            for ($pon = 1; $pon <= 4; $pon++) {
+                $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
+                    'select' => (string) $pon,
+                    'searchMac' => '',
+                    'searchDescription' => '',
+                    'who' => '100',
+                ], $statusUrl);
+
+                $statusRows = $this->parseStatus($statusHtml);
+
+                Log::info('OLT status dibaca.', [
+                    'pon' => $pon,
+                    'rows' => count($statusRows),
+                    'target' => $username,
+                ]);
+
+                $matchedRow = $this->matchOnuRow($statusRows, $username, $callerId);
+
+                if (!$matchedRow) {
+                    $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                        'select' => (string) $pon,
+                        'searchMac' => '',
+                        'searchDescription' => '',
+                        'who' => '100',
+                    ], $opmUrl);
+
+                    $opmRows = $this->parseOpm($opmHtml);
+
+                    Log::info('OLT OPM fallback dibaca.', [
+                        'pon' => $pon,
+                        'rows' => count($opmRows),
+                        'target' => $username,
+                    ]);
+
+                    $matchedOpm = $this->matchOnuRow($opmRows, $username, $callerId);
+
+                    if ($matchedOpm) {
+                        $matchedRow = [
+                            'onu' => $matchedOpm['onu'],
+                            'status' => 'Unknown',
+                            'mac' => $matchedOpm['mac'] ?? '',
+                            'description' => $matchedOpm['description'] ?? '',
+                            'distance' => $matchedOpm['distance'] ?? '-',
+                            'last_deregister_reason' => '-',
+                        ];
+                    } else {
+                        continue;
+                    }
+                } else {
+                    $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                        'select' => (string) $pon,
+                        'searchMac' => '',
+                        'searchDescription' => '',
+                        'who' => '100',
+                    ], $opmUrl);
+
+                    $opmRows = $this->parseOpm($opmHtml);
+
+                    Log::info('OLT OPM dibaca.', [
+                        'pon' => $pon,
+                        'rows' => count($opmRows),
+                        'target' => $username,
+                    ]);
+                }
+
+                $opm = $this->findOpmRow($opmRows, $matchedRow, $callerId);
+
+                Log::info('OLT ONU cocok.', [
+                    'pon' => $pon,
+                    'onu' => $matchedRow['onu'],
+                    'description' => $matchedRow['description'],
+                    'rx_power' => $opm['rx_power'] ?? null,
+                    'tx_power' => $opm['tx_power'] ?? null,
+                    'distance' => $matchedRow['distance'] ?? null,
+                ]);
+
+                return [
+                    'onu' => $matchedRow['onu'],
+                    'status' => $matchedRow['status'],
+                    'mac' => $matchedRow['mac'],
+                    'description' => $matchedRow['description'],
+                    'distance' => $matchedRow['distance'],
+                    'last_deregister_reason' => $matchedRow['last_deregister_reason'],
+                    'temperature' => $opm['temperature'] ?? null,
+                    'voltage' => $opm['voltage'] ?? null,
+                    'tx_bias' => $opm['tx_bias'] ?? null,
+                    'tx_power' => $opm['tx_power'] ?? null,
+                    'rx_power' => $opm['rx_power'] ?? null,
+                ];
+            }
+
+            Log::warning('OLT ONU tidak ditemukan pada seluruh PON.', [
+                'username' => $username,
+                'caller_id' => $callerId,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Gagal mengambil data ONU dari OLT.', [
+                'username' => $username,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    protected function findRumahGpon(array $config, string $username, ?string $callerId): ?array
+    {
+        $jar = new CookieJar();
+
+        $client = new Client([
+            'timeout' => (float) config('services.olt.timeout', 10),
+            'connect_timeout' => (float) config('services.olt.timeout', 10),
+            'http_errors' => false,
+            'verify' => false,
+            'cookies' => $jar,
+        ]);
+
+        $base = rtrim((string) ($config['base_url'] ?? ''), '/');
+        $loginPage = $base . '/action/login.html';
+        $loginUrl = $base . '/action/main.html';
+        $statusUrl = $base . '/action/onustatusinfo.html';
+        // RUMAH V1600GS-F uses a different optical page than KUWU.
+        // The page source confirms: <form method=post action="pononuopticalinfo.html">
+        $opticalUrl = $base . '/action/pononuopticalinfo.html';
+
+        $headers = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+        ];
+
+        Log::info('OLT RUMAH lookup mulai.', [
+            'username' => $username,
+            'base_url' => $base,
+        ]);
+
+        $client->get($loginPage, ['headers' => $headers]);
+
+        $client->post($loginUrl, [
+            'headers' => $headers + [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+                'Referer' => $loginPage,
+            ],
+            'form_params' => [
+                'user' => (string) ($config['username'] ?? ''),
+                'pass' => (string) ($config['password'] ?? ''),
+                'button' => 'login',
+                'who' => '100',
+            ],
+        ]);
+
+        for ($pon = 1; $pon <= 4; $pon++) {
+            $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
+                'select' => (string) $pon,
+                'searchMac' => '',
+                'searchDescription' => '',
+                'who' => '100',
+            ], $statusUrl);
+
+            $statusRows = $this->parseRumahStatus($statusHtml);
+            $matched = $this->matchOnuRow($statusRows, $username, $callerId);
+
+            if (!$matched) {
+                continue;
+            }
+
+            // The optical page is a normal form at /action/pononuopticalinfo.html.
+            // It uses "pon" and "onu_group" instead of the KUWU parameters.
+            // GET already renders the current optical table, then POST selects the PON/group.
+            $opticalHtml = $this->requestPage($client, $jar, $opticalUrl, [
+                'pon' => (string) $pon,
+                'onu_group' => '0',
+                'who' => '100',
+                'onuid' => '0',
+            ], $opticalUrl);
+
+            $opticalRows = $this->parseRumahOptical($opticalHtml);
+            $optical = $this->findOpmRow($opticalRows, $matched, $callerId);
+
+            Log::info('OLT RUMAH ONU cocok.', [
+                'pon' => $pon,
+                'onu' => $matched['onu'],
+                'description' => $matched['description'],
+                'status' => $matched['status'],
+                'optical_rows' => count($opticalRows),
+                'rx_power' => $optical['rx_power'] ?? null,
+                'tx_power' => $optical['tx_power'] ?? null,
+                'last_deregister_reason' => $matched['last_deregister_reason'] ?? null,
+            ]);
+
+            return [
+                'pon' => $pon,
+                'onu' => $matched['onu'],
+                'status' => $matched['status'],
+                'mac' => null,
+                'description' => $matched['description'],
+                'distance' => null,
+                'last_deregister_reason' => $matched['last_deregister_reason'],
+                'temperature' => null,
+                'voltage' => null,
+                'tx_bias' => null,
+                'tx_power' => $optical['tx_power'] ?? null,
+                'rx_power' => $optical['rx_power'] ?? null,
+            ];
+        }
+
+        Log::warning('OLT RUMAH ONU tidak ditemukan.', [
+            'username' => $username,
+            'caller_id' => $callerId,
+        ]);
+
+        return null;
+    }
+
+    protected function parseRumahStatus(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 9) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'status' => $cells[3] ?? '-',
+                'mac' => '',
+                'description' => $cells[4] ?? '',
+                'distance' => null,
+                'last_deregister_reason' => $cells[7] ?? '-',
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function parseRumahOptical(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 5) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'mac' => '',
+                'description' => $cells[1] ?? '',
+                'distance' => null,
+                'temperature' => null,
+                'voltage' => null,
+                'tx_bias' => null,
+                'tx_power' => $cells[3] ?? null,
+                'rx_power' => $cells[2] ?? null,
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function findViaPython(array $config, string $username, ?string $callerId): ?array
+    {
+        $script = base_path('scripts/olt_kuwu.py');
+
+        if (!is_file($script)) {
+            Log::warning('Script OLT KUWU tidak ditemukan.', ['script' => $script]);
+            return null;
+        }
+
+        $payload = base64_encode(json_encode([
+            'base_url' => rtrim((string) ($config['base_url'] ?? ''), '/'),
+            'username' => (string) ($config['username'] ?? ''),
+            'password' => (string) ($config['password'] ?? ''),
+            'target_username' => $username,
+            'caller_id' => $callerId,
+        ], JSON_UNESCAPED_SLASHES));
+
+        $python = trim((string) env('OLT_PYTHON', 'py'));
+        $command = $python . ' ' . escapeshellarg($script) . ' ' . escapeshellarg($payload);
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = proc_open($command, $descriptor, $pipes, base_path());
+        if (!is_resource($process)) {
+            Log::warning('Python OLT KUWU tidak dapat dijalankan.');
+            return null;
+        }
+
+        fclose($pipes[0]);
+        $stdout = trim(stream_get_contents($pipes[1]));
+        $stderr = trim(stream_get_contents($pipes[2]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+
+        $result = json_decode($stdout, true);
+
+        if ($exitCode !== 0 || !is_array($result) || isset($result['error'])) {
+            Log::warning('Client Python OLT KUWU gagal.', [
+                'exit_code' => $exitCode,
+                'stderr' => $stderr,
+                'stdout' => $stdout,
+            ]);
+            return null;
+        }
+
+        Log::info('OLT KUWU terbaca melalui client Python.', [
+            'username' => $username,
+            'onu' => $result['onu'] ?? null,
+            'rx_power' => $result['rx_power'] ?? null,
+            'tx_power' => $result['tx_power'] ?? null,
+            'distance' => $result['distance'] ?? null,
+        ]);
+
+        return $result;
+    }
+
+    public function enabled(?Router $router = null): bool
+    {
+        $config = $router ? $this->configForRouter($router) : config('services.olt');
+
+        return (bool) config('services.olt.enabled', false)
+            && filled($config['base_url'] ?? null)
+            && filled($config['username'] ?? null)
+            && filled($config['password'] ?? null);
+    }
+
+    protected function configForRouter(Router $router): array
+    {
+        $global = config('services.olt', []);
+        $routers = config('services.olt.routers', []);
+
+        $key = strtoupper(trim((string) $router->nama_router));
+        $specific = is_array($routers[$key] ?? null) ? $routers[$key] : [];
+
+        return array_merge([
+            'base_url' => $global['base_url'] ?? null,
+            'username' => $global['username'] ?? null,
+            'password' => $global['password'] ?? null,
+        ], $specific);
+    }
+
+    protected function requestPage(Client $client, CookieJar $jar, string $url, array $data, string $referer): string
+    {
+        $response = $client->get($url, [
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+                'Referer' => $referer,
+            ],
+            'cookies' => $jar,
+        ]);
+
+        $html = mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
+
+        $sessionKey = $this->sessionKey($html);
+
+        if ($sessionKey !== '') {
+            $data['SessionKey'] = $sessionKey;
+        }
+
+        $response = $client->post($url, [
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+                'Referer' => $referer,
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+            'body' => http_build_query($data, '', '&'),
+            'cookies' => $jar,
+        ]);
+
+        return mb_convert_encoding((string) $response->getBody(), 'UTF-8', 'GB2312');
+    }
+
+    protected function sessionKey(string $html): string
+    {
+        $patterns = [
+            '/name=[\'\"]SessionKey[\'\"][^>]*value=[\'\"]([^\'\"]*)[\'\"]/i',
+            '/value=[\'\"]([^\'\"]*)[\'\"][^>]*name=[\'\"]SessionKey[\'\"]/i',
+            '/SessionKey\\.value\\s*=\\s*[\'\"]([^\'\"]+)[\'\"]/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $match)) {
+                return trim(html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
+        }
+
+        return '';
+    }
+
+    protected function parseStatus(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 5) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'status' => $cells[1],
+                'mac' => $cells[2],
+                'description' => $cells[3],
+                'distance' => $cells[4],
+                'last_deregister_reason' => $cells[8] ?? '-',
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function parseOpm(string $html): array
+    {
+        $rows = [];
+
+        preg_match_all('/<tr[^>]*>(.*?)<\/tr>/is', $html, $matches);
+
+        foreach ($matches[1] ?? [] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cells);
+
+            if (count($cells[1] ?? []) < 9) {
+                continue;
+            }
+
+            $cells = array_map(fn ($cell) => $this->clean($cell), $cells[1]);
+
+            if (!preg_match('/^(EPON|GPON)/i', $cells[0])) {
+                continue;
+            }
+
+            $rows[] = [
+                'onu' => $cells[0],
+                'mac' => $cells[1],
+                'description' => $cells[2],
+                'distance' => $cells[3],
+                'temperature' => $cells[4],
+                'voltage' => $cells[5],
+                'tx_bias' => $cells[6],
+                'tx_power' => $cells[7],
+                'rx_power' => $cells[8],
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function findOpmRow(array $rows, array $matchedRow, ?string $callerId): ?array
+    {
+        $targetOnu = strtoupper(trim((string) ($matchedRow['onu'] ?? '')));
+        $targetMac = $this->normalizeMac($callerId ?: ($matchedRow['mac'] ?? ''));
+        $targetDescription = trim((string) ($matchedRow['description'] ?? ''));
+
+        foreach ($rows as $row) {
+            $rowOnu = strtoupper(trim((string) ($row['onu'] ?? '')));
+            if ($targetOnu !== '' && $rowOnu === $targetOnu) {
+                return $row;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $rowMac = $this->normalizeMac($row['mac'] ?? '');
+            if ($targetMac !== '' && $rowMac !== '' && $targetMac === $rowMac) {
+                return $row;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $description = trim((string) ($row['description'] ?? ''));
+            if ($targetDescription !== '' && strcasecmp($description, $targetDescription) === 0) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    protected function matchOnuRow(array $rows, string $username, ?string $callerId): ?array
+    {
+        $target = trim($username);
+        $targetMac = $this->normalizeMac($callerId);
+
+        foreach ($rows as $row) {
+            $description = trim((string) ($row['description'] ?? ''));
+            $rowMac = $this->normalizeMac($row['mac'] ?? '');
+
+            if ($target !== '' && strcasecmp($description, $target) === 0) {
+                return $row;
+            }
+
+            if ($target !== '' && stripos($description, $target) !== false) {
+                return $row;
+            }
+
+            if ($targetMac !== '' && $rowMac !== '' && $targetMac === $rowMac) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeMac(?string $mac): string
+    {
+        return strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', (string) $mac) ?? '');
+    }
+
+    protected function clean(string $cell): string
+    {
+        $cell = strip_tags($cell);
+        $cell = html_entity_decode($cell, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $cell = preg_replace('/\s+/', ' ', $cell) ?? $cell;
+
+        return trim($cell);
+    }
+}
