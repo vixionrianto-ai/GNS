@@ -25,14 +25,22 @@ class OltEventController extends Controller
         }
 
         $validated = $request->validate([
-            'router_id' => ['required', 'integer', 'min:1'],
+            'router' => ['required', 'string', 'max:80'],
             'username' => ['required', 'string', 'max:191'],
             'event' => ['required', 'in:down,up'],
         ]);
 
+        $router = Router::query()
+            ->whereRaw('UPPER(nama_router) = ?', [mb_strtoupper(trim($validated['router']))])
+            ->first();
+
+        if (!$router) {
+            return response()->json(['ok' => false, 'message' => 'Router tidak ditemukan'], Response::HTTP_NOT_FOUND);
+        }
+
         $customer = Pelanggan::query()
             ->with('router')
-            ->where('router_id', $validated['router_id'])
+            ->where('router_id', $router->id)
             ->where('username_pppoe', $validated['username'])
             ->where('status', Pelanggan::AKTIF)
             ->first();
