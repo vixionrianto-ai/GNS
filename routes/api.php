@@ -12,6 +12,14 @@ use App\Http\Controllers\Api\TagihanController;
 use App\Http\Controllers\Api\RouterController;
 use App\Http\Controllers\Api\PaketController;
 use App\Http\Controllers\Api\WhatsAppLogController;
+use App\Http\Controllers\Api\OltEventController;
+
+/*
+|--------------------------------------------------------------------------
+| OLT event trigger from MikroTik (shared-token protected)
+|--------------------------------------------------------------------------
+*/
+Route::post('/olt/event', OltEventController::class)->middleware('throttle:30,1');
 
 /*
 |--------------------------------------------------------------------------
