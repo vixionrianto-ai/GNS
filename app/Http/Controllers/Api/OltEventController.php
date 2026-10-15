@@ -78,8 +78,11 @@ class OltEventController extends Controller
 
         $state = OltOnuState::query()->where('pelanggan_id', $customer->id)->first();
         $oldStatus = $state?->status;
-        $shouldNotify = ($status === 'offline' && $oldStatus !== 'offline')
-            || ($status === 'online' && $oldStatus === 'offline' && $validated['event'] === 'up');
+
+        // First observation establishes a baseline; it must not trigger an alert.
+        // Notify only on a verified transition from a known opposite state.
+        $shouldNotify = ($oldStatus === 'online' && $status === 'offline')
+            || ($oldStatus === 'offline' && $status === 'online' && $validated['event'] === 'up');
 
         $snapshot = [
             'router_id' => $router->id,
