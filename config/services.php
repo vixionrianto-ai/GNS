@@ -45,7 +45,7 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
     ],
 
-    'olt' => [
+    'olt_event' => [\n        'token' => env('OLT_EVENT_TOKEN'),\n    ],\n\n    'olt' => [
         'enabled' => env('OLT_ENABLED', false),
         'base_url' => env('OLT_BASE_URL'),
         'username' => env('OLT_USERNAME'),
