@@ -19,9 +19,6 @@ Schedule::command('isolation:check --run')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('olt:monitor')
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->runInBackground();
+// OLT is event-triggered by MikroTik; do not poll the OLT on a fixed schedule.
 
 Schedule::command('wa:reminder')    ->dailyAt((string) Setting::value('whatsapp.send_time', '08:00'))    ->withoutOverlapping()    ->runInBackground();
