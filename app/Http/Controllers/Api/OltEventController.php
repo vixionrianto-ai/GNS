@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessOltDisconnect;
 use App\Models\OltOnuState;
 use App\Models\Pelanggan;
 use App\Models\Router;
@@ -38,6 +39,11 @@ class OltEventController extends Controller
             return response()->json(['ok' => false, 'message' => 'Router tidak ditemukan'], Response::HTTP_NOT_FOUND);
         }
 
+        // Pemicu tahap ini memang khusus MikroTik KUWU. Router lain tidak disentuh.
+        if (strtoupper(trim((string) $router->nama_router)) !== 'KUWU') {
+            return response()->json(['ok' => false, 'message' => 'Event OLT hanya diizinkan untuk router KUWU'], Response::HTTP_FORBIDDEN);
+        }
+
         $customer = Pelanggan::query()
             ->with('router')
             ->where('router_id', $router->id)
@@ -49,17 +55,35 @@ class OltEventController extends Controller
             return response()->json(['ok' => false, 'message' => 'Pelanggan aktif tidak ditemukan'], Response::HTTP_NOT_FOUND);
         }
 
-        $router = $customer->router;
+        // Event down hanya masuk antrean. Pemeriksaan ONU dilakukan setelah jeda 30 detik.
+        if ($validated['event'] === 'down') {
+            ProcessOltDisconnect::dispatch((int) $customer->id)
+                ->delay(now()->addSeconds(30));
 
+            Log::info('Event OLT KUWU down masuk antrean.', [
+                'pelanggan_id' => $customer->id,
+                'username' => $customer->username_pppoe,
+                'delay_seconds' => 30,
+            ]);
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Event disconnect masuk antrean.',
+                'customer' => $customer->nama,
+                'event' => 'down',
+                'delay_seconds' => 30,
+            ], Response::HTTP_ACCEPTED);
+        }
+
+        // Event up diverifikasi ke OLT sebelum status dan notifikasi pemulihan diperbarui.
         try {
             $onu = $oltService->findByUsername(
-                $router,
+                $customer->router,
                 (string) $customer->username_pppoe,
                 $customer->mac_address
             );
         } catch (Throwable $e) {
-            Log::error('Pemicu event OLT gagal membaca ONU.', [
-                'router' => $router->nama_router,
+            Log::error('Pemicu event OLT KUWU gagal membaca ONU.', [
                 'pelanggan_id' => $customer->id,
                 'error' => $e->getMessage(),
             ]);
@@ -67,26 +91,31 @@ class OltEventController extends Controller
             return response()->json(['ok' => false, 'message' => 'Pembacaan OLT gagal'], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        if (!is_array($onu) || !isset($onu['status'])) {
-            return response()->json(['ok' => false, 'message' => 'Status ONU tidak berhasil dibaca; notifikasi dilewati'], Response::HTTP_SERVICE_UNAVAILABLE);
+        if (!is_array($onu) || !isset($onu['status']) || empty($onu['onu'])) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Data ONU tidak berhasil dibaca; status tidak diubah.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         $status = $this->normalizeStatus((string) $onu['status']);
         if ($status === null) {
-            return response()->json(['ok' => false, 'message' => 'Status ONU tidak dikenal; notifikasi dilewati'], Response::HTTP_SERVICE_UNAVAILABLE);
+            return response()->json([
+                'ok' => false,
+                'message' => 'Status ONU tidak dikenal; status tidak diubah.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        $state = OltOnuState::query()->where('pelanggan_id', $customer->id)->first();
-        $oldStatus = $state?->status;
+        $state = OltOnuState::query()
+            ->where('pelanggan_id', $customer->id)
+            ->first();
 
-        // First observation establishes a baseline; it must not trigger an alert.
-        // Notify only on a verified transition from a known opposite state.
-        $shouldNotify = ($oldStatus === 'online' && $status === 'offline')
-            || ($oldStatus === 'offline' && $status === 'online' && $validated['event'] === 'up');
+        $oldStatus = $state?->status;
+        $shouldNotify = $oldStatus === 'offline' && $status === 'online';
 
         $snapshot = [
-            'router_id' => $router->id,
-            'onu' => $onu['onu'] ?? null,
+            'router_id' => $customer->router->id,
+            'onu' => $onu['onu'],
             'status' => $status,
             'distance' => $this->displayValue($onu['distance'] ?? null),
             'rx_power' => $this->displayValue($onu['rx_power'] ?? null),
@@ -94,16 +123,30 @@ class OltEventController extends Controller
             'last_checked_at' => now(),
         ];
 
-        if ($shouldNotify && !$this->sendTelegram($customer, (string) $router->nama_router, $snapshot)) {
-            return response()->json(['ok' => false, 'message' => 'Status terbaca tetapi Telegram gagal dikirim'], Response::HTTP_BAD_GATEWAY);
+        if ($shouldNotify && !$this->sendTelegram($customer, (string) $customer->router->nama_router, $snapshot)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Status ONU online, tetapi Telegram gagal dikirim.',
+            ], Response::HTTP_BAD_GATEWAY);
         }
 
-        OltOnuState::query()->updateOrCreate(['pelanggan_id' => $customer->id], $snapshot);
+        OltOnuState::query()->updateOrCreate(
+            ['pelanggan_id' => $customer->id],
+            $snapshot
+        );
+
+        Log::info('Event OLT KUWU up selesai diproses.', [
+            'pelanggan_id' => $customer->id,
+            'username' => $customer->username_pppoe,
+            'previous_status' => $oldStatus,
+            'onu_status' => $status,
+            'notified' => $shouldNotify,
+        ]);
 
         return response()->json([
             'ok' => true,
             'customer' => $customer->nama,
-            'event' => $validated['event'],
+            'event' => 'up',
             'onu_status' => $status,
             'notified' => $shouldNotify,
         ]);
@@ -133,19 +176,18 @@ class OltEventController extends Controller
         if (!(bool) config('services.telegram.enabled')
             || !filled(config('services.telegram.bot_token'))
             || !filled(config('services.telegram.chat_id'))) {
-            Log::warning('Notifikasi event OLT tidak dikirim karena konfigurasi Telegram belum lengkap.');
+            Log::warning('Notifikasi pemulihan OLT tidak dikirim karena konfigurasi Telegram belum lengkap.');
             return false;
         }
 
-        $offline = $snapshot['status'] === 'offline';
         $lines = [
-            $offline ? '🔴 <b>PELANGGAN OLT PUTUS</b>' : '🟢 <b>ONU ONLINE KEMBALI</b>',
+            '🟢 <b>ONU ONLINE KEMBALI</b>',
             '<b>Pelanggan:</b> ' . $this->escape((string) $customer->nama),
             '<b>Kode:</b> ' . $this->escape((string) ($customer->kode_pelanggan ?? '-')),
             '<b>Router:</b> ' . $this->escape($routerName),
             '<b>Username:</b> ' . $this->escape((string) $customer->username_pppoe),
             '<b>ONU:</b> ' . $this->escape((string) ($snapshot['onu'] ?? '-')),
-            '<b>Status ONU:</b> ' . strtoupper($this->escape((string) $snapshot['status'])),
+            '<b>Status ONU:</b> ONLINE',
         ];
 
         if ($snapshot['distance'] !== null) {
@@ -159,7 +201,8 @@ class OltEventController extends Controller
         }
 
         if (is_numeric($customer->latitude) && is_numeric($customer->longitude)) {
-            $url = 'https://www.google.com/maps?q=' . rawurlencode((string) $customer->latitude . ',' . (string) $customer->longitude);
+            $url = 'https://www.google.com/maps?q=' .
+                rawurlencode((string) $customer->latitude . ',' . (string) $customer->longitude);
             $lines[] = '<a href="' . $this->escape($url) . '">📍 Buka lokasi pelanggan</a>';
         }
 
@@ -175,7 +218,7 @@ class OltEventController extends Controller
             );
 
             if (!$response->successful() || !$response->json('ok')) {
-                Log::warning('Telegram gagal mengirim event OLT.', [
+                Log::warning('Telegram gagal mengirim notifikasi pemulihan OLT KUWU.', [
                     'http_status' => $response->status(),
                     'response' => $response->json(),
                 ]);
@@ -184,7 +227,9 @@ class OltEventController extends Controller
 
             return true;
         } catch (Throwable $e) {
-            Log::error('Koneksi Telegram gagal pada event OLT.', ['error' => $e->getMessage()]);
+            Log::error('Koneksi Telegram gagal pada pemulihan OLT KUWU.', [
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
     }
@@ -192,7 +237,6 @@ class OltEventController extends Controller
     private function displayValue(mixed $value): ?string
     {
         $value = trim((string) $value);
-
         return $value === '' || $value === '-' ? null : $value;
     }
 
