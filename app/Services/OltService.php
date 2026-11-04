@@ -38,12 +38,19 @@ class OltService
             // lanjutkan ke implementasi HTTP PHP di bawah, bukan langsung menggagalkan lookup.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
                 $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
-                if ($pythonResult !== null) {
+
+                if (
+                    is_array($pythonResult)
+                    && empty($pythonResult['error'])
+                    && empty($pythonResult['not_found'])
+                    && !empty($pythonResult['onu'])
+                ) {
                     return $pythonResult;
                 }
 
-                Log::warning('Client Python OLT KUWU tidak menghasilkan data; mencoba HTTP PHP fallback.', [
+                Log::warning('Client Python OLT KUWU tidak menghasilkan data yang cocok; mencoba HTTP PHP fallback.', [
                     'username' => $username,
+                    'not_found' => is_array($pythonResult) ? (bool) ($pythonResult['not_found'] ?? false) : null,
                 ]);
             }
 
@@ -439,9 +446,19 @@ class OltService
             return null;
         }
 
+        if (!empty($result['not_found']) || empty($result['onu'])) {
+            Log::notice('Client Python OLT KUWU berjalan tetapi ONU target tidak ditemukan.', [
+                'username' => $username,
+                'total_rows' => $result['total_rows'] ?? null,
+                'not_found' => (bool) ($result['not_found'] ?? false),
+            ]);
+
+            return $result;
+        }
+
         Log::info('OLT KUWU terbaca melalui client Python.', [
             'username' => $username,
-            'onu' => $result['onu'] ?? null,
+            'onu' => $result['onu'],
             'rx_power' => $result['rx_power'] ?? null,
             'tx_power' => $result['tx_power'] ?? null,
             'distance' => $result['distance'] ?? null,
