@@ -397,7 +397,21 @@ class OltService
         return $rows;
     }
 
-    protected function findViaPython(array $config, string $username, ?string $callerId): ?array
+    /** Ambil seluruh ONU KUWU dalam satu sesi untuk memperbarui baseline. */
+    public function getAllKuwuOnus(Router $router): array
+    {
+        if (strtoupper(trim((string) $router->nama_router)) !== 'KUWU' || !$this->enabled($router)) {
+            return [];
+        }
+
+        $result = $this->findViaPython($this->configForRouter($router), '', null, true);
+
+        return is_array($result) && isset($result['onus']) && is_array($result['onus'])
+            ? $result['onus']
+            : [];
+    }
+
+    protected function findViaPython(array $config, string $username, ?string $callerId, bool $allOnus = false): ?array
     {
         $script = base_path('scripts/olt_kuwu.py');
 
@@ -412,6 +426,7 @@ class OltService
             'password' => (string) ($config['password'] ?? ''),
             'target_username' => $username,
             'caller_id' => $callerId,
+            'all_onus' => $allOnus,
         ], JSON_UNESCAPED_SLASHES));
 
         $python = trim((string) env('OLT_PYTHON', 'py'));
@@ -444,6 +459,15 @@ class OltService
                 'stdout' => $stdout,
             ]);
             return null;
+        }
+
+        if ($allOnus) {
+            if (!isset($result['onus']) || !is_array($result['onus'])) {
+                Log::warning('Client Python KUWU tidak mengembalikan daftar ONU.');
+                return null;
+            }
+
+            return $result;
         }
 
         if (!empty($result['not_found']) || empty($result['onu'])) {
