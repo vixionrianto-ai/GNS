@@ -92,14 +92,14 @@ class ProcessOltDisconnect implements ShouldQueue
 
             // Event down adalah pemicu pembacaan OLT. Tidak perlu baseline polling.
             // Kirim alarm hanya saat status belum tercatat offline agar event berulang tidak spam.
+            $notified = false;
+
             if ($state?->status !== 'offline') {
                 if (!$this->sendTelegram($customer, $snapshot)) {
                     throw new RuntimeException('Telegram gagal mengirim notifikasi OLT KUWU.');
                 }
-            }
 
-            if (!$this->sendTelegram($customer, $snapshot)) {
-                throw new RuntimeException('Telegram gagal mengirim notifikasi OLT KUWU.');
+                $notified = true;
             }
 
             OltOnuState::updateOrCreate(
@@ -107,10 +107,11 @@ class ProcessOltDisconnect implements ShouldQueue
                 $snapshot
             );
 
-            Log::info('Notifikasi OLT KUWU berhasil dikirim.', [
+            Log::info('Event OLT KUWU selesai diproses.', [
                 'pelanggan_id' => $customer->id,
                 'username' => $customer->username_pppoe,
                 'onu' => $snapshot['onu'],
+                'notified' => $notified,
             ]);
         } catch (Throwable $e) {
             Log::warning('Job OLT KUWU gagal; antrean akan mencoba ulang bila kesempatan masih tersedia.', [
