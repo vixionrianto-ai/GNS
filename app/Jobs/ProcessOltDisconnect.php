@@ -90,25 +90,12 @@ class ProcessOltDisconnect implements ShouldQueue
                 return;
             }
 
-            // Baseline online harus masih segar. Data lama tidak boleh memicu alarm palsu.
-            $baselineIsFresh = $state?->last_checked_at
-                && $state->last_checked_at->greaterThanOrEqualTo(now()->subMinutes(5));
-
-            if ($state?->status !== 'online' || !$baselineIsFresh) {
-                // Tandai unknown agar event up berikutnya tidak mengirim alarm pemulihan palsu.
-                $snapshot['status'] = 'unknown';
-
-                OltOnuState::updateOrCreate(
-                    ['pelanggan_id' => $customer->id],
-                    $snapshot
-                );
-
-                Log::info('Job OLT KUWU: baseline tidak valid/terlalu lama; alarm dilewati.', [
-                    'pelanggan_id' => $customer->id,
-                    'previous_status' => $state?->status,
-                    'baseline_checked_at' => $state?->last_checked_at,
-                ]);
-                return;
+            // Event down adalah pemicu pembacaan OLT. Tidak perlu baseline polling.
+            // Kirim alarm hanya saat status belum tercatat offline agar event berulang tidak spam.
+            if ($state?->status !== 'offline') {
+                if (!$this->sendTelegram($customer, $snapshot)) {
+                    throw new RuntimeException('Telegram gagal mengirim notifikasi OLT KUWU.');
+                }
             }
 
             if (!$this->sendTelegram($customer, $snapshot)) {
