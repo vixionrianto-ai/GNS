@@ -90,16 +90,23 @@ class ProcessOltDisconnect implements ShouldQueue
                 return;
             }
 
-            // Hanya transisi dari status online yang tercatat menjadi offline yang memberi alarm.
-            if ($state?->status !== 'online') {
+            // Baseline online harus masih segar. Data lama tidak boleh memicu alarm palsu.
+            $baselineIsFresh = $state?->last_checked_at
+                && $state->last_checked_at->greaterThanOrEqualTo(now()->subMinutes(5));
+
+            if ($state?->status !== 'online' || !$baselineIsFresh) {
+                // Tandai unknown agar event up berikutnya tidak mengirim alarm pemulihan palsu.
+                $snapshot['status'] = 'unknown';
+
                 OltOnuState::updateOrCreate(
                     ['pelanggan_id' => $customer->id],
                     $snapshot
                 );
 
-                Log::info('Job OLT KUWU: baseline offline diperbarui tanpa notifikasi.', [
+                Log::info('Job OLT KUWU: baseline tidak valid/terlalu lama; alarm dilewati.', [
                     'pelanggan_id' => $customer->id,
                     'previous_status' => $state?->status,
+                    'baseline_checked_at' => $state?->last_checked_at,
                 ]);
                 return;
             }
