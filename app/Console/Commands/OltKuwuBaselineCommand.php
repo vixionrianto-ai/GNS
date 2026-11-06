@@ -1,13 +1,13 @@
 <?php
 
-namespace App\\Console\\Commands;
+namespace App\Console\Commands;
 
-use App\\Models\\OltOnuState;
-use App\\Models\\Pelanggan;
-use App\\Models\\Router;
-use App\\Services\\OltService;
-use Illuminate\\Console\\Command;
-use Illuminate\\Support\\Facades\\Log;
+use App\Models\OltOnuState;
+use App\Models\Pelanggan;
+use App\Models\Router;
+use App\Services\OltService;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class OltKuwuBaselineCommand extends Command
