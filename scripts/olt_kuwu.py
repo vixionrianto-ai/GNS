@@ -81,12 +81,14 @@ def main():
         password = payload["password"]
         target_username = payload.get("target_username", "")
         caller_id = payload.get("caller_id", "")
+        all_onus = bool(payload.get("all_onus", False))
     else:
         BASE = "http://lamongan.gopal.my.id:725"
         username = input("Username OLT: ")
         password = getpass.getpass("Password OLT: ")
         target_username = ""
         caller_id = ""
+        all_onus = False
 
     LOGIN_URL = BASE + "/action/main.html"
     STATUS_URL = BASE + "/action/onustatusinfo.html"
@@ -205,6 +207,10 @@ def main():
                 f"OPM: {len(opm_data)} | "
                 f"Gabungan: {len(status_data)}"
             )
+
+    if bridge_mode and all_onus:
+        print(json.dumps({"onus": semua, "total_rows": len(semua)}, ensure_ascii=False))
+        return
 
     if bridge_mode:
         target = (target_username or "").strip().lower()
