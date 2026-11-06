@@ -19,9 +19,4 @@ Schedule::command('isolation:check --run')
     ->withoutOverlapping()
     ->runInBackground();
 
-// KUWU-only baseline refresh: one OLT session for all PONs, no Telegram notifications.
-Schedule::command('olt:kuwu-baseline')
-    ->everyMinute()
-    ->withoutOverlapping();
-
 Schedule::command('wa:reminder')    ->dailyAt((string) Setting::value('whatsapp.send_time', '08:00'))    ->withoutOverlapping()    ->runInBackground();
