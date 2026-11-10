@@ -34,24 +34,10 @@ class OltService
         }
 
         try {
-            // Coba client Python KUWU jika tersedia. Bila script/runtime tidak tersedia,
-            // lanjutkan ke implementasi HTTP PHP di bawah, bukan langsung menggagalkan lookup.
+            // KUWU menggunakan sesi HTTP khusus. Setiap kegagalan scan akan
+            // membuat sesi dan login baru, bukan mengulang request pada sesi basi.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
-                $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
-
-                if (
-                    is_array($pythonResult)
-                    && empty($pythonResult['error'])
-                    && empty($pythonResult['not_found'])
-                    && !empty($pythonResult['onu'])
-                ) {
-                    return $pythonResult;
-                }
-
-                Log::warning('Client Python OLT KUWU tidak menghasilkan data yang cocok; mencoba HTTP PHP fallback.', [
-                    'username' => $username,
-                    'not_found' => is_array($pythonResult) ? (bool) ($pythonResult['not_found'] ?? false) : null,
-                ]);
+                return $this->findKuwuHttp($oltConfig, $username, $callerId);
             }
 
             // RUMAH memakai OLT GPON V1600GS-F.
@@ -219,6 +205,166 @@ class OltService
                 'error' => $e->getMessage(),
             ]);
         }
+
+        return null;
+    }
+
+    /**
+     * Lookup khusus OLT EPON KUWU.
+     *
+     * Setiap percobaan memakai CookieJar dan login baru. Ini penting karena
+     * OLT kadang mengembalikan HTTP 200 berisi halaman kosong/login meskipun
+     * sesi sebelumnya sudah tidak berlaku.
+     */
+    protected function findKuwuHttp(array $config, string $username, ?string $callerId): ?array
+    {
+        $base = rtrim((string) ($config['base_url'] ?? ''), '/');
+        $loginPage = $base . '/action/login.html';
+        $loginUrl = $base . '/action/main.html';
+        $statusUrl = $base . '/action/onustatusinfo.html';
+        $opmUrl = $base . '/action/onuopmdiag.html';
+
+        $headers = [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152',
+        ];
+
+        for ($sessionAttempt = 1; $sessionAttempt <= 3; $sessionAttempt++) {
+            $jar = new CookieJar();
+            $client = new Client([
+                'timeout' => (float) config('services.olt.timeout', 10),
+                'connect_timeout' => (float) config('services.olt.timeout', 10),
+                'http_errors' => false,
+                'verify' => false,
+                'cookies' => $jar,
+            ]);
+
+            try {
+                $loginPageResponse = $client->get($loginPage, ['headers' => $headers]);
+                $loginResponse = $client->post($loginUrl, [
+                    'headers' => $headers + [
+                        'Content-Type' => 'application/x-www-form-urlencoded',
+                        'Referer' => $loginPage,
+                    ],
+                    'form_params' => [
+                        'user' => (string) ($config['username'] ?? ''),
+                        'pass' => (string) ($config['password'] ?? ''),
+                        'button' => 'login',
+                        'who' => '100',
+                    ],
+                ]);
+
+                Log::info('OLT KUWU sesi login dibuat.', [
+                    'attempt' => $sessionAttempt,
+                    'login_page_status' => $loginPageResponse->getStatusCode(),
+                    'login_status' => $loginResponse->getStatusCode(),
+                ]);
+
+                $totalStatusRows = 0;
+
+                for ($pon = 1; $pon <= 4; $pon++) {
+                    $statusHtml = $this->requestPage($client, $jar, $statusUrl, [
+                        'select' => (string) $pon,
+                        'searchMac' => '',
+                        'searchDescription' => '',
+                        'who' => '100',
+                    ], $statusUrl);
+
+                    $statusRows = $this->parseStatus($statusHtml);
+                    $totalStatusRows += count($statusRows);
+
+                    Log::info('OLT KUWU status PON dibaca.', [
+                        'attempt' => $sessionAttempt,
+                        'pon' => $pon,
+                        'rows' => count($statusRows),
+                        'target' => $username,
+                    ]);
+
+                    $matchedRow = $this->matchOnuRow($statusRows, $username, $callerId);
+
+                    if (!$matchedRow) {
+                        $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                            'select' => (string) $pon,
+                            'searchMac' => '',
+                            'searchDescription' => '',
+                            'who' => '100',
+                        ], $opmUrl);
+
+                        $opmRows = $this->parseOpm($opmHtml);
+                        $matchedOpm = $this->matchOnuRow($opmRows, $username, $callerId);
+
+                        if ($matchedOpm) {
+                            $matchedRow = [
+                                'onu' => $matchedOpm['onu'],
+                                'status' => 'Unknown',
+                                'mac' => $matchedOpm['mac'] ?? '',
+                                'description' => $matchedOpm['description'] ?? '',
+                                'distance' => $matchedOpm['distance'] ?? '-',
+                                'last_deregister_reason' => '-',
+                            ];
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        $opmHtml = $this->requestPage($client, $jar, $opmUrl, [
+                            'select' => (string) $pon,
+                            'searchMac' => '',
+                            'searchDescription' => '',
+                            'who' => '100',
+                        ], $opmUrl);
+
+                        $opmRows = $this->parseOpm($opmHtml);
+                    }
+
+                    $opm = $this->findOpmRow($opmRows, $matchedRow, $callerId);
+
+                    Log::info('OLT KUWU ONU cocok.', [
+                        'attempt' => $sessionAttempt,
+                        'pon' => $pon,
+                        'onu' => $matchedRow['onu'],
+                        'description' => $matchedRow['description'],
+                        'status' => $matchedRow['status'],
+                        'rx_power' => $opm['rx_power'] ?? null,
+                        'tx_power' => $opm['tx_power'] ?? null,
+                        'distance' => $matchedRow['distance'] ?? null,
+                    ]);
+
+                    return [
+                        'onu' => $matchedRow['onu'],
+                        'status' => $matchedRow['status'],
+                        'mac' => $matchedRow['mac'],
+                        'description' => $matchedRow['description'],
+                        'distance' => $matchedRow['distance'],
+                        'last_deregister_reason' => $matchedRow['last_deregister_reason'],
+                        'temperature' => $opm['temperature'] ?? null,
+                        'voltage' => $opm['voltage'] ?? null,
+                        'tx_bias' => $opm['tx_bias'] ?? null,
+                        'tx_power' => $opm['tx_power'] ?? null,
+                        'rx_power' => $opm['rx_power'] ?? null,
+                    ];
+                }
+
+                Log::warning('OLT KUWU target ONU belum ditemukan pada sesi ini.', [
+                    'attempt' => $sessionAttempt,
+                    'username' => $username,
+                    'status_rows_total' => $totalStatusRows,
+                ]);
+            } catch (Throwable $e) {
+                Log::warning('Sesi OLT KUWU gagal; akan login ulang.', [
+                    'attempt' => $sessionAttempt,
+                    'username' => $username,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            if ($sessionAttempt < 3) {
+                usleep(750000);
+            }
+        }
+
+        Log::error('OLT KUWU gagal menemukan ONU setelah 3 sesi login baru.', [
+            'username' => $username,
+            'caller_id' => $callerId,
+        ]);
 
         return null;
     }
