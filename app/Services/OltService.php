@@ -34,9 +34,28 @@ class OltService
         }
 
         try {
-            // KUWU menggunakan sesi HTTP khusus. Setiap kegagalan scan akan
-            // membuat sesi dan login baru, bukan mengulang request pada sesi basi.
+            // KUWU: pertahankan mekanisme pembacaan lama yang sudah pernah berhasil
+            // (client Python), lalu gunakan HTTP PHP sebagai fallback jika runtime/
+            // script Python tidak tersedia atau tidak menghasilkan ONU target.
             if (strtoupper(trim((string) $router->nama_router)) === 'KUWU') {
+                $pythonResult = $this->findViaPython($oltConfig, $username, $callerId);
+
+                if (
+                    is_array($pythonResult)
+                    && empty($pythonResult['error'])
+                    && empty($pythonResult['not_found'])
+                    && !empty($pythonResult['onu'])
+                ) {
+                    return $pythonResult;
+                }
+
+                Log::warning('Client Python KUWU tidak menghasilkan ONU; lanjutkan ke HTTP PHP fallback.', [
+                    'username' => $username,
+                    'not_found' => is_array($pythonResult)
+                        ? (bool) ($pythonResult['not_found'] ?? false)
+                        : null,
+                ]);
+
                 return $this->findKuwuHttp($oltConfig, $username, $callerId);
             }
 
