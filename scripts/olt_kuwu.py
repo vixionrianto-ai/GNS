@@ -125,15 +125,22 @@ def main():
     login_data = urllib.parse.urlencode({
         "user": username,
         "pass": password,
-        "button": "login",
+        "button": "Login",
         "who": "100",
     }).encode()
 
-    ambil_html(
+    html_login = ambil_html(
         LOGIN_URL,
         data=login_data,
         referer=BASE + "/action/login.html"
     )
+
+    # Pastikan OLT benar-benar mengembalikan halaman utama, bukan pesan penolakan.
+    login_lower = html_login.lower()
+    if "sorry, you do not have access" in login_lower or "login.html" in login_lower and "olt web management interface" not in login_lower:
+        raise RuntimeError("Login OLT ditolak. Periksa akun, password, dan hak akses.")
+    if "olt web management interface" not in login_lower and 'id="menu"' not in login_lower:
+        raise RuntimeError("Respons login OLT tidak dikenali; pembacaan ONU dibatalkan.")
 
     if not bridge_mode:
         print("Login OK")
