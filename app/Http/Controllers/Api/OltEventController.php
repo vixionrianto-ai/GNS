@@ -1,17 +1,17 @@
 <?php
 
-namespace App\\Http\\Controllers\\Api;
+namespace App\Http\Controllers\Api;
 
-use App\\Http\\Controllers\\Controller;
-use App\\Jobs\\ProcessOltDisconnect;
-use App\\Jobs\\ProcessOltRecovery;
-use App\\Models\\Pelanggan;
-use App\\Models\\Router;
-use Illuminate\\Http\\Request;
-use Illuminate\\Support\\Facades\\Cache;
-use Illuminate\\Support\\Facades\\Log;
-use Illuminate\\Support\\Str;
-use Symfony\\Component\\HttpFoundation\\Response;
+use App\Http\Controllers\Controller;
+use App\Jobs\ProcessOltDisconnect;
+use App\Jobs\ProcessOltRecovery;
+use App\Models\Pelanggan;
+use App\Models\Router;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 
 class OltEventController extends Controller
 {
