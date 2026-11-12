@@ -33,8 +33,10 @@ class ProcessOltRecovery implements ShouldQueue
         $lock->block(10);
 
         try {
+            $pendingKey = 'olt:kuwu:pending-down:' . $this->pelangganId;
             $notifiedKey = 'olt:kuwu:down-notified:' . $this->pelangganId;
-            if (!Cache::has($notifiedKey)) {
+            // Jika DOWN baru sudah datang, jangan kirim pesan recovery dari event UP sebelumnya.
+            if (Cache::has($pendingKey) || !Cache::has($notifiedKey)) {
                 return;
             }
 
