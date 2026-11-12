@@ -15,6 +15,11 @@ if ! git remote get-url origin >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! docker exec gns-php php -v >/dev/null 2>&1; then
+  echo "ERROR: container gns-php tidak berjalan atau PHP tidak tersedia."
+  exit 1
+fi
+
 echo "==> Mengambil branch patch dari GitHub..."
 git fetch origin "$BRANCH"
 
@@ -48,7 +53,7 @@ echo "==> Menyiapkan file dari branch $BRANCH..."
 for file in "${FILES[@]}"; do
   mkdir -p "$TMP/$(dirname "$file")"
   git show "origin/$BRANCH:$file" > "$TMP/$file"
-  php -l "$TMP/$file"
+  docker exec -i gns-php php -l < "$TMP/$file"
 done
 
 echo "==> Memasang tiga file KUWU..."
@@ -58,9 +63,9 @@ for file in "${FILES[@]}"; do
 done
 
 echo "==> Memeriksa file setelah dipasang..."
-if ! php -l "$ROOT/app/Http/Controllers/Api/OltEventController.php" ||
-   ! php -l "$ROOT/app/Jobs/ProcessOltDisconnect.php" ||
-   ! php -l "$ROOT/app/Jobs/ProcessOltRecovery.php"; then
+if ! docker exec -w /config/www gns-php php -l app/Http/Controllers/Api/OltEventController.php ||
+   ! docker exec -w /config/www gns-php php -l app/Jobs/ProcessOltDisconnect.php ||
+   ! docker exec -w /config/www gns-php php -l app/Jobs/ProcessOltRecovery.php; then
   echo "ERROR: pemeriksaan gagal. Mengembalikan backup..."
   for file in "${FILES[@]}"; do
     if [ -f "$BACKUP/$file" ]; then
