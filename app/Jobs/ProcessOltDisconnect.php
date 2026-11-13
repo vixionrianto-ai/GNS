@@ -117,7 +117,7 @@ class ProcessOltDisconnect implements ShouldQueue
         ];
 
         if (!empty($snapshot['last_checked_at'])) {
-            $checkedAt = $snapshot['last_checked_at'] instanceof \\DateTimeInterface
+            $checkedAt = $snapshot['last_checked_at'] instanceof \DateTimeInterface
                 ? $snapshot['last_checked_at']->format('d-m-Y H:i:s')
                 : (string) $snapshot['last_checked_at'];
             $lines[] = '<b>Data optik terakhir dibaca:</b> ' . $this->escape($checkedAt);
