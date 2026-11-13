@@ -55,6 +55,7 @@ FILES=(
   "app/Jobs/ProcessOltRecovery.php"
   "app/Services/OltMonitoringService.php"
   "app/Console/Commands/OltMonitorCommand.php"
+  "database/migrations/2026_11_13_000000_create_ppp_disconnect_events_table.php"
 )
 
 cleanup() { rm -rf "$TMP"; }
@@ -103,7 +104,21 @@ if ! docker exec -w /config/www gns-php php -l app/Http/Controllers/Api/OltEvent
   exit 1
 fi
 
+echo "==> Menjalankan migrasi pencatatan gangguan..."
+if ! docker exec -w /config/www gns-php php artisan migrate --force; then
+  echo "ERROR: migrasi gagal. Mengembalikan file aplikasi..."
+  for file in "${FILES[@]}"; do
+    if [ -f "$BACKUP/$file" ]; then
+      cp -a "$BACKUP/$file" "$ROOT/$file"
+    else
+      rm -f "$ROOT/$file"
+    fi
+  done
+  echo "ROLLBACK file selesai. Periksa status migrasi sebelum mencoba ulang."
+  exit 1
+fi
+
 echo
-echo "BERHASIL: lima file KUWU terpasang dan lolos php -l."
+echo "BERHASIL: patch KUWU dan migrasi pencatatan gangguan terpasang."
 echo "Backup lama: $BACKUP"
-echo "Belum ada container yang direstart."
+echo "Restart queue manual: docker restart gns-queue"
