@@ -80,7 +80,7 @@ for file in "${FILES[@]}"; do
   docker exec -i gns-php php -l < "$TMP/$file"
 done
 
-echo "==> Memasang lima file KUWU..."
+echo "==> Memasang file patch KUWU..."
 for file in "${FILES[@]}"; do
   mkdir -p "$ROOT/$(dirname "$file")"
   install -m 0644 "$TMP/$file" "$ROOT/$file"
