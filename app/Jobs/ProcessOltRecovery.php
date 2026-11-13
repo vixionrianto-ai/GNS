@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\OltOnuState;
 use App\Models\Pelanggan;
+use App\Services\OltService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,7 +30,7 @@ class ProcessOltRecovery implements ShouldQueue
 
     public function handle(): void
     {
-        $lock = Cache::lock('olt:kuwu:notify-lock:' . $this->pelangganId, 45);
+        $lock = Cache::lock('olt:kuwu:notify-lock:' . $this->pelangganId, 90);
         $lock->block(10);
 
         try {
