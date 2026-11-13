@@ -55,6 +55,7 @@ class ProcessOltRecovery implements ShouldQueue
                 'distance' => $state?->distance,
                 'rx_power' => $state?->rx_power,
                 'tx_power' => $state?->tx_power,
+                'last_checked_at' => $state?->last_checked_at,
             ])) {
                 throw new \RuntimeException('Telegram gagal mengirim notifikasi pemulihan PPP KUWU.');
             }
@@ -95,6 +96,13 @@ class ProcessOltRecovery implements ShouldQueue
             '<b>Status:</b> PPP CONNECTED',
             '<b>ONU terakhir tercatat:</b> ' . $this->escape((string) ($snapshot['onu'] ?: '-')),
         ];
+
+        if (!empty($snapshot['last_checked_at'])) {
+            $checkedAt = $snapshot['last_checked_at'] instanceof \\DateTimeInterface
+                ? $snapshot['last_checked_at']->format('d-m-Y H:i:s')
+                : (string) $snapshot['last_checked_at'];
+            $lines[] = '<b>Data optik terakhir dibaca:</b> ' . $this->escape($checkedAt);
+        }
 
         if (!empty($snapshot['distance'])) $lines[] = '<b>Jarak terakhir:</b> ' . $this->escape((string) $snapshot['distance']) . ' m';
         if (!empty($snapshot['rx_power'])) $lines[] = '<b>RX Power terakhir:</b> ' . $this->escape((string) $snapshot['rx_power']) . ' dBm';
