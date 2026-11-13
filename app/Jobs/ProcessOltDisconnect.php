@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\OltOnuState;
 use App\Models\Pelanggan;
+use App\Services\OltService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,7 +21,7 @@ class ProcessOltDisconnect implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 5;
-    public int $timeout = 30;
+    public int $timeout = 50;
     public array $backoff = [15, 30, 60];
 
     public function __construct(public int $pelangganId, public string $eventId)
@@ -30,7 +31,7 @@ class ProcessOltDisconnect implements ShouldQueue
 
     public function handle(): void
     {
-        $lock = Cache::lock('olt:kuwu:notify-lock:' . $this->pelangganId, 45);
+        $lock = Cache::lock('olt:kuwu:notify-lock:' . $this->pelangganId, 90);
         $lock->block(10);
 
         try {
@@ -50,7 +51,7 @@ class ProcessOltDisconnect implements ShouldQueue
                 return;
             }
 
-            $customer = Pelanggan::with('router')->find($this->pelangganId);
+            $customer = Pelanggan::with(['router', 'paket'])->find($this->pelangganId);
             if (!$customer || !$customer->router ||
                 strtoupper(trim((string) $customer->router->nama_router)) !== 'KUWU') {
                 Log::warning('Job DOWN dibatalkan: pelanggan bukan router KUWU.', [
@@ -59,15 +60,65 @@ class ProcessOltDisconnect implements ShouldQueue
                 return;
             }
 
-            // Snapshot ONU hanya untuk identitas/informasi terakhir. Tidak melakukan lookup OLT.
+            // Pada DOWN yang sudah bertahan 30 detik, coba baca OLT tepat satu kali.
+            // Ini berjalan di queue. Jika ONU sudah hilang, gunakan snapshot terakhir.
             $state = OltOnuState::where('pelanggan_id', $customer->id)->first();
             $snapshot = [
                 'onu' => $state?->onu,
+                'status' => null,
+                'last_deregister_reason' => null,
+                'olt_verified' => false,
                 'distance' => $state?->distance,
                 'rx_power' => $state?->rx_power,
                 'tx_power' => $state?->tx_power,
                 'last_checked_at' => $state?->last_checked_at,
             ];
+
+            if (strtoupper(trim((string) ($customer->paket?->profile_mikrotik ?? ''))) === 'C20') {
+                try {
+                    $olt = app(OltService::class)->findByUsername(
+                        $customer->router,
+                        (string) $customer->username_pppoe,
+                        $customer->mac_address
+                    );
+
+                    if (is_array($olt) && !empty($olt['onu'])) {
+                        $snapshot = array_merge($snapshot, [
+                            'onu' => $olt['onu'],
+                            'status' => $olt['status'] ?? 'Unknown',
+                            'last_deregister_reason' => $olt['last_deregister_reason'] ?? null,
+                            'olt_verified' => true,
+                            'distance' => $olt['distance'] ?? $snapshot['distance'],
+                            'rx_power' => $olt['rx_power'] ?? $snapshot['rx_power'],
+                            'tx_power' => $olt['tx_power'] ?? $snapshot['tx_power'],
+                            'last_checked_at' => now(),
+                        ]);
+
+                        OltOnuState::updateOrCreate(
+                            ['pelanggan_id' => $customer->id],
+                            [
+                                'router_id' => $customer->router_id,
+                                'onu' => $snapshot['onu'],
+                                'status' => $snapshot['status'],
+                                'distance' => $snapshot['distance'],
+                                'rx_power' => $snapshot['rx_power'],
+                                'tx_power' => $snapshot['tx_power'],
+                                'last_checked_at' => now(),
+                            ]
+                        );
+                    } else {
+                        Log::warning('ONU KUWU tidak ditemukan saat event PPP DOWN; memakai snapshot terakhir.', [
+                            'pelanggan_id' => $customer->id,
+                            'username' => $customer->username_pppoe,
+                        ]);
+                    }
+                } catch (Throwable $oltError) {
+                    Log::warning('Pembacaan OLT saat PPP DOWN gagal; memakai snapshot terakhir.', [
+                        'pelanggan_id' => $customer->id,
+                        'error' => $oltError->getMessage(),
+                    ]);
+                }
+            }
 
             if (!$this->sendTelegram($customer, $snapshot)) {
                 throw new RuntimeException('Telegram gagal mengirim notifikasi PPP KUWU terputus.');
@@ -112,8 +163,18 @@ class ProcessOltDisconnect implements ShouldQueue
             '<b>Router:</b> KUWU',
             '<b>Username:</b> ' . $this->escape((string) $customer->username_pppoe),
             '<b>Status:</b> PPP DISCONNECTED',
-            '<b>ONU terakhir tercatat:</b> ' . $this->escape((string) ($snapshot['onu'] ?: '-')),
-            '<i>Status OFFLINE optik belum diverifikasi ke OLT.</i>',
+            '<b>ONU:</b> ' . $this->escape((string) ($snapshot['onu'] ?: '-')),
+        ];
+
+        if (!empty($snapshot['olt_verified'])) {
+            $lines[] = '<b>Status ONU dari OLT:</b> ' . $this->escape((string) ($snapshot['status'] ?: 'Unknown'));
+            if (!empty($snapshot['last_deregister_reason']) && $snapshot['last_deregister_reason'] !== '-') {
+                $lines[] = '<b>Alasan deregister:</b> ' . $this->escape((string) $snapshot['last_deregister_reason']);
+            }
+        } else {
+            $lines[] = '<b>Status ONU:</b> Tidak ditemukan / tidak dapat diverifikasi saat pemeriksaan OLT';
+            $lines[] = '<i>LOS atau Wire Down belum dapat dipastikan.</i>';
+        }
         ];
 
         if (!empty($snapshot['last_checked_at'])) {
