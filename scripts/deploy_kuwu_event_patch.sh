@@ -20,6 +20,11 @@ if ! docker exec gns-php php -v >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Mengambil branch patch dari GitHub..."
+git fetch origin "$BRANCH"
+
+STAMP="$(date +%Y%m%d_%H%M%S)"
+BACKUP="$ROOT/storage/app/backups/kuwu-event-$STAMP"
 # Matikan hanya jadwal polling OLT; pertahankan seluruh jadwal produksi lainnya.
 ROUTES="$ROOT/routes/console.php"
 if [ ! -f "$ROUTES" ]; then
@@ -41,11 +46,6 @@ p.write_text(new)
 PY
 fi
 
-echo "==> Mengambil branch patch dari GitHub..."
-git fetch origin "$BRANCH"
-
-STAMP="$(date +%Y%m%d_%H%M%S)"
-BACKUP="$ROOT/storage/app/backups/kuwu-event-$STAMP"
 TMP="$(mktemp -d)"
 mkdir -p "$BACKUP"
 
