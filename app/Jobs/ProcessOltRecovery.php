@@ -19,7 +19,7 @@ class ProcessOltRecovery implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 5;
-    public int $timeout = 30;
+    public int $timeout = 50;
     public array $backoff = [15, 30, 60];
 
     public function __construct(public int $pelangganId)
@@ -35,17 +35,64 @@ class ProcessOltRecovery implements ShouldQueue
         try {
             $pendingKey = 'olt:kuwu:pending-down:' . $this->pelangganId;
             $notifiedKey = 'olt:kuwu:down-notified:' . $this->pelangganId;
-            // Jika DOWN baru sudah datang, jangan kirim pesan recovery dari event UP sebelumnya.
-            if (Cache::has($pendingKey) || !Cache::has($notifiedKey)) {
+            // Jika DOWN baru sudah datang, event UP yang lama tidak boleh memproses snapshot/pemulihan.
+            if (Cache::has($pendingKey)) {
                 return;
             }
 
-            $customer = Pelanggan::with('router')->find($this->pelangganId);
+            $customer = Pelanggan::with(['router', 'paket'])->find($this->pelangganId);
             if (!$customer || !$customer->router ||
                 strtoupper(trim((string) $customer->router->nama_router)) !== 'KUWU') {
                 Log::warning('Job recovery dibatalkan: pelanggan bukan router KUWU.', [
                     'pelanggan_id' => $this->pelangganId,
                 ]);
+                return;
+            }
+
+            // Refresh hanya saat event UP: ONU sedang online sehingga lebih mungkin terbaca.
+            // Pekerjaan ini berjalan di queue, bukan di HTTP request MikroTik.
+            if (strtoupper(trim((string) ($customer->paket?->profile_mikrotik ?? ''))) === 'C20') {
+                try {
+                    $olt = app(OltService::class)->findByUsername(
+                        $customer->router,
+                        (string) $customer->username_pppoe,
+                        $customer->mac_address
+                    );
+
+                    if (is_array($olt) && !empty($olt['onu'])) {
+                        OltOnuState::updateOrCreate(
+                            ['pelanggan_id' => $customer->id],
+                            [
+                                'router_id' => $customer->router_id,
+                                'onu' => $olt['onu'],
+                                'status' => $olt['status'] ?? 'Online',
+                                'distance' => $olt['distance'] ?? null,
+                                'rx_power' => $olt['rx_power'] ?? null,
+                                'tx_power' => $olt['tx_power'] ?? null,
+                                'last_checked_at' => now(),
+                            ]
+                        );
+                        Log::info('Snapshot OLT KUWU C20 diperbarui dari event PPP UP.', [
+                            'pelanggan_id' => $customer->id,
+                            'username' => $customer->username_pppoe,
+                            'onu' => $olt['onu'],
+                        ]);
+                    } else {
+                        Log::warning('Refresh OLT saat PPP UP tidak menemukan ONU; snapshot lama dipertahankan.', [
+                            'pelanggan_id' => $customer->id,
+                            'username' => $customer->username_pppoe,
+                        ]);
+                    }
+                } catch (Throwable $oltError) {
+                    Log::warning('Refresh OLT dari event PPP UP gagal; snapshot lama dipertahankan.', [
+                        'pelanggan_id' => $customer->id,
+                        'error' => $oltError->getMessage(),
+                    ]);
+                }
+            }
+
+            // Refresh snapshot tetap dilakukan walau tidak ada notifikasi DOWN sebelumnya.
+            if (!Cache::has($notifiedKey)) {
                 return;
             }
 
