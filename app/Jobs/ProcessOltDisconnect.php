@@ -11,6 +11,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use App\Services\MikroTikService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -120,7 +122,42 @@ class ProcessOltDisconnect implements ShouldQueue
                 }
             }
 
-            if (!$this->sendTelegram($customer, $snapshot)) {
+            DB::table('ppp_disconnect_events')->insertOrIgnore([
+                'event_id' => $this->eventId,
+                'router_id' => $customer->router_id,
+                'pelanggan_id' => $customer->id,
+                'occurred_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $dailyCount = DB::table('ppp_disconnect_events')
+                ->where('router_id', $customer->router_id)
+                ->whereDate('occurred_at', today())
+                ->count();
+
+            $offlineCount = null;
+            try {
+                $eligible = Pelanggan::query()
+                    ->where('router_id', $customer->router_id)
+                    ->where('status', Pelanggan::AKTIF)
+                    ->whereNotNull('username_pppoe')
+                    ->where('username_pppoe', '<>', '')
+                    ->whereHas('paket', fn ($q) => $q->whereRaw('UPPER(TRIM(profile_mikrotik)) = ?', ['C20']))
+                    ->pluck('username_pppoe')
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter()
+                    ->values();
+                $activeNames = collect(app(MikroTikService::class)->getActiveSessions($customer->router))
+                    ->pluck('name')->map(fn ($name) => trim((string) $name))->all();
+                $offlineCount = $eligible->diff($activeNames)->count();
+            } catch (Throwable $countError) {
+                Log::warning('Gagal menghitung pelanggan offline KUWU C20.', [
+                    'error' => $countError->getMessage(),
+                ]);
+            }
+
+            if (!$this->sendTelegram($customer, $snapshot, $offlineCount, $dailyCount)) {
                 throw new RuntimeException('Telegram gagal mengirim notifikasi PPP KUWU terputus.');
             }
 
@@ -146,7 +183,7 @@ class ProcessOltDisconnect implements ShouldQueue
         }
     }
 
-    private function sendTelegram(Pelanggan $customer, array $snapshot): bool
+    private function sendTelegram(Pelanggan $customer, array $snapshot, ?int $offlineCount, int $dailyCount): bool
     {
         $botToken = config('services.telegram.bot_token');
         $chatId = config('services.telegram.chat_id');
@@ -161,7 +198,9 @@ class ProcessOltDisconnect implements ShouldQueue
             '<b>Pelanggan:</b> ' . $this->escape((string) $customer->nama),
             '<b>Kode:</b> ' . $this->escape((string) ($customer->kode_pelanggan ?? '-')),
             '<b>Router:</b> KUWU',
-            '<b>Username:</b> ' . $this->escape((string) $customer->username_pppoe),
+            '<b>User:</b> ' . $this->escape((string) $customer->username_pppoe),
+            '<b>Caller ID:</b> ' . $this->escape((string) ($customer->mac_address ?: '-')),
+            '<b>Profile:</b> C20',
             '<b>Status:</b> PPP DISCONNECTED',
             '<b>ONU:</b> ' . $this->escape((string) ($snapshot['onu'] ?: '-')),
         ];
@@ -186,6 +225,9 @@ class ProcessOltDisconnect implements ShouldQueue
         if (!empty($snapshot['distance'])) $lines[] = '<b>Jarak terakhir:</b> ' . $this->escape((string) $snapshot['distance']) . ' m';
         if (!empty($snapshot['rx_power'])) $lines[] = '<b>RX Power terakhir:</b> ' . $this->escape((string) $snapshot['rx_power']) . ' dBm';
         if (!empty($snapshot['tx_power'])) $lines[] = '<b>TX Power terakhir:</b> ' . $this->escape((string) $snapshot['tx_power']) . ' dBm';
+
+        $lines[] = '<b>Jumlah Pelanggan Offline:</b> ' . ($offlineCount === null ? 'Tidak dapat dibaca' : $offlineCount);
+        $lines[] = '<b>Jumlah Gangguan Hari Ini:</b> ' . $dailyCount . 'x';
 
         if (is_numeric($customer->latitude) && is_numeric($customer->longitude)) {
             $url = 'https://www.google.com/maps?q=' . rawurlencode($customer->latitude . ',' . $customer->longitude);
