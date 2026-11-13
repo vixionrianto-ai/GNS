@@ -20,6 +20,27 @@ if ! docker exec gns-php php -v >/dev/null 2>&1; then
   exit 1
 fi
 
+# Matikan hanya jadwal polling OLT; pertahankan seluruh jadwal produksi lainnya.
+ROUTES="$ROOT/routes/console.php"
+if [ ! -f "$ROUTES" ]; then
+  echo "ERROR: routes/console.php tidak ditemukan."
+  exit 1
+fi
+if grep -q "Schedule::command('olt:monitor')" "$ROUTES"; then
+  mkdir -p "$ROOT/storage/app/backups"
+  cp -a "$ROUTES" "$ROOT/storage/app/backups/routes-console-before-disable-olt-$STAMP.php"
+  python3 - "$ROUTES" <<'PY'
+import pathlib, re, sys
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+pattern = r"(?m)^Schedule::command\('olt:monitor'\)\s*\n\s*->everyFiveMinutes\(\)\s*\n\s*->withoutOverlapping\(\)\s*\n\s*->runInBackground\(\);\s*\n"
+new, count = re.subn(pattern, "", s)
+if count != 1:
+    raise SystemExit(f"ERROR: ditemukan {count} blok jadwal OLT; file tidak diubah.")
+p.write_text(new)
+PY
+fi
+
 echo "==> Mengambil branch patch dari GitHub..."
 git fetch origin "$BRANCH"
 
