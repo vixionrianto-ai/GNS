@@ -175,7 +175,6 @@ class ProcessOltDisconnect implements ShouldQueue
             $lines[] = '<b>Status ONU:</b> Tidak ditemukan / tidak dapat diverifikasi saat pemeriksaan OLT';
             $lines[] = '<i>LOS atau Wire Down belum dapat dipastikan.</i>';
         }
-        ];
 
         if (!empty($snapshot['last_checked_at'])) {
             $checkedAt = $snapshot['last_checked_at'] instanceof \DateTimeInterface
