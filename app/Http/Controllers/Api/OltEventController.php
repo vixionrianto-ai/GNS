@@ -44,7 +44,7 @@ class OltEventController extends Controller
         }
 
         $customer = Pelanggan::query()
-            ->with('router')
+            ->with(['router', 'paket'])
             ->where('router_id', $router->id)
             ->where('username_pppoe', $validated['username'])
             ->where('status', Pelanggan::AKTIF)
@@ -52,6 +52,11 @@ class OltEventController extends Controller
 
         if (!$customer || !$customer->router) {
             return response()->json(['ok' => false, 'message' => 'Pelanggan aktif tidak ditemukan'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Endpoint event ini khusus pelanggan dengan PPP Profile C20.
+        if (strtoupper(trim((string) ($customer->paket?->profile_mikrotik ?? ''))) !== 'C20') {
+            return response()->json(['ok' => false, 'message' => 'Event hanya diizinkan untuk PPP Profile C20'], Response::HTTP_FORBIDDEN);
         }
 
         $pendingKey = 'olt:kuwu:pending-down:' . $customer->id;
