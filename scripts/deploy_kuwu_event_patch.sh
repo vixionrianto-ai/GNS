@@ -32,6 +32,7 @@ FILES=(
   "app/Http/Controllers/Api/OltEventController.php"
   "app/Jobs/ProcessOltDisconnect.php"
   "app/Jobs/ProcessOltRecovery.php"
+  "app/Services/OltMonitoringService.php"
 )
 
 cleanup() { rm -rf "$TMP"; }
@@ -56,7 +57,7 @@ for file in "${FILES[@]}"; do
   docker exec -i gns-php php -l < "$TMP/$file"
 done
 
-echo "==> Memasang tiga file KUWU..."
+echo "==> Memasang empat file KUWU..."
 for file in "${FILES[@]}"; do
   mkdir -p "$ROOT/$(dirname "$file")"
   install -m 0644 "$TMP/$file" "$ROOT/$file"
@@ -65,7 +66,8 @@ done
 echo "==> Memeriksa file setelah dipasang..."
 if ! docker exec -w /config/www gns-php php -l app/Http/Controllers/Api/OltEventController.php ||
    ! docker exec -w /config/www gns-php php -l app/Jobs/ProcessOltDisconnect.php ||
-   ! docker exec -w /config/www gns-php php -l app/Jobs/ProcessOltRecovery.php; then
+   ! docker exec -w /config/www gns-php php -l app/Jobs/ProcessOltRecovery.php ||
+   ! docker exec -w /config/www gns-php php -l app/Services/OltMonitoringService.php; then
   echo "ERROR: pemeriksaan gagal. Mengembalikan backup..."
   for file in "${FILES[@]}"; do
     if [ -f "$BACKUP/$file" ]; then
@@ -79,6 +81,6 @@ if ! docker exec -w /config/www gns-php php -l app/Http/Controllers/Api/OltEvent
 fi
 
 echo
-echo "BERHASIL: tiga file KUWU terpasang dan lolos php -l."
+echo "BERHASIL: empat file KUWU terpasang dan lolos php -l."
 echo "Backup lama: $BACKUP"
 echo "Belum ada container yang direstart."
