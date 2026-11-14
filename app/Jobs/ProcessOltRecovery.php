@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\OltOnuState;
 use App\Models\Pelanggan;
 use App\Services\OltService;
+use App\Services\MikroTikService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -98,13 +99,42 @@ class ProcessOltRecovery implements ShouldQueue
             }
 
             $state = OltOnuState::where('pelanggan_id', $customer->id)->first();
+
+            // Tampilkan kondisi offline terkini untuk seluruh pelanggan aktif KUWU C20.
+            $offlineCount = null;
+            try {
+                $eligible = Pelanggan::query()
+                    ->where('router_id', $customer->router_id)
+                    ->where('status', Pelanggan::AKTIF)
+                    ->whereNotNull('username_pppoe')
+                    ->where('username_pppoe', '<>', '')
+                    ->whereHas('paket', fn ($q) => $q->whereRaw('UPPER(TRIM(profile_mikrotik)) = ?', ['C20']))
+                    ->pluck('username_pppoe')
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter()
+                    ->values();
+
+                $activeNames = collect(app(MikroTikService::class)->getActiveSessions($customer->router))
+                    ->pluck('name')
+                    ->map(fn ($name) => trim((string) $name))
+                    ->all();
+
+                $offlineCount = $eligible->diff($activeNames)->count();
+            } catch (Throwable $countError) {
+                Log::warning('Gagal menghitung pelanggan offline KUWU C20 pada notifikasi recovery.', [
+                    'pelanggan_id' => $customer->id,
+                    'error' => $countError->getMessage(),
+                ]);
+            }
+
             if (!$this->sendTelegram($customer, [
+
                 'onu' => $state?->onu,
                 'distance' => $state?->distance,
                 'rx_power' => $state?->rx_power,
                 'tx_power' => $state?->tx_power,
                 'last_checked_at' => $state?->last_checked_at,
-            ])) {
+            ], $offlineCount)) {
                 throw new \RuntimeException('Telegram gagal mengirim notifikasi pemulihan PPP KUWU.');
             }
 
@@ -125,7 +155,7 @@ class ProcessOltRecovery implements ShouldQueue
         }
     }
 
-    private function sendTelegram(Pelanggan $customer, array $snapshot): bool
+    private function sendTelegram(Pelanggan $customer, array $snapshot, ?int $offlineCount): bool
     {
         $botToken = config('services.telegram.bot_token');
         $chatId = config('services.telegram.chat_id');
@@ -155,6 +185,8 @@ class ProcessOltRecovery implements ShouldQueue
         if (!empty($snapshot['distance'])) $lines[] = '<b>Jarak terakhir:</b> ' . $this->escape((string) $snapshot['distance']) . ' m';
         if (!empty($snapshot['rx_power'])) $lines[] = '<b>RX Power terakhir:</b> ' . $this->escape((string) $snapshot['rx_power']) . ' dBm';
         if (!empty($snapshot['tx_power'])) $lines[] = '<b>TX Power terakhir:</b> ' . $this->escape((string) $snapshot['tx_power']) . ' dBm';
+
+        $lines[] = '<b>Jumlah Pelanggan Offline:</b> ' . ($offlineCount === null ? 'Tidak dapat dibaca' : $offlineCount);
 
         if (is_numeric($customer->latitude) && is_numeric($customer->longitude)) {
             $url = 'https://www.google.com/maps?q=' . rawurlencode($customer->latitude . ',' . $customer->longitude);
