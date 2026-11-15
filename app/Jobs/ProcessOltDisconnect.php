@@ -137,6 +137,7 @@ class ProcessOltDisconnect implements ShouldQueue
                 ->count();
 
             $offlineCount = null;
+            $offlineCustomers = null;
             try {
                 $eligible = Pelanggan::query()
                     ->where('router_id', $customer->router_id)
@@ -144,20 +145,27 @@ class ProcessOltDisconnect implements ShouldQueue
                     ->whereNotNull('username_pppoe')
                     ->where('username_pppoe', '<>', '')
                     ->whereHas('paket', fn ($q) => $q->whereRaw('UPPER(TRIM(profile_mikrotik)) = ?', ['C20']))
-                    ->pluck('username_pppoe')
+                    ->get(['id', 'nama', 'username_pppoe']);
+
+                $activeNames = collect(app(MikroTikService::class)->getActiveSessions($customer->router))
+                    ->pluck('name')
                     ->map(fn ($name) => trim((string) $name))
                     ->filter()
+                    ->all();
+
+                $activeLookup = array_fill_keys($activeNames, true);
+                $offlineCustomers = $eligible
+                    ->filter(fn ($item) => !isset($activeLookup[trim((string) $item->username_pppoe)]))
                     ->values();
-                $activeNames = collect(app(MikroTikService::class)->getActiveSessions($customer->router))
-                    ->pluck('name')->map(fn ($name) => trim((string) $name))->all();
-                $offlineCount = $eligible->diff($activeNames)->count();
+
+                $offlineCount = $offlineCustomers->count();
             } catch (Throwable $countError) {
-                Log::warning('Gagal menghitung pelanggan offline KUWU C20.', [
+                Log::warning('Gagal menghitung daftar pelanggan offline KUWU C20.', [
                     'error' => $countError->getMessage(),
                 ]);
             }
 
-            if (!$this->sendTelegram($customer, $snapshot, $offlineCount, $dailyCount)) {
+            if (!$this->sendTelegram($customer, $snapshot, $offlineCount, $dailyCount, $offlineCustomers)) {
                 throw new RuntimeException('Telegram gagal mengirim notifikasi PPP KUWU terputus.');
             }
 
@@ -183,7 +191,7 @@ class ProcessOltDisconnect implements ShouldQueue
         }
     }
 
-    private function sendTelegram(Pelanggan $customer, array $snapshot, ?int $offlineCount, int $dailyCount): bool
+    private function sendTelegram(Pelanggan $customer, array $snapshot, ?int $offlineCount, int $dailyCount, $offlineCustomers): bool
     {
         $botToken = config('services.telegram.bot_token');
         $chatId = config('services.telegram.chat_id');
@@ -227,6 +235,19 @@ class ProcessOltDisconnect implements ShouldQueue
         if (!empty($snapshot['tx_power'])) $lines[] = '<b>TX Power terakhir:</b> ' . $this->escape((string) $snapshot['tx_power']) . ' dBm';
 
         $lines[] = '<b>Jumlah Pelanggan Offline:</b> ' . ($offlineCount === null ? 'Tidak dapat dibaca' : $offlineCount);
+        if ($offlineCustomers !== null) {
+            $lines[] = '<b>Daftar Pelanggan Offline KUWU C20:</b>';
+            if ($offlineCustomers->isEmpty()) {
+                $lines[] = '- Tidak ada';
+            } else {
+                foreach ($offlineCustomers as $offlineCustomer) {
+                    $displayName = trim((string) $offlineCustomer->nama) ?: (string) $offlineCustomer->username_pppoe;
+                    $lines[] = '• ' . $this->escape($displayName) . ' (' . $this->escape((string) $offlineCustomer->username_pppoe) . ')';
+                }
+            }
+        } else {
+            $lines[] = '<i>Daftar pelanggan offline tidak dapat dibaca dari MikroTik.</i>';
+        }
         $lines[] = '<b>Jumlah Gangguan Hari Ini:</b> ' . $dailyCount . 'x';
 
         if (is_numeric($customer->latitude) && is_numeric($customer->longitude)) {
