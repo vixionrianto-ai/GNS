@@ -224,10 +224,22 @@ class ProcessOltDisconnect implements ShouldQueue
         }
 
         if (!empty($snapshot['last_checked_at'])) {
-            $checkedAt = $snapshot['last_checked_at'] instanceof \DateTimeInterface
-                ? $snapshot['last_checked_at']->format('d-m-Y H:i:s')
-                : (string) $snapshot['last_checked_at'];
-            $lines[] = '<b>Data optik terakhir dibaca:</b> ' . $this->escape($checkedAt);
+            $checkedAt = \Illuminate\Support\Carbon::parse($snapshot['last_checked_at'])
+                ->timezone(config('app.timezone', 'Asia/Jakarta'));
+            $ageSeconds = max(0, (int) $checkedAt->diffInSeconds(now()));
+            $ageDays = intdiv($ageSeconds, 86400);
+            $ageHours = intdiv($ageSeconds % 86400, 3600);
+            $ageMinutes = intdiv($ageSeconds % 3600, 60);
+            $ageParts = [];
+            if ($ageDays > 0) $ageParts[] = $ageDays . ' hari';
+            if ($ageHours > 0) $ageParts[] = $ageHours . ' jam';
+            if ($ageDays === 0 && $ageMinutes > 0) $ageParts[] = $ageMinutes . ' menit';
+            $ageText = $ageParts ? implode(' ', $ageParts) : 'kurang dari 1 menit';
+
+            $lines[] = '<b>Data optik terakhir berhasil dibaca (WIB):</b> ' . $this->escape($checkedAt->format('d-m-Y H:i:s'));
+            $lines[] = '<b>Usia data optik:</b> ' . $this->escape($ageText);
+        } else {
+            $lines[] = '<b>Data optik terakhir:</b> Belum tersedia';
         }
 
         if (!empty($snapshot['distance'])) $lines[] = '<b>Jarak terakhir:</b> ' . $this->escape((string) $snapshot['distance']) . ' m';
